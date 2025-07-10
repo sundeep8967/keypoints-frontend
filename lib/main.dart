@@ -20,6 +20,11 @@ void main() async {
     ),
   );
   
+  // Enable edge-to-edge mode
+  SystemChrome.setEnabledSystemUIMode(
+    SystemUiMode.edgeToEdge,
+  );
+  
   // Initialize Firebase (skip for now to test basic app)
   try {
     // Commented out for initial testing without Firebase setup
