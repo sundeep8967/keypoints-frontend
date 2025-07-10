@@ -49,7 +49,7 @@ class KeyPointsApp extends StatelessWidget {
       theme: const CupertinoThemeData(
         brightness: Brightness.light,
         primaryColor: CupertinoColors.systemBlue,
-        scaffoldBackgroundColor: CupertinoColors.systemGroupedBackground,
+        scaffoldBackgroundColor: CupertinoColors.transparent,
       ),
       home: const HomeScreen(),
       debugShowCheckedModeBanner: false,

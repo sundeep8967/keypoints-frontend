@@ -57,8 +57,9 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
+      backgroundColor: CupertinoColors.transparent,
       navigationBar: CupertinoNavigationBar(
-        backgroundColor: CupertinoColors.systemBackground,
+        backgroundColor: CupertinoColors.transparent,
         border: null,
         middle: const Text(
           'KeyPoints',
@@ -182,7 +183,6 @@ class _HomeScreenState extends State<HomeScreen> {
     return Container(
       width: double.infinity,
       height: double.infinity,
-      color: CupertinoColors.systemBackground.resolveFrom(context),
       child: Stack(
         children: [
           // Background Image
