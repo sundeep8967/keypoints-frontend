@@ -4,6 +4,7 @@ class NewsArticle {
   final String description;
   final String imageUrl;
   final DateTime timestamp;
+  final String category;
 
   NewsArticle({
     required this.id,
@@ -11,6 +12,7 @@ class NewsArticle {
     required this.description,
     required this.imageUrl,
     required this.timestamp,
+    this.category = 'General',
   });
 
   factory NewsArticle.fromFirestore(Map<String, dynamic> data, String id) {
@@ -20,6 +22,7 @@ class NewsArticle {
       description: data['description'] ?? '',
       imageUrl: data['image'] ?? '',
       timestamp: data['timestamp']?.toDate() ?? DateTime.now(),
+      category: data['category'] ?? 'General',
     );
   }
 
@@ -29,6 +32,7 @@ class NewsArticle {
       'description': description,
       'image': imageUrl,
       'timestamp': timestamp,
+      'category': category,
     };
   }
 }

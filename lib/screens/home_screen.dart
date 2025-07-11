@@ -6,6 +6,7 @@ import '../services/firebase_service.dart';
 import '../widgets/news_card.dart';
 import 'news_detail_screen.dart';
 import 'admin_screen.dart';
+import 'color_demo_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -68,19 +69,38 @@ class _HomeScreenState extends State<HomeScreen> {
             fontWeight: FontWeight.w600,
           ),
         ),
-        trailing: CupertinoButton(
-          padding: EdgeInsets.zero,
-          onPressed: () {
-            Navigator.of(context).push(
-              CupertinoPageRoute(
-                builder: (context) => const AdminScreen(),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CupertinoButton(
+              padding: EdgeInsets.zero,
+              onPressed: () {
+                Navigator.of(context).push(
+                  CupertinoPageRoute(
+                    builder: (context) => const ColorDemoScreen(),
+                  ),
+                );
+              },
+              child: const Icon(
+                CupertinoIcons.color_filter,
+                color: CupertinoColors.systemPurple,
               ),
-            );
-          },
-          child: const Icon(
-            CupertinoIcons.settings,
-            color: CupertinoColors.systemBlue,
-          ),
+            ),
+            CupertinoButton(
+              padding: EdgeInsets.zero,
+              onPressed: () {
+                Navigator.of(context).push(
+                  CupertinoPageRoute(
+                    builder: (context) => const AdminScreen(),
+                  ),
+                );
+              },
+              child: const Icon(
+                CupertinoIcons.settings,
+                color: CupertinoColors.systemBlue,
+              ),
+            ),
+          ],
         ),
       ),
       child: SafeArea(
