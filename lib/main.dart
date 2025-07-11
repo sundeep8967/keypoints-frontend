@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
-import 'screens/home_screen.dart';
+import 'screens/color_demo_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -51,7 +51,7 @@ class KeyPointsApp extends StatelessWidget {
         primaryColor: CupertinoColors.systemBlue,
         scaffoldBackgroundColor: CupertinoColors.transparent,
       ),
-      home: const HomeScreen(),
+      home: const ColorDemoScreen(),
       debugShowCheckedModeBanner: false,
     );
   }

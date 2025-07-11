@@ -21,8 +21,6 @@ class DynamicColorNewsCard extends StatefulWidget {
 
 class _DynamicColorNewsCardState extends State<DynamicColorNewsCard> {
   Color _dominantColor = const Color(0xFF4B5563);
-  Color _textColor = Colors.white;
-  bool _isColorExtracted = false;
 
   @override
   void initState() {
@@ -39,224 +37,140 @@ class _DynamicColorNewsCardState extends State<DynamicColorNewsCard> {
       if (mounted) {
         setState(() {
           _dominantColor = dominantColor;
-          _textColor = ColorExtractionService.getContrastingTextColor(dominantColor);
-          _isColorExtracted = true;
         });
       }
     } catch (e) {
-      print('Error extracting color for ${widget.article.title}: $e');
-      // Keep default colors
+      // Keep default color on error
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: _dominantColor.withOpacity(0.3),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       child: CupertinoButton(
         padding: EdgeInsets.zero,
         onPressed: widget.onTap,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(16),
-          child: Container(
-            height: 280,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  _dominantColor.withOpacity(0.8),
-                  _dominantColor,
-                ],
-              ),
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                _dominantColor.withOpacity(0.08),
+                _dominantColor.withOpacity(0.12),
+              ],
             ),
-            child: Stack(
-              children: [
-                // Background Image with Overlay
-                Positioned.fill(
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: _dominantColor.withOpacity(0.15),
+              width: 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: _dominantColor.withOpacity(0.15),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
+                spreadRadius: 0,
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Image Section
+              ClipRRect(
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                child: AspectRatio(
+                  aspectRatio: 1.6,
                   child: CachedNetworkImage(
                     imageUrl: widget.article.imageUrl,
                     fit: BoxFit.cover,
+                    width: double.infinity,
                     placeholder: (context, url) => Container(
-                      color: _dominantColor.withOpacity(0.3),
-                      child: Center(
-                        child: CupertinoActivityIndicator(
-                          color: _textColor,
-                        ),
+                      color: CupertinoColors.systemGrey6.resolveFrom(context),
+                      child: const Center(
+                        child: CupertinoActivityIndicator(),
                       ),
                     ),
                     errorWidget: (context, url, error) => Container(
-                      color: _dominantColor.withOpacity(0.3),
+                      color: CupertinoColors.systemGrey6.resolveFrom(context),
                       child: Center(
                         child: Icon(
                           CupertinoIcons.photo,
-                          size: 60,
-                          color: _textColor.withOpacity(0.7),
+                          size: 40,
+                          color: CupertinoColors.systemGrey3.resolveFrom(context),
                         ),
                       ),
                     ),
                   ),
                 ),
-                
-                // Gradient Overlay
-                Positioned.fill(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.transparent,
-                          _dominantColor.withOpacity(0.7),
-                          _dominantColor.withOpacity(0.9),
-                        ],
-                        stops: const [0.0, 0.6, 1.0],
+              ),
+              
+              // Content Section
+              Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Timestamp
+                    Text(
+                      _formatTimestamp(widget.article.timestamp),
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: CupertinoColors.systemGrey.resolveFrom(context),
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
-                  ),
+                    
+                    const SizedBox(height: 12),
+                    
+                    // Title
+                    Text(
+                      widget.article.title,
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w700,
+                        color: CupertinoColors.label.resolveFrom(context),
+                        height: 1.3,
+                        letterSpacing: -0.5,
+                      ),
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    
+                    const SizedBox(height: 12),
+                    
+                    // Description
+                    Text(
+                      widget.article.description,
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: CupertinoColors.secondaryLabel.resolveFrom(context),
+                        height: 1.5,
+                        letterSpacing: 0.1,
+                      ),
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    
+                    const SizedBox(height: 20),
+                    
+                    // Read More Indicator
+                    Row(
+                      children: [
+                        const Spacer(),
+                        Icon(
+                          CupertinoIcons.chevron_right,
+                          size: 16,
+                          color: _dominantColor,
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-                
-                // Content
-                Positioned(
-                  left: 20,
-                  right: 20,
-                  bottom: 20,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Color extraction indicator
-                      if (_isColorExtracted)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: _textColor.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                width: 8,
-                                height: 8,
-                                decoration: BoxDecoration(
-                                  color: _dominantColor,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: _textColor.withOpacity(0.5),
-                                    width: 1,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                'Dynamic Color',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  color: _textColor.withOpacity(0.8),
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      
-                      const SizedBox(height: 12),
-                      
-                      // Title
-                      Text(
-                        widget.article.title,
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: _textColor,
-                          height: 1.2,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      
-                      const SizedBox(height: 8),
-                      
-                      // Description
-                      Text(
-                        widget.article.description,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: _textColor.withOpacity(0.9),
-                          height: 1.4,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      
-                      const SizedBox(height: 12),
-                      
-                      // Timestamp and Read More
-                      Row(
-                        children: [
-                          Text(
-                            _formatTimestamp(widget.article.timestamp),
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: _textColor.withOpacity(0.8),
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          const Spacer(),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: _textColor.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(
-                                color: _textColor.withOpacity(0.3),
-                                width: 1,
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  'Read More',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: _textColor,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                const SizedBox(width: 4),
-                                Icon(
-                                  CupertinoIcons.arrow_right,
-                                  size: 12,
-                                  color: _textColor,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),

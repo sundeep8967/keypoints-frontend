@@ -107,10 +107,10 @@ class _ColorDemoScreenState extends State<ColorDemoScreen> {
       backgroundColor: CupertinoColors.systemGroupedBackground,
       navigationBar: const CupertinoNavigationBar(
         backgroundColor: CupertinoColors.systemBackground,
-        middle: Text(
-          'Dynamic Color Demo',
+        middle: const Text(
+          'KeyPoints',
           style: TextStyle(
-            fontSize: 18,
+            fontSize: 20,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -134,14 +134,6 @@ class _ColorDemoScreenState extends State<ColorDemoScreen> {
               style: TextStyle(
                 fontSize: 16,
                 color: CupertinoColors.secondaryLabel,
-              ),
-            ),
-            SizedBox(height: 8),
-            Text(
-              'Extracting colors from images',
-              style: TextStyle(
-                fontSize: 14,
-                color: CupertinoColors.tertiaryLabel,
               ),
             ),
           ],
@@ -180,60 +172,8 @@ class _ColorDemoScreenState extends State<ColorDemoScreen> {
 
     return CustomScrollView(
       slivers: [
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Dynamic Color Extraction',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: CupertinoColors.label,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Each card automatically extracts the dominant color from its image and adjusts the design accordingly.',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: CupertinoColors.secondaryLabel,
-                    height: 1.4,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: CupertinoColors.systemBlue.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(
-                        CupertinoIcons.info,
-                        color: CupertinoColors.systemBlue,
-                        size: 20,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Android only - Uses Chaquopy Python integration',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: CupertinoColors.systemBlue,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
+        CupertinoSliverRefreshControl(
+          onRefresh: _loadDemoArticles,
         ),
         SliverList(
           delegate: SliverChildBuilderDelegate(
@@ -242,8 +182,7 @@ class _ColorDemoScreenState extends State<ColorDemoScreen> {
               return DynamicColorNewsCard(
                 article: article,
                 onTap: () {
-                  // Show color info
-                  _showColorInfo(article);
+                  // Navigate to article detail
                 },
               );
             },
@@ -257,36 +196,4 @@ class _ColorDemoScreenState extends State<ColorDemoScreen> {
     );
   }
 
-  void _showColorInfo(NewsArticle article) {
-    showCupertinoDialog(
-      context: context,
-      builder: (context) => CupertinoAlertDialog(
-        title: const Text('Dynamic Color Feature'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 8),
-            Text('Article: ${article.title}'),
-            const SizedBox(height: 12),
-            const Text(
-              'This card uses Python\'s ColorThief library to extract the dominant color from the image and automatically adjusts:',
-              style: TextStyle(fontSize: 14),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              '• Background gradient\n• Text color for contrast\n• Shadow color\n• Button styling',
-              style: TextStyle(fontSize: 13),
-              textAlign: TextAlign.left,
-            ),
-          ],
-        ),
-        actions: [
-          CupertinoDialogAction(
-            child: const Text('Got it'),
-            onPressed: () => Navigator.of(context).pop(),
-          ),
-        ],
-      ),
-    );
-  }
 }
