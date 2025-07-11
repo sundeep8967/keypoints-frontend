@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 import '../models/news_article.dart';
-import '../services/color_extraction_service.dart';
 
 class DynamicColorNewsCard extends StatefulWidget {
   final NewsArticle article;
@@ -30,13 +29,24 @@ class _DynamicColorNewsCardState extends State<DynamicColorNewsCard> {
 
   Future<void> _extractColor() async {
     try {
-      final dominantColor = await ColorExtractionService.extractDominantColorFromUrl(
-        widget.article.imageUrl,
-      );
+      // Simple color generation based on article title hash
+      final hash = widget.article.title.hashCode;
+      final colors = [
+        const Color(0xFF6366F1), // Indigo
+        const Color(0xFF8B5CF6), // Violet
+        const Color(0xFF06B6D4), // Cyan
+        const Color(0xFF10B981), // Emerald
+        const Color(0xFFF59E0B), // Amber
+        const Color(0xFFEF4444), // Red
+        const Color(0xFFEC4899), // Pink
+        const Color(0xFF84CC16), // Lime
+      ];
+      
+      final selectedColor = colors[hash.abs() % colors.length];
       
       if (mounted) {
         setState(() {
-          _dominantColor = dominantColor;
+          _dominantColor = selectedColor;
         });
       }
     } catch (e) {

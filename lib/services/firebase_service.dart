@@ -1,6 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/news_article.dart';
-import 'data_import_service.dart';
 
 class FirebaseService {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -32,7 +31,7 @@ class FirebaseService {
       // If no articles in Firebase, try to get data from GitHub
       if (articles.isEmpty) {
         print('No articles in Firebase, fetching from GitHub...');
-        articles = await DataImportService.getSampleData();
+        articles = _getSampleData();
       }
 
       return articles;
@@ -41,7 +40,7 @@ class FirebaseService {
       // Fallback to GitHub data if Firebase fails
       try {
         print('Falling back to GitHub data...');
-        return await DataImportService.getSampleData();
+        return _getSampleData();
       } catch (githubError) {
         print('Error fetching from GitHub: $githubError');
         return _getSampleData();
