@@ -11,15 +11,55 @@ class ColorDemoScreen extends StatefulWidget {
   State<ColorDemoScreen> createState() => _ColorDemoScreenState();
 }
 
-class _ColorDemoScreenState extends State<ColorDemoScreen> {
+class _ColorDemoScreenState extends State<ColorDemoScreen> with TickerProviderStateMixin {
   List<NewsArticle> _articles = [];
   bool _isLoading = true;
   String _error = '';
+  int _currentIndex = 0;
+  
+  // Animation controllers for swipe
+  late AnimationController _animationController;
+  late Animation<Offset> _slideAnimation;
+  late Animation<double> _rotationAnimation;
+  
+  // Drag state
+  Offset _dragOffset = Offset.zero;
+  bool _isDragging = false;
 
   @override
   void initState() {
     super.initState();
+    _setupAnimations();
     _loadDemoArticles();
+  }
+  
+  void _setupAnimations() {
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+    
+    _slideAnimation = Tween<Offset>(
+      begin: Offset.zero,
+      end: const Offset(2.0, 0.0),
+    ).animate(CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeInOut,
+    ));
+    
+    _rotationAnimation = Tween<double>(
+      begin: 0.0,
+      end: 0.3,
+    ).animate(CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeInOut,
+    ));
+  }
+  
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadDemoArticles() async {
@@ -194,6 +234,209 @@ class _ColorDemoScreenState extends State<ColorDemoScreen> {
         ),
       ],
     );
+  }
+
+  Widget _buildSwipableStack() {
+    if (_articles.isEmpty) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              CupertinoIcons.news,
+              size: 60,
+              color: CupertinoColors.systemGrey,
+            ),
+            SizedBox(height: 16),
+            Text(
+              'No more articles',
+              style: TextStyle(
+                fontSize: 18,
+                color: CupertinoColors.secondaryLabel,
+              ),
+            ),
+            SizedBox(height: 8),
+            Text(
+              'Pull to refresh for more stories',
+              style: TextStyle(
+                fontSize: 14,
+                color: CupertinoColors.tertiaryLabel,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Stack(
+      children: [
+        // Show up to 3 cards in stack
+        for (int i = _currentIndex; i < _currentIndex + 3 && i < _articles.length; i++)
+          _buildStackCard(_articles[i], i - _currentIndex),
+      ],
+    );
+  }
+
+  Widget _buildStackCard(NewsArticle article, int stackIndex) {
+    final scale = 1.0 - (stackIndex * 0.05);
+    final yOffset = stackIndex * 10.0;
+    
+    return Positioned.fill(
+      child: Transform.scale(
+        scale: scale,
+        child: Transform.translate(
+          offset: Offset(0, yOffset),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: stackIndex == 0 
+                ? _buildSwipableCard(article)
+                : _buildStaticCard(article),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSwipableCard(NewsArticle article) {
+    return GestureDetector(
+      onPanStart: (details) {
+        setState(() {
+          _isDragging = true;
+        });
+      },
+      onPanUpdate: (details) {
+        setState(() {
+          _dragOffset += details.delta;
+        });
+      },
+      onPanEnd: (details) {
+        final velocity = details.velocity.pixelsPerSecond.dx;
+        final threshold = MediaQuery.of(context).size.width * 0.3;
+        
+        if (_dragOffset.dx.abs() > threshold || velocity.abs() > 500) {
+          // Swipe detected
+          final isRightSwipe = _dragOffset.dx > 0 || velocity > 0;
+          _animateSwipe(isRightSwipe);
+        } else {
+          // Return to center
+          _resetCard();
+        }
+      },
+      child: AnimatedBuilder(
+        animation: _animationController,
+        builder: (context, child) {
+          final offset = _isDragging 
+              ? _dragOffset 
+              : _slideAnimation.value * MediaQuery.of(context).size.width;
+          
+          final rotation = _isDragging
+              ? _dragOffset.dx * 0.0005
+              : _rotationAnimation.value * (_slideAnimation.value.dx > 0 ? 1 : -1);
+          
+          return Transform.translate(
+            offset: offset,
+            child: Transform.rotate(
+              angle: rotation,
+              child: DynamicColorNewsCard(
+                article: article,
+                onTap: () {
+                  // Navigate to article detail
+                },
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildStaticCard(NewsArticle article) {
+    return DynamicColorNewsCard(
+      article: article,
+      onTap: null, // Disable tap for background cards
+    );
+  }
+
+  Widget _buildActionButton({
+    required IconData icon,
+    required Color color,
+    required VoidCallback onPressed,
+  }) {
+    return CupertinoButton(
+      onPressed: onPressed,
+      padding: EdgeInsets.zero,
+      child: Container(
+        width: 60,
+        height: 60,
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: color.withOpacity(0.3),
+            width: 2,
+          ),
+        ),
+        child: Icon(
+          icon,
+          color: color,
+          size: 28,
+        ),
+      ),
+    );
+  }
+
+  void _animateSwipe(bool isRightSwipe) {
+    _slideAnimation = Tween<Offset>(
+      begin: Offset.zero,
+      end: Offset(isRightSwipe ? 2.0 : -2.0, 0.0),
+    ).animate(CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeInOut,
+    ));
+    
+    _animationController.forward().then((_) {
+      _nextCard();
+      _resetCard();
+      final message = isRightSwipe ? 'Liked!' : 'Passed';
+      _showFeedback(message, isRightSwipe);
+    });
+  }
+  
+  void _resetCard() {
+    setState(() {
+      _dragOffset = Offset.zero;
+      _isDragging = false;
+    });
+    _animationController.reset();
+  }
+  
+  void _nextCard() {
+    setState(() {
+      _currentIndex++;
+      if (_currentIndex >= _articles.length) {
+        _currentIndex = 0; // Loop back to start
+      }
+    });
+  }
+  
+  void _swipeCard(bool liked) {
+    if (_currentIndex < _articles.length && !_isDragging) {
+      _animateSwipe(liked);
+    }
+  }
+
+  void _bookmarkCard() {
+    if (_currentIndex < _articles.length) {
+      _showFeedback('Bookmarked!', true);
+      // Add bookmark logic here
+    }
+  }
+
+  void _showFeedback(String message, bool positive) {
+    final color = positive ? CupertinoColors.systemGreen : CupertinoColors.systemRed;
+    
+    // You can implement a toast or snackbar here
+    print(message); // For now, just print
   }
 
 }
