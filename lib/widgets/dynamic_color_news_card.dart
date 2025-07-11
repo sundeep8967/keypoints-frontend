@@ -89,27 +89,30 @@ class _DynamicColorNewsCardState extends State<DynamicColorNewsCard> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Image Section
-              ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-                child: AspectRatio(
-                  aspectRatio: 1.6,
-                  child: CachedNetworkImage(
-                    imageUrl: widget.article.imageUrl,
-                    fit: BoxFit.cover,
-                    width: double.infinity,
-                    placeholder: (context, url) => Container(
-                      color: CupertinoColors.systemGrey6.resolveFrom(context),
-                      child: const Center(
-                        child: CupertinoActivityIndicator(),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: AspectRatio(
+                    aspectRatio: 1.6,
+                    child: CachedNetworkImage(
+                      imageUrl: widget.article.imageUrl,
+                      fit: BoxFit.cover,
+                      width: double.infinity,
+                      placeholder: (context, url) => Container(
+                        color: CupertinoColors.systemGrey6.resolveFrom(context),
+                        child: const Center(
+                          child: CupertinoActivityIndicator(),
+                        ),
                       ),
-                    ),
-                    errorWidget: (context, url, error) => Container(
-                      color: CupertinoColors.systemGrey6.resolveFrom(context),
-                      child: Center(
-                        child: Icon(
-                          CupertinoIcons.photo,
-                          size: 40,
-                          color: CupertinoColors.systemGrey3.resolveFrom(context),
+                      errorWidget: (context, url, error) => Container(
+                        color: CupertinoColors.systemGrey6.resolveFrom(context),
+                        child: Center(
+                          child: Icon(
+                            CupertinoIcons.photo,
+                            size: 40,
+                            color: CupertinoColors.systemGrey3.resolveFrom(context),
+                          ),
                         ),
                       ),
                     ),
