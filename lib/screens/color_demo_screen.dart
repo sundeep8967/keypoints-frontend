@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/news_article.dart';
 import '../widgets/dynamic_color_news_card.dart';
 import '../services/firebase_service.dart';
+import '../services/color_extraction_service.dart';
 
 class ColorDemoScreen extends StatefulWidget {
   const ColorDemoScreen({super.key});
@@ -210,29 +211,28 @@ class _ColorDemoScreenState extends State<ColorDemoScreen> with TickerProviderSt
       );
     }
 
-    return CustomScrollView(
-      slivers: [
-        CupertinoSliverRefreshControl(
-          onRefresh: _loadDemoArticles,
-        ),
-        SliverList(
-          delegate: SliverChildBuilderDelegate(
-            (context, index) {
-              final article = _articles[index];
-              return DynamicColorNewsCard(
-                article: article,
-                onTap: () {
-                  // Navigate to article detail
-                },
-              );
-            },
-            childCount: _articles.length,
-          ),
-        ),
-        const SliverToBoxAdapter(
-          child: SizedBox(height: 20),
-        ),
-      ],
+    return PageView.builder(
+      scrollDirection: Axis.vertical,
+      physics: const ClampingScrollPhysics(),
+      itemCount: _articles.length,
+      controller: PageController(
+        viewportFraction: 1.0,
+        keepPage: true,
+      ),
+      pageSnapping: true,
+      onPageChanged: (index) {
+        setState(() {
+          _currentIndex = index;
+        });
+      },
+      itemBuilder: (context, index) {
+        final article = _articles[index];
+        return Container(
+          width: double.infinity,
+          height: double.infinity,
+          child: _buildFullScreenCard(article, index),
+        );
+      },
     );
   }
 
@@ -437,6 +437,323 @@ class _ColorDemoScreenState extends State<ColorDemoScreen> with TickerProviderSt
     
     // You can implement a toast or snackbar here
     print(message); // For now, just print
+  }
+
+  String _formatTimestamp(DateTime timestamp) {
+    final now = DateTime.now();
+    final difference = now.difference(timestamp);
+    
+    if (difference.inMinutes < 60) {
+      return '${difference.inMinutes}m ago';
+    } else if (difference.inHours < 24) {
+      return '${difference.inHours}h ago';
+    } else if (difference.inDays < 7) {
+      return '${difference.inDays}d ago';
+    } else {
+      return '${(difference.inDays / 7).floor()}w ago';
+    }
+  }
+
+  Widget _buildFullScreenCard(NewsArticle article, int index) {
+    return FutureBuilder<ColorPalette>(
+      future: ColorExtractionService.extractColorsFromImage(article.imageUrl),
+      builder: (context, snapshot) {
+        final palette = snapshot.data ?? ColorPalette.defaultPalette();
+        
+        return Container(
+          width: double.infinity,
+          height: double.infinity,
+          color: palette.primary,
+          child: Column(
+            children: [
+              // Top image section (like Inshorts)
+              Container(
+                height: MediaQuery.of(context).size.height * 0.3,
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                child: Stack(
+                  children: [
+                    // Image with rounded corners
+                    Positioned.fill(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: Image.network(
+                          article.imageUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Container(
+                              decoration: BoxDecoration(
+                                color: palette.secondary,
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Center(
+                                child: Icon(
+                                  CupertinoIcons.photo_fill,
+                                  size: 60,
+                                  color: palette.onPrimary.withOpacity(0.5),
+                                ),
+                              ),
+                            );
+                          },
+                          loadingBuilder: (context, child, loadingProgress) {
+                            if (loadingProgress == null) return child;
+                            return Container(
+                              decoration: BoxDecoration(
+                                color: palette.secondary,
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Center(
+                                child: CupertinoActivityIndicator(
+                                  color: palette.onPrimary,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                    
+                    // Top UI elements overlay
+                    Positioned(
+                      top: MediaQuery.of(context).padding.top + 20,
+                      left: 20,
+                      right: 20,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          // Category badge
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.9),
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.2),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Text(
+                              article.category.toUpperCase(),
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w800,
+                                color: palette.primary,
+                                letterSpacing: 1.0,
+                              ),
+                            ),
+                          ),
+                          
+                          // Page indicator
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.6),
+                              borderRadius: BorderRadius.circular(15),
+                            ),
+                            child: Text(
+                              '${index + 1} / ${_articles.length}',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              
+              // Bottom content section (like Inshorts)
+              Expanded(
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: palette.primary,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Title
+                      Text(
+                        article.title,
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w800,
+                          color: palette.onPrimary,
+                          height: 1.3,
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                      
+                      const SizedBox(height: 20),
+                      
+                      // Description
+                      Expanded(
+                        child: SingleChildScrollView(
+                          child: Text(
+                            article.description,
+                            style: TextStyle(
+                              fontSize: 18,
+                              color: palette.onPrimary.withOpacity(0.9),
+                              height: 1.6,
+                              letterSpacing: 0.2,
+                            ),
+                          ),
+                        ),
+                      ),
+                      
+                      const SizedBox(height: 24),
+                      
+                      // Bottom actions
+                      Row(
+                        children: [
+                          // Timestamp
+                          Expanded(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                              decoration: BoxDecoration(
+                                color: palette.onPrimary.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: palette.onPrimary.withOpacity(0.2),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Text(
+                                _formatTimestamp(article.timestamp),
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: palette.onPrimary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                          
+                          const SizedBox(width: 16),
+                          
+                          // Action buttons
+                          _buildInshortsActionButton(
+                            CupertinoIcons.heart_fill,
+                            palette.onPrimary,
+                            () {
+                              // Like action
+                            },
+                          ),
+                          const SizedBox(width: 12),
+                          _buildInshortsActionButton(
+                            CupertinoIcons.bookmark_fill,
+                            palette.onPrimary,
+                            () {
+                              // Bookmark action
+                            },
+                          ),
+                          const SizedBox(width: 12),
+                          _buildInshortsActionButton(
+                            CupertinoIcons.share_up,
+                            palette.onPrimary,
+                            () {
+                              // Share action
+                            },
+                          ),
+                        ],
+                      ),
+                      
+                      const SizedBox(height: 20),
+                      
+                      // Swipe indicator
+                      if (index < _articles.length - 1)
+                        Center(
+                          child: Column(
+                            children: [
+                              Icon(
+                                CupertinoIcons.chevron_up,
+                                color: palette.onPrimary.withOpacity(0.7),
+                                size: 20,
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Swipe up for next story',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: palette.onPrimary.withOpacity(0.7),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      
+                      SizedBox(height: MediaQuery.of(context).padding.bottom),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildVerticalActionButton(IconData icon, Color color, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 50,
+        height: 50,
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.2),
+          borderRadius: BorderRadius.circular(25),
+          border: Border.all(
+            color: Colors.white.withOpacity(0.3),
+            width: 2,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Icon(
+          icon,
+          size: 24,
+          color: Colors.white,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInshortsActionButton(IconData icon, Color color, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 48,
+        height: 48,
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: color.withOpacity(0.2),
+            width: 1.5,
+          ),
+        ),
+        child: Icon(
+          icon,
+          size: 22,
+          color: color,
+        ),
+      ),
+    );
   }
 
 }
