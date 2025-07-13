@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/news_article.dart';
 import '../widgets/dynamic_color_news_card.dart';
 import '../services/firebase_service.dart';
+import '../services/color_extraction_service.dart';
 
 class ColorDemoScreen extends StatefulWidget {
   const ColorDemoScreen({super.key});
@@ -144,20 +145,8 @@ class _ColorDemoScreenState extends State<ColorDemoScreen> with TickerProviderSt
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
-      backgroundColor: CupertinoColors.systemGroupedBackground,
-      navigationBar: const CupertinoNavigationBar(
-        backgroundColor: CupertinoColors.systemBackground,
-        middle: const Text(
-          'KeyPoints',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ),
-      child: SafeArea(
-        child: _buildBody(),
-      ),
+      backgroundColor: CupertinoColors.black,
+      child: _buildBody(),
     );
   }
 
@@ -210,30 +199,7 @@ class _ColorDemoScreenState extends State<ColorDemoScreen> with TickerProviderSt
       );
     }
 
-    return CustomScrollView(
-      slivers: [
-        CupertinoSliverRefreshControl(
-          onRefresh: _loadDemoArticles,
-        ),
-        SliverList(
-          delegate: SliverChildBuilderDelegate(
-            (context, index) {
-              final article = _articles[index];
-              return DynamicColorNewsCard(
-                article: article,
-                onTap: () {
-                  // Navigate to article detail
-                },
-              );
-            },
-            childCount: _articles.length,
-          ),
-        ),
-        const SliverToBoxAdapter(
-          child: SizedBox(height: 20),
-        ),
-      ],
-    );
+    return _buildVerticalSwipeView();
   }
 
   Widget _buildSwipableStack() {
@@ -437,6 +403,331 @@ class _ColorDemoScreenState extends State<ColorDemoScreen> with TickerProviderSt
     
     // You can implement a toast or snackbar here
     print(message); // For now, just print
+  }
+
+  String _formatTimestamp(DateTime timestamp) {
+    final now = DateTime.now();
+    final difference = now.difference(timestamp);
+    
+    if (difference.inMinutes < 60) {
+      return '${difference.inMinutes}m ago';
+    } else if (difference.inHours < 24) {
+      return '${difference.inHours}h ago';
+    } else if (difference.inDays < 7) {
+      return '${difference.inDays}d ago';
+    } else {
+      return '${(difference.inDays / 7).floor()}w ago';
+    }
+  }
+
+  Widget _buildVerticalSwipeView() {
+    return PageView.builder(
+      scrollDirection: Axis.vertical,
+      physics: const BouncingScrollPhysics(),
+      itemCount: _articles.length,
+      onPageChanged: (index) {
+        setState(() {
+          _currentIndex = index;
+        });
+      },
+      itemBuilder: (context, index) {
+        final article = _articles[index];
+        return _buildFullScreenCard(article, index);
+      },
+    );
+  }
+
+  Widget _buildFullScreenCard(NewsArticle article, int index) {
+    return FutureBuilder<ColorPalette>(
+      future: ColorExtractionService.extractColorsFromImage(article.imageUrl),
+      builder: (context, snapshot) {
+        final palette = snapshot.data ?? ColorPalette.defaultPalette();
+        
+        return Container(
+          width: double.infinity,
+          height: double.infinity,
+          decoration: BoxDecoration(
+            color: palette.primary,
+          ),
+          child: Stack(
+            children: [
+              // Background image with overlay
+              Positioned.fill(
+                child: Stack(
+                  children: [
+                    // Image
+                    Image.network(
+                      article.imageUrl,
+                      width: double.infinity,
+                      height: double.infinity,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          color: palette.primary,
+                          child: Center(
+                            child: Icon(
+                              CupertinoIcons.photo_fill,
+                              size: 80,
+                              color: palette.onPrimary.withOpacity(0.3),
+                            ),
+                          ),
+                        );
+                      },
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return Container(
+                          color: palette.primary,
+                          child: Center(
+                            child: CupertinoActivityIndicator(
+                              color: palette.onPrimary,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                    
+                    // Gradient overlay
+                    Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.transparent,
+                            Colors.transparent,
+                            palette.primary.withOpacity(0.3),
+                            palette.primary.withOpacity(0.8),
+                            palette.primary,
+                          ],
+                          stops: const [0.0, 0.3, 0.6, 0.8, 1.0],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              
+              // Top UI elements
+              Positioned(
+                top: MediaQuery.of(context).padding.top + 20,
+                left: 20,
+                right: 20,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    // Category badge
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.9),
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 10,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Text(
+                        article.category.toUpperCase(),
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          color: palette.primary,
+                          letterSpacing: 1.0,
+                        ),
+                      ),
+                    ),
+                    
+                    // Page indicator
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      child: Text(
+                        '${index + 1} / ${_articles.length}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              
+              // Bottom content
+              Positioned(
+                bottom: MediaQuery.of(context).padding.bottom + 40,
+                left: 20,
+                right: 20,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Title
+                    Text(
+                      article.title,
+                      style: const TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                        height: 1.2,
+                        letterSpacing: -0.5,
+                        shadows: [
+                          Shadow(
+                            color: Colors.black26,
+                            blurRadius: 8,
+                            offset: Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                    ),
+                    
+                    const SizedBox(height: 16),
+                    
+                    // Description
+                    Text(
+                      article.description,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        color: Colors.white,
+                        height: 1.5,
+                        shadows: [
+                          Shadow(
+                            color: Colors.black26,
+                            blurRadius: 4,
+                            offset: Offset(0, 1),
+                          ),
+                        ],
+                      ),
+                      maxLines: 4,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    
+                    const SizedBox(height: 24),
+                    
+                    // Bottom actions
+                    Row(
+                      children: [
+                        // Timestamp
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: Colors.white.withOpacity(0.3),
+                                width: 1,
+                              ),
+                            ),
+                            child: Text(
+                              _formatTimestamp(article.timestamp),
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                        
+                        const SizedBox(width: 16),
+                        
+                        // Action buttons
+                        _buildVerticalActionButton(
+                          CupertinoIcons.heart_fill,
+                          Colors.red,
+                          () {
+                            // Like action
+                          },
+                        ),
+                        const SizedBox(width: 12),
+                        _buildVerticalActionButton(
+                          CupertinoIcons.bookmark_fill,
+                          Colors.blue,
+                          () {
+                            // Bookmark action
+                          },
+                        ),
+                        const SizedBox(width: 12),
+                        _buildVerticalActionButton(
+                          CupertinoIcons.share_up,
+                          Colors.green,
+                          () {
+                            // Share action
+                          },
+                        ),
+                      ],
+                    ),
+                    
+                    const SizedBox(height: 20),
+                    
+                    // Swipe indicator
+                    if (index < _articles.length - 1)
+                      Center(
+                        child: Column(
+                          children: [
+                            const Icon(
+                              CupertinoIcons.chevron_up,
+                              color: Colors.white,
+                              size: 20,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Swipe up for next story',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.white.withOpacity(0.8),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildVerticalActionButton(IconData icon, Color color, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 50,
+        height: 50,
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.2),
+          borderRadius: BorderRadius.circular(25),
+          border: Border.all(
+            color: Colors.white.withOpacity(0.3),
+            width: 2,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Icon(
+          icon,
+          size: 24,
+          color: Colors.white,
+        ),
+      ),
+    );
   }
 
 }

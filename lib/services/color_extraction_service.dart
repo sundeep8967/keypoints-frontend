@@ -81,10 +81,10 @@ class ColorExtractionService {
     for (int y = 0; y < resized.height; y += 2) {
       for (int x = 0; x < resized.width; x += 2) {
         final pixel = resized.getPixel(x, y);
-        final r = img.getRed(pixel);
-        final g = img.getGreen(pixel);
-        final b = img.getBlue(pixel);
-        final a = img.getAlpha(pixel);
+        final r = pixel.r.toInt();
+        final g = pixel.g.toInt();
+        final b = pixel.b.toInt();
+        final a = pixel.a.toInt();
         
         if (a > 128) {
           // Round colors to reduce similar shades
