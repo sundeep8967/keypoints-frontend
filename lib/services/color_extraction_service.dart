@@ -223,9 +223,25 @@ class ColorExtractionService {
     final hash = bytes.fold(0, (prev, element) => prev + element);
     
     // Generate royal, sleek colors that are comfortable to eyes
-    final hue = (hash % 360).toDouble();
-    final saturation = 0.45 + (hash % 20) / 100; // 0.45-0.65 for more muted, royal colors
-    final lightness = 0.35 + (hash % 25) / 100; // 0.35-0.60 for deeper, more comfortable tones
+    var hue = (hash % 360).toDouble();
+    var saturation = 0.45 + (hash % 20) / 100; // 0.45-0.65 for more muted, royal colors
+    var lightness = 0.35 + (hash % 25) / 100; // 0.35-0.60 for deeper, more comfortable tones
+    
+    // Special handling for green hues to make them impressive
+    if (hue >= 90 && hue <= 150) { // Green range
+      // Use beautiful forest green, emerald, or sage tones
+      final greenVariants = [
+        HSLColor.fromAHSL(1.0, 140, 0.6, 0.35), // Deep forest green
+        HSLColor.fromAHSL(1.0, 160, 0.7, 0.4),  // Emerald green
+        HSLColor.fromAHSL(1.0, 120, 0.5, 0.45), // Rich sage green
+        HSLColor.fromAHSL(1.0, 135, 0.65, 0.38), // Deep jade
+        HSLColor.fromAHSL(1.0, 155, 0.6, 0.42),  // Teal green
+      ];
+      final selectedGreen = greenVariants[hash % greenVariants.length];
+      hue = selectedGreen.hue;
+      saturation = selectedGreen.saturation;
+      lightness = selectedGreen.lightness;
+    }
     
     // Create primary color with higher saturation
     final primaryHSL = HSLColor.fromAHSL(1.0, hue, saturation, lightness);

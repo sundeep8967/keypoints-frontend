@@ -721,11 +721,11 @@ class _ColorDemoScreenState extends State<ColorDemoScreen> with TickerProviderSt
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 48,
-        height: 48,
+        width: 44,
+        height: 44,
         decoration: BoxDecoration(
           color: color.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(22),
           border: Border.all(
             color: color.withOpacity(0.2),
             width: 1.5,
@@ -733,7 +733,7 @@ class _ColorDemoScreenState extends State<ColorDemoScreen> with TickerProviderSt
         ),
         child: Icon(
           icon,
-          size: 22,
+          size: 20,
           color: color,
         ),
       ),
