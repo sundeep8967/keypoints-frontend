@@ -145,19 +145,13 @@ class _ColorDemoScreenState extends State<ColorDemoScreen> with TickerProviderSt
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
-      backgroundColor: CupertinoColors.systemGroupedBackground,
-      navigationBar: const CupertinoNavigationBar(
-        backgroundColor: CupertinoColors.systemBackground,
-        middle: const Text(
-          'KeyPoints',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ),
-      child: SafeArea(
-        child: _buildBody(),
+      backgroundColor: CupertinoColors.black,
+      child: Stack(
+        children: [
+          _buildBody(),
+          // Simple clean header - positioned last to be on top
+          _buildCleanHeader(),
+        ],
       ),
     );
   }
@@ -466,11 +460,13 @@ class _ColorDemoScreenState extends State<ColorDemoScreen> with TickerProviderSt
           color: palette.primary,
           child: Column(
             children: [
-              // Top image section (like Inshorts)
+              // Space for the floating header
+              SizedBox(height: MediaQuery.of(context).padding.top + 50),
+              // Top image section (like Inshorts) - starts right after header
               Container(
                 height: MediaQuery.of(context).size.height * 0.3,
                 width: double.infinity,
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
                 child: Stack(
                   children: [
                     // Image with rounded corners
@@ -513,24 +509,24 @@ class _ColorDemoScreenState extends State<ColorDemoScreen> with TickerProviderSt
                       ),
                     ),
                     
-                    // Top UI elements overlay
+                    // Category badge and page indicator on image
                     Positioned(
-                      top: MediaQuery.of(context).padding.top + 20,
-                      left: 20,
-                      right: 20,
+                      top: 15,
+                      left: 15,
+                      right: 15,
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           // Category badge
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                             decoration: BoxDecoration(
                               color: Colors.white.withOpacity(0.9),
-                              borderRadius: BorderRadius.circular(20),
+                              borderRadius: BorderRadius.circular(16),
                               boxShadow: [
                                 BoxShadow(
                                   color: Colors.black.withOpacity(0.2),
-                                  blurRadius: 10,
+                                  blurRadius: 8,
                                   offset: const Offset(0, 2),
                                 ),
                               ],
@@ -538,25 +534,25 @@ class _ColorDemoScreenState extends State<ColorDemoScreen> with TickerProviderSt
                             child: Text(
                               article.category.toUpperCase(),
                               style: TextStyle(
-                                fontSize: 12,
+                                fontSize: 11,
                                 fontWeight: FontWeight.w800,
                                 color: palette.primary,
-                                letterSpacing: 1.0,
+                                letterSpacing: 0.8,
                               ),
                             ),
                           ),
                           
                           // Page indicator
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                             decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.6),
-                              borderRadius: BorderRadius.circular(15),
+                              color: Colors.black.withOpacity(0.7),
+                              borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(
                               '${index + 1} / ${_articles.length}',
                               style: const TextStyle(
-                                fontSize: 12,
+                                fontSize: 11,
                                 fontWeight: FontWeight.w600,
                                 color: Colors.white,
                               ),
@@ -751,6 +747,81 @@ class _ColorDemoScreenState extends State<ColorDemoScreen> with TickerProviderSt
           icon,
           size: 22,
           color: color,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCleanHeader() {
+    return Positioned(
+      top: MediaQuery.of(context).padding.top, // Start below notification bar
+      left: 0,
+      right: 0,
+      child: Container(
+        height: 60,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Colors.black.withOpacity(0.6),
+              Colors.black.withOpacity(0.3),
+              Colors.transparent,
+            ],
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              // KeyPoints text - smaller size
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.15),
+                      blurRadius: 6,
+                      offset: const Offset(0, 1),
+                    ),
+                  ],
+                ),
+                child: const Text(
+                  'KeyPoints',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.black,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+              ),
+              
+              // Smaller menu button
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: CupertinoButton(
+                  padding: EdgeInsets.zero,
+                  onPressed: () {
+                    // Menu action
+                  },
+                  child: const Icon(
+                    CupertinoIcons.ellipsis,
+                    size: 16,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
