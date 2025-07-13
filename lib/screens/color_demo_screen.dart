@@ -569,7 +569,7 @@ class _ColorDemoScreenState extends State<ColorDemoScreen> with TickerProviderSt
               Expanded(
                 child: Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.all(24),
+                  padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
                     color: palette.primary,
                   ),
@@ -580,114 +580,102 @@ class _ColorDemoScreenState extends State<ColorDemoScreen> with TickerProviderSt
                       Text(
                         article.title,
                         style: TextStyle(
-                          fontSize: 24,
+                          fontSize: 22,
                           fontWeight: FontWeight.w800,
                           color: palette.onPrimary,
                           height: 1.3,
                           letterSpacing: -0.3,
                         ),
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
                       ),
                       
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 12),
                       
-                      // Description
+                      // Description - fills ALL available space
                       Expanded(
                         child: SingleChildScrollView(
                           child: Text(
                             article.description,
                             style: TextStyle(
-                              fontSize: 18,
+                              fontSize: 16,
                               color: palette.onPrimary.withOpacity(0.9),
-                              height: 1.6,
-                              letterSpacing: 0.2,
+                              height: 1.5,
+                              letterSpacing: 0.1,
                             ),
                           ),
                         ),
                       ),
                       
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 12),
                       
-                      // Bottom actions
-                      Row(
+                      // Add spacer to push bottom content down
+                      const Spacer(),
+                      
+                      // Bottom section with all elements in same area
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          // Timestamp
-                          Expanded(
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                              decoration: BoxDecoration(
-                                color: palette.onPrimary.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                  color: palette.onPrimary.withOpacity(0.2),
-                                  width: 1,
+                          // Timestamp and action buttons in same row
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              // Timestamp on left
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: palette.onPrimary.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                    color: palette.onPrimary.withOpacity(0.2),
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Text(
+                                  _formatTimestamp(article.timestamp),
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: palette.onPrimary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                               ),
-                              child: Text(
-                                _formatTimestamp(article.timestamp),
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: palette.onPrimary,
-                                  fontWeight: FontWeight.w600,
-                                ),
+                              
+                              // Action buttons on right
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  _buildInshortsActionButton(
+                                    CupertinoIcons.heart_fill,
+                                    palette.onPrimary,
+                                    () {
+                                      // Like action
+                                    },
+                                  ),
+                                  const SizedBox(width: 12),
+                                  _buildInshortsActionButton(
+                                    CupertinoIcons.bookmark_fill,
+                                    palette.onPrimary,
+                                    () {
+                                      // Bookmark action
+                                    },
+                                  ),
+                                  const SizedBox(width: 12),
+                                  _buildInshortsActionButton(
+                                    CupertinoIcons.share_up,
+                                    palette.onPrimary,
+                                    () {
+                                      // Share action
+                                    },
+                                  ),
+                                ],
                               ),
-                            ),
-                          ),
-                          
-                          const SizedBox(width: 16),
-                          
-                          // Action buttons
-                          _buildInshortsActionButton(
-                            CupertinoIcons.heart_fill,
-                            palette.onPrimary,
-                            () {
-                              // Like action
-                            },
-                          ),
-                          const SizedBox(width: 12),
-                          _buildInshortsActionButton(
-                            CupertinoIcons.bookmark_fill,
-                            palette.onPrimary,
-                            () {
-                              // Bookmark action
-                            },
-                          ),
-                          const SizedBox(width: 12),
-                          _buildInshortsActionButton(
-                            CupertinoIcons.share_up,
-                            palette.onPrimary,
-                            () {
-                              // Share action
-                            },
+                            ],
                           ),
                         ],
                       ),
                       
-                      const SizedBox(height: 20),
-                      
-                      // Swipe indicator
-                      if (index < _articles.length - 1)
-                        Center(
-                          child: Column(
-                            children: [
-                              Icon(
-                                CupertinoIcons.chevron_up,
-                                color: palette.onPrimary.withOpacity(0.7),
-                                size: 20,
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Swipe up for next story',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: palette.onPrimary.withOpacity(0.7),
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      
-                      SizedBox(height: MediaQuery.of(context).padding.bottom),
+                      SizedBox(height: MediaQuery.of(context).padding.bottom + 4),
                     ],
                   ),
                 ),
