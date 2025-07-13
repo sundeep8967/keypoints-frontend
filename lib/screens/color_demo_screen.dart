@@ -759,17 +759,7 @@ class _ColorDemoScreenState extends State<ColorDemoScreen> with TickerProviderSt
       right: 0,
       child: Container(
         height: 60,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Colors.black.withOpacity(0.6),
-              Colors.black.withOpacity(0.3),
-              Colors.transparent,
-            ],
-          ),
-        ),
+        color: Colors.transparent,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
           child: Row(

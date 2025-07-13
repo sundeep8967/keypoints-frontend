@@ -209,9 +209,9 @@ class ColorExtractionService {
 
   static ExtractedColors _getDefaultExtractedColors() {
     return ExtractedColors(
-      primary: const Color(0xFF667EEA),
-      secondary: const Color(0xFF764BA2),
-      accent: const Color(0xFF8B5FBF),
+      primary: const Color(0xFF4A5568), // Royal slate gray
+      secondary: const Color(0xFF2D3748), // Deep charcoal
+      accent: const Color(0xFF553C9A), // Royal purple
       textColor: Colors.white,
     );
   }
@@ -222,18 +222,18 @@ class ColorExtractionService {
     final bytes = utf8.encode(url);
     final hash = bytes.fold(0, (prev, element) => prev + element);
     
-    // Generate more vibrant and diverse colors
+    // Generate royal, sleek colors that are comfortable to eyes
     final hue = (hash % 360).toDouble();
-    final saturation = 0.75 + (hash % 25) / 100; // 0.75-1.0 for more vibrant colors
-    final lightness = 0.45 + (hash % 30) / 100; // 0.45-0.75 for better contrast
+    final saturation = 0.45 + (hash % 20) / 100; // 0.45-0.65 for more muted, royal colors
+    final lightness = 0.35 + (hash % 25) / 100; // 0.35-0.60 for deeper, more comfortable tones
     
     // Create primary color with higher saturation
     final primaryHSL = HSLColor.fromAHSL(1.0, hue, saturation, lightness);
     final primary = primaryHSL.toColor();
     
-    // Generate more diverse complementary colors
-    final secondary = HSLColor.fromAHSL(1.0, (hue + 60) % 360, saturation * 0.85, lightness * 1.15).toColor();
-    final accent = HSLColor.fromAHSL(1.0, (hue + 120) % 360, saturation * 0.9, lightness * 0.8).toColor();
+    // Generate royal, complementary colors
+    final secondary = HSLColor.fromAHSL(1.0, (hue + 40) % 360, saturation * 0.8, lightness * 1.1).toColor();
+    final accent = HSLColor.fromAHSL(1.0, (hue + 80) % 360, saturation * 0.7, lightness * 0.9).toColor();
     
     // Create themed background colors
     final background = HSLColor.fromAHSL(1.0, hue, saturation * 0.15, 0.97).toColor();
@@ -307,9 +307,9 @@ class ColorPalette {
 
   factory ColorPalette.defaultPalette() {
     return const ColorPalette(
-      primary: CupertinoColors.systemBlue,
-      secondary: CupertinoColors.systemIndigo,
-      accent: CupertinoColors.systemPurple,
+      primary: Color(0xFF4A5568), // Royal slate gray
+      secondary: Color(0xFF2D3748), // Deep charcoal  
+      accent: Color(0xFF553C9A), // Royal purple
       background: CupertinoColors.systemBackground,
       surface: CupertinoColors.secondarySystemBackground,
       onPrimary: CupertinoColors.white,
