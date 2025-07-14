@@ -55,15 +55,18 @@ class ColorExtractionService {
       // Extract colors using advanced algorithm
       final extractedColors = await _extractColorsFromImage(image);
       
+      // Create muted version of extracted colors
+      final mutedPrimary = _createMutedBackground(extractedColors.primary);
+      
       return ColorPalette(
-        primary: extractedColors.primary,
-        secondary: extractedColors.secondary,
-        accent: extractedColors.accent,
-        background: extractedColors.primary.withOpacity(0.1),
-        surface: extractedColors.primary.withOpacity(0.05),
-        onPrimary: extractedColors.textColor,
-        onSecondary: extractedColors.textColor,
-        onAccent: extractedColors.textColor,
+        primary: mutedPrimary,
+        secondary: _createMutedBackground(extractedColors.secondary),
+        accent: _createMutedBackground(extractedColors.accent),
+        background: mutedPrimary.withOpacity(0.1),
+        surface: mutedPrimary.withOpacity(0.05),
+        onPrimary: Colors.white,
+        onSecondary: Colors.white,
+        onAccent: Colors.white,
       );
     } catch (e) {
       throw Exception('Color extraction failed: $e');
@@ -222,10 +225,10 @@ class ColorExtractionService {
     final bytes = utf8.encode(url);
     final hash = bytes.fold(0, (prev, element) => prev + element);
     
-    // Generate royal, sleek colors that are comfortable to eyes
+    // Generate pleasant colors that keep their identity
     var hue = (hash % 360).toDouble();
-    var saturation = 0.45 + (hash % 20) / 100; // 0.45-0.65 for more muted, royal colors
-    var lightness = 0.35 + (hash % 25) / 100; // 0.35-0.60 for deeper, more comfortable tones
+    var saturation = 0.4 + (hash % 15) / 100; // 0.4-0.55 for recognizable colors
+    var lightness = 0.2 + (hash % 10) / 100; // 0.2-0.3 for dark but visible backgrounds
     
     // Special handling for green hues to make them impressive
     if (hue >= 90 && hue <= 150) { // Green range
@@ -281,6 +284,17 @@ class ColorExtractionService {
       palette.secondary.withOpacity(0.05),
       palette.surface,
     ];
+  }
+
+  /// Create a muted background color from any color (keeps color identity)
+  static Color _createMutedBackground(Color originalColor) {
+    final hsl = HSLColor.fromColor(originalColor);
+    
+    // Keep the color identity but make it pleasant
+    final mutedSaturation = (hsl.saturation * 0.6).clamp(0.3, 0.7); // Keep more saturation
+    final mutedLightness = 0.25; // Darker but not too dark
+    
+    return hsl.withSaturation(mutedSaturation).withLightness(mutedLightness).toColor();
   }
 
   /// Get themed colors for different UI elements

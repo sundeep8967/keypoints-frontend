@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
-import 'screens/color_demo_screen.dart';
+import 'screens/news_feed_screen.dart';
+import 'services/supabase_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,13 +26,21 @@ void main() async {
     SystemUiMode.edgeToEdge,
   );
   
-  // Initialize Firebase (skip for now to test basic app)
+  // Initialize Supabase
   try {
-    // Commented out for initial testing without Firebase setup
+    await SupabaseService.initialize();
+    print('Supabase initialized successfully');
+  } catch (e) {
+    print('Supabase initialization error: $e');
+  }
+
+  // Initialize Firebase (optional fallback)
+  try {
+    // Commented out for now since we're using Supabase
     // await Firebase.initializeApp(
     //   options: DefaultFirebaseOptions.currentPlatform,
     // );
-    print('Firebase initialization skipped for testing');
+    print('Firebase initialization skipped - using Supabase');
   } catch (e) {
     print('Firebase initialization error: $e');
   }
@@ -51,7 +60,7 @@ class KeyPointsApp extends StatelessWidget {
         primaryColor: CupertinoColors.systemBlue,
         scaffoldBackgroundColor: CupertinoColors.transparent,
       ),
-      home: const ColorDemoScreen(),
+      home: const NewsFeedScreen(),
       debugShowCheckedModeBanner: false,
     );
   }
