@@ -73,10 +73,10 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
 
       // Try to load from Supabase first
       try {
-        final articles = await SupabaseService.getNews(limit: 10);
+        final articles = await SupabaseService.getNews(limit: 100);
         if (articles.isNotEmpty) {
           setState(() {
-            _articles = articles.take(5).toList(); // Show first 5 for demo
+            _articles = articles; // Show ALL articles from Supabase
             _isLoading = false;
           });
           return;

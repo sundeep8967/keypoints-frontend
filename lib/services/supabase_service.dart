@@ -16,7 +16,7 @@ class SupabaseService {
   }
 
   /// Get news articles from Supabase
-  static Future<List<NewsArticle>> getNews({int limit = 50}) async {
+  static Future<List<NewsArticle>> getNews({int limit = 100}) async {
     try {
       final response = await client
           .from('news_articles')
