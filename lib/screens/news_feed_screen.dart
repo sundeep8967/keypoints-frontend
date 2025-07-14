@@ -558,22 +558,6 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
                             ),
                           ),
                           
-                          // Page indicator
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.7),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              '${index + 1} / ${_articles.length}',
-                              style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
                         ],
                       ),
                     ),
