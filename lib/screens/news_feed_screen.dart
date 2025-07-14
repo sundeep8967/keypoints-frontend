@@ -160,9 +160,10 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
           });
           
           if (unreadCategoryArticles.isEmpty) {
-            setState(() {
-              _error = 'All $category articles have been read! Try selecting a different category or check back later for new articles.';
-            });
+            // Show toast and load all other unread articles
+            _showToast('You have read all articles in $category category');
+            await _loadAllOtherUnreadArticles();
+            return;
           } else {
             _preloadColors();
           }
@@ -195,20 +196,14 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
             _preloadColors();
             return;
           } else if (filteredArticles.isNotEmpty) {
-            setState(() {
-              _articles = [];
-              _error = 'All $category articles have been read! Try selecting a different category or check back later.';
-              _isLoading = false;
-            });
-            print('INFO: All $category articles already read');
+            // Show toast and load all other unread articles
+            _showToast('You have read all articles in $category category');
+            await _loadAllOtherUnreadArticles();
             return;
           } else {
-            setState(() {
-              _articles = [];
-              _error = 'No $category articles found in database. Try selecting a different category or check back later.';
-              _isLoading = false;
-            });
-            print('INFO: No $category articles found in Supabase');
+            // Show toast and load all other unread articles instead of showing error
+            _showToast('No $category articles found. Showing other news instead.');
+            await _loadAllOtherUnreadArticles();
             return;
           }
         }
@@ -216,13 +211,17 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
         print('ERROR: Failed to filter Supabase articles: $e');
       }
 
-      // PRIORITY 3: If Supabase completely fails, show error
-      setState(() {
-        _articles = [];
-        _error = 'Unable to load $category articles. Please check your internet connection and try again.';
-        _isLoading = false;
-      });
-      print('ERROR: Supabase completely unavailable for $category');
+      // PRIORITY 3: If Supabase completely fails, show toast and try to load other articles
+      _showToast('Unable to load $category articles. Showing other available news.');
+      await _loadAllOtherUnreadArticles();
+      if (_articles.isEmpty) {
+        setState(() {
+          _articles = [];
+          _error = 'Unable to load any articles. Please check your internet connection and try again.';
+          _isLoading = false;
+        });
+        print('ERROR: Supabase completely unavailable for $category');
+      }
     } catch (e) {
       setState(() {
         _error = 'Failed to load articles for $category: $e';
@@ -665,6 +664,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  // My Feed button
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
@@ -932,6 +932,59 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
       await _loadNewsArticles();
     } else {
       await _loadArticlesByCategory(_selectedCategory);
+    }
+  }
+
+  Future<void> _loadAllOtherUnreadArticles() async {
+    print('INFO: Loading all other unread articles...');
+    
+    try {
+      // Reset to "All" category and load all unread articles
+      setState(() {
+        _selectedCategory = 'All';
+      });
+      
+      await _loadNewsArticles();
+    } catch (e) {
+      print('ERROR: Failed to load other unread articles: $e');
+      setState(() {
+        _error = 'Failed to load other articles: $e';
+        _isLoading = false;
+      });
+    }
+  }
+
+  void _showToast(String message) {
+    print('TOAST: $message');
+    
+    // Show a Cupertino-style alert dialog for better visibility
+    if (mounted) {
+      showCupertinoDialog(
+        context: context,
+        barrierDismissible: true,
+        builder: (BuildContext context) {
+          return CupertinoAlertDialog(
+            title: const Text('Info'),
+            content: Text(message),
+            actions: [
+              CupertinoDialogAction(
+                isDefaultAction: true,
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+                child: const Text('OK'),
+              ),
+            ],
+          );
+        },
+      );
+      
+      // Auto-dismiss after 3 seconds
+      Future.delayed(const Duration(seconds: 3), () {
+        if (mounted && Navigator.canPop(context)) {
+          Navigator.of(context).pop();
+        }
+      });
     }
   }
 }
