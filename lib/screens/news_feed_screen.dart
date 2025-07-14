@@ -109,25 +109,14 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
         print('ERROR: Supabase failed: $e');
       }
 
-      // PRIORITY 2: Fallback to demo data only if Supabase fails
-      final demoArticles = _getDemoArticles();
-      final readIds = await ReadArticlesService.getReadArticleIds();
-      final unreadDemoArticles = demoArticles.where((article) => 
-        !readIds.contains(article.id)
-      ).toList();
-      
+      // No fallback - show error if no Supabase articles
       setState(() {
-        _articles = unreadDemoArticles;
+        _articles = [];
         _isLoading = false;
+        _error = 'No articles available. Please check your internet connection and try again.';
       });
       
-      if (unreadDemoArticles.isEmpty) {
-        setState(() {
-          _error = 'All demo articles have been read! Please check your internet connection to load new articles.';
-        });
-      }
-      
-      print('FALLBACK: Using ${unreadDemoArticles.length} unread demo articles out of ${demoArticles.length} total');
+      print('ERROR: No articles found in Supabase and no fallback used');
     } catch (e) {
       setState(() {
         _error = 'Failed to load articles: $e';
@@ -230,58 +219,6 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
     }
   }
 
-  List<NewsArticle> _getDemoArticles() {
-    return [
-      NewsArticle(
-        id: 'demo1',
-        title: 'Breaking: Revolutionary AI Technology Unveiled',
-        description: 'Scientists have developed a groundbreaking AI system that can extract colors from images in real-time, revolutionizing mobile app design.',
-        imageUrl: 'https://images.unsplash.com/photo-1677442136019-21780ecad995?w=800&h=600&fit=crop',
-        timestamp: DateTime.now().subtract(const Duration(hours: 2)),
-        category: 'Technology',
-      ),
-      NewsArticle(
-        id: 'demo2',
-        title: 'Ocean Conservation Efforts Show Promising Results',
-        description: 'Marine biologists report significant improvements in coral reef health following new conservation initiatives.',
-        imageUrl: 'https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800&h=600&fit=crop',
-        timestamp: DateTime.now().subtract(const Duration(hours: 5)),
-        category: 'Environment',
-      ),
-      NewsArticle(
-        id: 'demo6',
-        title: 'Hollywood Blockbuster Breaks Box Office Records',
-        description: 'The latest superhero movie has shattered opening weekend records, earning over \$200 million globally in its first three days.',
-        imageUrl: 'https://images.unsplash.com/photo-1489599735734-79b4169c2a78?w=800&h=600&fit=crop',
-        timestamp: DateTime.now().subtract(const Duration(hours: 12)),
-        category: 'Entertainment',
-      ),
-      NewsArticle(
-        id: 'demo8',
-        title: 'Tech Giant Reports Record Quarterly Earnings',
-        description: 'Major technology company exceeds analyst expectations with strong performance across all business segments.',
-        imageUrl: 'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=800&h=600&fit=crop',
-        timestamp: DateTime.now().subtract(const Duration(hours: 6)),
-        category: 'Business',
-      ),
-      NewsArticle(
-        id: 'demo10',
-        title: 'Breakthrough in Cancer Treatment Research',
-        description: 'Scientists develop new immunotherapy approach showing promising results in clinical trials for multiple cancer types.',
-        imageUrl: 'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=800&h=600&fit=crop',
-        timestamp: DateTime.now().subtract(const Duration(hours: 10)),
-        category: 'Health',
-      ),
-      NewsArticle(
-        id: 'demo12',
-        title: 'Championship Final Set for This Weekend',
-        description: 'Two powerhouse teams prepare for the ultimate showdown in what promises to be the game of the century.',
-        imageUrl: 'https://images.unsplash.com/photo-1461896836934-ffe607ba8211?w=800&h=600&fit=crop',
-        timestamp: DateTime.now().subtract(const Duration(hours: 4)),
-        category: 'Sports',
-      ),
-    ];
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -316,47 +253,20 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
       );
     }
 
-    if (_error.isNotEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(
-              CupertinoIcons.exclamationmark_triangle,
-              size: 60,
-              color: CupertinoColors.systemRed,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              _error,
-              style: const TextStyle(
-                fontSize: 16,
-                color: CupertinoColors.secondaryLabel,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 20),
-            CupertinoButton.filled(
-              child: const Text('Retry'),
-              onPressed: _loadNewsArticles,
-            ),
-          ],
-        ),
-      );
+    if (_error.isNotEmpty || _articles.isEmpty) {
+      return _buildNoArticlesPage();
     }
 
     return PageView.builder(
       scrollDirection: Axis.vertical,
-      physics: const ClampingScrollPhysics(),
-      itemCount: _articles.length,
-      controller: PageController(
-        viewportFraction: 1.0,
-        keepPage: true,
-      ),
+      physics: const PageScrollPhysics(),
+      itemCount: _articles.length + 1, // +1 for "end of articles" page
       pageSnapping: true,
       onPageChanged: (index) async {
+        print('PAGE CHANGED: Moving to article $index');
+        
         // Mark previous article as read when moving to next article
-        if (index > 0 && _articles.isNotEmpty) {
+        if (index > 0 && index <= _articles.length && _articles.isNotEmpty) {
           final previousArticle = _articles[index - 1];
           await ReadArticlesService.markAsRead(previousArticle.id);
           print('Marked article "${previousArticle.title}" as read');
@@ -366,16 +276,16 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
           _currentIndex = index;
         });
         
-        if (index % 3 == 0) {
+        if (index < _articles.length && index % 3 == 0) {
           _preloadColors();
-        }
-        
-        // If we're near the end and running out of articles, try to load more
-        if (index >= _articles.length - 2) {
-          _tryLoadMoreArticles();
         }
       },
       itemBuilder: (context, index) {
+        // Show "end of articles" page after last article
+        if (index >= _articles.length) {
+          return _buildEndOfArticlesPage();
+        }
+        
         final article = _articles[index];
         return Container(
           width: double.infinity,
@@ -986,5 +896,122 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
         }
       });
     }
+  }
+
+  Widget _buildNoArticlesPage() {
+    return Container(
+      width: double.infinity,
+      height: double.infinity,
+      color: const Color(0xFF1a1a1a),
+      child: Column(
+        children: [
+          SizedBox(height: MediaQuery.of(context).padding.top + 50),
+          Expanded(
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    CupertinoIcons.news,
+                    size: 80,
+                    color: CupertinoColors.systemGrey,
+                  ),
+                  const SizedBox(height: 24),
+                  const Text(
+                    'No Articles Available',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    _error.isNotEmpty ? _error : 'All articles have been read!\nCheck back later for new content.',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      color: CupertinoColors.systemGrey,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 32),
+                  CupertinoButton.filled(
+                    onPressed: _loadNewsArticles,
+                    child: const Text('Refresh'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEndOfArticlesPage() {
+    return Container(
+      width: double.infinity,
+      height: double.infinity,
+      color: const Color(0xFF2a2a2a),
+      child: Column(
+        children: [
+          SizedBox(height: MediaQuery.of(context).padding.top + 50),
+          Expanded(
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    CupertinoIcons.checkmark_circle_fill,
+                    size: 80,
+                    color: CupertinoColors.systemGreen,
+                  ),
+                  const SizedBox(height: 24),
+                  const Text(
+                    'You\'re All Caught Up!',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'You\'ve read all available articles.\nCheck back later for fresh content!',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: CupertinoColors.systemGrey,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 32),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      CupertinoButton.filled(
+                        onPressed: _loadNewsArticles,
+                        child: const Text('Refresh'),
+                      ),
+                      const SizedBox(width: 16),
+                      CupertinoButton(
+                        onPressed: () {
+                          setState(() {
+                            _currentIndex = 0;
+                          });
+                        },
+                        child: const Text(
+                          'Back to Top',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
