@@ -474,38 +474,53 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
                     Positioned.fill(
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(16),
-                        child: Image.network(
-                          article.imageUrl,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            return Container(
-                              decoration: BoxDecoration(
-                                color: palette.secondary,
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: Center(
-                                child: Icon(
-                                  CupertinoIcons.photo_fill,
-                                  size: 60,
-                                  color: palette.onPrimary.withOpacity(0.5),
-                                ),
-                              ),
-                            );
-                          },
-                          loadingBuilder: (context, child, loadingProgress) {
-                            if (loadingProgress == null) return child;
-                            return Container(
-                              decoration: BoxDecoration(
-                                color: palette.secondary,
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: Center(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: palette.secondary,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Stack(
+                            children: [
+                              // Always show loading indicator initially
+                              Center(
                                 child: CupertinoActivityIndicator(
                                   color: palette.onPrimary,
                                 ),
                               ),
-                            );
-                          },
+                              // Image on top
+                              Image.network(
+                                article.imageUrl,
+                                fit: BoxFit.cover,
+                                width: double.infinity,
+                                height: double.infinity,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Container(
+                                    decoration: BoxDecoration(
+                                      color: palette.secondary,
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                    child: Center(
+                                      child: Icon(
+                                        CupertinoIcons.photo_fill,
+                                        size: 60,
+                                        color: palette.onPrimary.withOpacity(0.5),
+                                      ),
+                                    ),
+                                  );
+                                },
+                                loadingBuilder: (context, child, loadingProgress) {
+                                  if (loadingProgress == null) {
+                                    // Image loaded successfully, show image
+                                    return child;
+                                  }
+                                  // Still loading, show transparent container so loading indicator shows through
+                                  return Container(
+                                    color: Colors.transparent,
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
