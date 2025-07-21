@@ -358,7 +358,10 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
     return CupertinoPageScaffold(
       backgroundColor: CupertinoColors.black,
       child: GestureDetector(
-        onHorizontalDragEnd: _handleHorizontalSwipe,
+        onHorizontalDragEnd: (details) {
+          print('DEBUG: Horizontal swipe detected');
+          _handleHorizontalSwipe(details);
+        },
         child: Stack(
           children: [
             _buildBody(),
@@ -938,11 +941,11 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
     bool isRightSwipe = velocity > 0;
     
     if (isRightSwipe) {
-      // Right swipe - go to previous category
-      newIndex = currentIndex > 0 ? currentIndex - 1 : categories.length - 1;
-    } else {
-      // Left swipe - go to next category
+      // Right swipe - go to next category  
       newIndex = currentIndex < categories.length - 1 ? currentIndex + 1 : 0;
+    } else {
+      // Left swipe - go to previous category
+      newIndex = currentIndex > 0 ? currentIndex - 1 : categories.length - 1;
     }
     
     final newCategory = categories[newIndex];
