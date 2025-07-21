@@ -82,14 +82,6 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  CupertinoButton(
-                    padding: EdgeInsets.zero,
-                    onPressed: _loadNewsArticles,
-                    child: const Icon(
-                      CupertinoIcons.refresh,
-                      color: CupertinoColors.white,
-                    ),
-                  ),
                 ],
               ),
             ),
@@ -124,10 +116,6 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
                                   textAlign: TextAlign.center,
                                 ),
                                 const SizedBox(height: 16),
-                                CupertinoButton.filled(
-                                  onPressed: _loadNewsArticles,
-                                  child: const Text('Retry'),
-                                ),
                               ],
                             ),
                           ),

@@ -480,18 +480,6 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               _buildActionButton(
-                                CupertinoIcons.heart_fill,
-                                palette.onPrimary,
-                                () {},
-                              ),
-                              const SizedBox(width: 12),
-                              _buildActionButton(
-                                CupertinoIcons.bookmark_fill,
-                                palette.onPrimary,
-                                () {},
-                              ),
-                              const SizedBox(width: 12),
-                              _buildActionButton(
                                 CupertinoIcons.share_up,
                                 palette.onPrimary,
                                 () {},
@@ -603,26 +591,6 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  
-                  // Refresh button
-                  Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: CupertinoButton(
-                      padding: EdgeInsets.zero,
-                      onPressed: _refreshArticles,
-                      child: const Icon(
-                        CupertinoIcons.refresh,
-                        size: 16,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
                   
                   const SizedBox(width: 8),
                   
@@ -667,20 +635,6 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
           ),
           message: const Text('Manage your personalized news feed'),
           actions: [
-            CupertinoActionSheetAction(
-              onPressed: () {
-                Navigator.pop(context);
-                print('Show bookmarked articles');
-              },
-              child: const Text('Bookmarked Articles'),
-            ),
-            CupertinoActionSheetAction(
-              onPressed: () {
-                Navigator.pop(context);
-                print('Show liked articles');
-              },
-              child: const Text('Liked Articles'),
-            ),
             CupertinoActionSheetAction(
               onPressed: () {
                 Navigator.pop(context);
@@ -832,18 +786,6 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
     }
   }
 
-  Future<void> _refreshArticles() async {
-    print('INFO: Refreshing articles...');
-    
-    // Clean up old read IDs periodically
-    await ReadArticlesService.cleanupOldReadIds();
-    
-    if (_selectedCategory == 'All') {
-      await _loadNewsArticles();
-    } else {
-      await _loadArticlesByCategory(_selectedCategory);
-    }
-  }
 
   Future<void> _loadAllOtherUnreadArticles() async {
     print('INFO: Loading all other unread articles...');
@@ -935,10 +877,6 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 32),
-                  CupertinoButton.filled(
-                    onPressed: _loadNewsArticles,
-                    child: const Text('Refresh'),
-                  ),
                 ],
               ),
             ),
@@ -988,11 +926,6 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      CupertinoButton.filled(
-                        onPressed: _loadNewsArticles,
-                        child: const Text('Refresh'),
-                      ),
-                      const SizedBox(width: 16),
                       CupertinoButton(
                         onPressed: () {
                           setState(() {
