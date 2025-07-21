@@ -4,7 +4,9 @@ import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'screens/news_feed_screen.dart';
+import 'screens/language_selection_screen.dart';
 import 'services/supabase_service.dart';
+import 'services/local_storage_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -60,8 +62,86 @@ class KeyPointsApp extends StatelessWidget {
         primaryColor: CupertinoColors.systemBlue,
         scaffoldBackgroundColor: CupertinoColors.transparent,
       ),
-      home: const NewsFeedScreen(),
+      home: const AppInitializer(),
       debugShowCheckedModeBanner: false,
     );
+  }
+}
+
+class AppInitializer extends StatefulWidget {
+  const AppInitializer({super.key});
+
+  @override
+  State<AppInitializer> createState() => _AppInitializerState();
+}
+
+class _AppInitializerState extends State<AppInitializer> {
+  bool _isLoading = true;
+  bool _isFirstTime = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkFirstTimeSetup();
+  }
+
+  Future<void> _checkFirstTimeSetup() async {
+    try {
+      final isCompleted = await LocalStorageService.isFirstTimeSetupCompleted();
+      setState(() {
+        _isFirstTime = !isCompleted;
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Error checking first-time setup: $e');
+      setState(() {
+        _isFirstTime = true; // Default to first-time if error
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const CupertinoPageScaffold(
+        backgroundColor: CupertinoColors.black,
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CupertinoActivityIndicator(
+                radius: 20,
+                color: CupertinoColors.white,
+              ),
+              SizedBox(height: 16),
+              Text(
+                'KeyPoints',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: CupertinoColors.white,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (_isFirstTime) {
+      return const LanguageSelectionScreen();
+    }
+
+    return const NewsFeedScreen();
+  }
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const NewsFeedScreen();
   }
 }

@@ -7,6 +7,9 @@ class LocalStorageService {
   static const String _articlesKey = 'cached_news_articles';
   static const String _lastFetchKey = 'last_fetch_timestamp';
   static const String _lastArticleIdKey = 'last_article_id';
+  static const String _firstTimeSetupKey = 'first_time_setup_completed';
+  static const String _languagePreferenceKey = 'language_preference';
+  static const String _categoryPreferencesKey = 'category_preferences';
 
   /// Save articles to local storage
   static Future<void> saveArticles(List<NewsArticle> articles) async {
@@ -222,6 +225,87 @@ class LocalStorageService {
       print('🧹 Storage cleanup completed. Kept ${unreadArticles.length} unread articles');
     } catch (e) {
       print('❌ Error during storage cleanup: $e');
+    }
+  }
+
+  // First-time setup methods
+  
+  /// Check if first-time setup has been completed
+  static Future<bool> isFirstTimeSetupCompleted() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getBool(_firstTimeSetupKey) ?? false;
+    } catch (e) {
+      print('❌ Error checking first-time setup: $e');
+      return false;
+    }
+  }
+
+  /// Mark first-time setup as completed
+  static Future<void> setFirstTimeSetupCompleted(bool completed) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_firstTimeSetupKey, completed);
+      print('✅ First-time setup marked as ${completed ? 'completed' : 'not completed'}');
+    } catch (e) {
+      print('❌ Error setting first-time setup: $e');
+    }
+  }
+
+  /// Save language preference
+  static Future<void> setLanguagePreference(String languageCode) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_languagePreferenceKey, languageCode);
+      print('✅ Language preference saved: $languageCode');
+    } catch (e) {
+      print('❌ Error saving language preference: $e');
+    }
+  }
+
+  /// Get language preference
+  static Future<String?> getLanguagePreference() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getString(_languagePreferenceKey);
+    } catch (e) {
+      print('❌ Error getting language preference: $e');
+      return null;
+    }
+  }
+
+  /// Save category preferences
+  static Future<void> setCategoryPreferences(List<String> categories) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList(_categoryPreferencesKey, categories);
+      print('✅ Category preferences saved: ${categories.join(', ')}');
+    } catch (e) {
+      print('❌ Error saving category preferences: $e');
+    }
+  }
+
+  /// Get category preferences
+  static Future<List<String>> getCategoryPreferences() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getStringList(_categoryPreferencesKey) ?? [];
+    } catch (e) {
+      print('❌ Error getting category preferences: $e');
+      return [];
+    }
+  }
+
+  /// Reset first-time setup (for testing)
+  static Future<void> resetFirstTimeSetup() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_firstTimeSetupKey);
+      await prefs.remove(_languagePreferenceKey);
+      await prefs.remove(_categoryPreferencesKey);
+      print('🔄 First-time setup reset');
+    } catch (e) {
+      print('❌ Error resetting first-time setup: $e');
     }
   }
 }

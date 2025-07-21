@@ -125,6 +125,138 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
     }
   }
 
+  Future<void> _loadArticlesByCategoryWithSwipeContext(String category, bool isRightSwipe) async {
+    try {
+      setState(() {
+        _isLoading = true;
+        _error = '';
+      });
+
+      // Get read articles to filter them out
+      final readIds = await ReadArticlesService.getReadArticleIds();
+
+      // PRIORITY 1: Try Supabase category filter
+      try {
+        final allCategoryArticles = await SupabaseService.getNewsByCategory(category, limit: 100);
+        if (allCategoryArticles.isNotEmpty) {
+          final unreadCategoryArticles = allCategoryArticles.where((article) => 
+            !readIds.contains(article.id)
+          ).toList();
+          
+          setState(() {
+            _articles = unreadCategoryArticles;
+            _isLoading = false;
+          });
+          
+          if (unreadCategoryArticles.isEmpty) {
+            if (isRightSwipe) {
+              // Right swipe: Just show "You read all" in UI, no popup
+              setState(() {
+                _articles = [];
+                _error = 'You have read all articles in $category category.';
+                _isLoading = false;
+              });
+            } else {
+              // Left swipe: Show toast and load all other unread articles
+              _showToast('You have read all articles in $category category');
+              await _loadAllOtherUnreadArticles();
+            }
+            return;
+          } else {
+            _preloadColors();
+          }
+          
+          print('SUCCESS: Loaded ${allCategoryArticles.length} total $category articles, ${unreadCategoryArticles.length} unread from Supabase');
+          return;
+        }
+      } catch (e) {
+        print('ERROR: Supabase category filter failed: $e');
+      }
+
+      // PRIORITY 2: Try filtering all Supabase articles locally
+      try {
+        final allSupabaseArticles = await SupabaseService.getNews(limit: 100);
+        if (allSupabaseArticles.isNotEmpty) {
+          final filteredArticles = allSupabaseArticles.where((article) => 
+            article.category.toLowerCase() == category.toLowerCase()
+          ).toList();
+          
+          final unreadFilteredArticles = filteredArticles.where((article) => 
+            !readIds.contains(article.id)
+          ).toList();
+          
+          if (unreadFilteredArticles.isNotEmpty) {
+            setState(() {
+              _articles = unreadFilteredArticles;
+              _isLoading = false;
+            });
+            print('SUCCESS: Filtered ${unreadFilteredArticles.length} unread $category articles from ${filteredArticles.length} total');
+            _preloadColors();
+            return;
+          } else if (filteredArticles.isNotEmpty) {
+            if (isRightSwipe) {
+              // Right swipe: Just show "You read all" in UI, no popup
+              setState(() {
+                _articles = [];
+                _error = 'You have read all articles in $category category.';
+                _isLoading = false;
+              });
+            } else {
+              // Left swipe: Show toast and load all other unread articles
+              _showToast('You have read all articles in $category category');
+              await _loadAllOtherUnreadArticles();
+            }
+            return;
+          } else {
+            if (isRightSwipe) {
+              // Right swipe: Just show "No articles" in UI, no popup
+              setState(() {
+                _articles = [];
+                _error = 'No $category articles found.';
+                _isLoading = false;
+              });
+            } else {
+              // Left swipe: Show toast and switch back to All category
+              setState(() {
+                _articles = [];
+                _error = 'No $category articles found.';
+                _isLoading = false;
+              });
+              _showToast('No $category articles found. Switching back to All categories.');
+            }
+            return;
+          }
+        }
+      } catch (e) {
+        print('ERROR: Failed to filter Supabase articles: $e');
+      }
+
+      // PRIORITY 3: If Supabase completely fails
+      if (isRightSwipe) {
+        // Right swipe: Just show error in UI, no popup
+        setState(() {
+          _articles = [];
+          _error = 'Unable to load $category articles.';
+          _isLoading = false;
+        });
+      } else {
+        // Left swipe: Show toast and prepare to switch back to All
+        setState(() {
+          _articles = [];
+          _error = 'Unable to load $category articles.';
+          _isLoading = false;
+        });
+        _showToast('Unable to load $category articles. Switching back to All categories.');
+      }
+      print('ERROR: Supabase completely unavailable for $category');
+    } catch (e) {
+      setState(() {
+        _error = 'Failed to load articles for $category: $e';
+        _isLoading = false;
+      });
+    }
+  }
+
   Future<void> _loadArticlesByCategory(String category) async {
     try {
       setState(() {
@@ -190,9 +322,13 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
             await _loadAllOtherUnreadArticles();
             return;
           } else {
-            // Show toast and load all other unread articles instead of showing error
-            _showToast('No $category articles found. Showing other news instead.');
-            await _loadAllOtherUnreadArticles();
+            // Show toast and switch back to All category
+            setState(() {
+              _articles = [];
+              _error = 'No $category articles found.';
+              _isLoading = false;
+            });
+            _showToast('No $category articles found. Switching back to All categories.');
             return;
           }
         }
@@ -200,17 +336,14 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
         print('ERROR: Failed to filter Supabase articles: $e');
       }
 
-      // PRIORITY 3: If Supabase completely fails, show toast and try to load other articles
-      _showToast('Unable to load $category articles. Showing other available news.');
-      await _loadAllOtherUnreadArticles();
-      if (_articles.isEmpty) {
-        setState(() {
-          _articles = [];
-          _error = 'Unable to load any articles. Please check your internet connection and try again.';
-          _isLoading = false;
-        });
-        print('ERROR: Supabase completely unavailable for $category');
-      }
+      // PRIORITY 3: If Supabase completely fails, show toast and prepare to switch back to All
+      setState(() {
+        _articles = [];
+        _error = 'Unable to load $category articles.';
+        _isLoading = false;
+      });
+      _showToast('Unable to load $category articles. Switching back to All categories.');
+      print('ERROR: Supabase completely unavailable for $category');
     } catch (e) {
       setState(() {
         _error = 'Failed to load articles for $category: $e';
@@ -224,11 +357,14 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
       backgroundColor: CupertinoColors.black,
-      child: Stack(
-        children: [
-          _buildBody(),
-          _buildCleanHeader(),
-        ],
+      child: GestureDetector(
+        onHorizontalDragEnd: _handleHorizontalSwipe,
+        child: Stack(
+          children: [
+            _buildBody(),
+            _buildCleanHeader(),
+          ],
+        ),
       ),
     );
   }
@@ -579,7 +715,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
                     child: CupertinoButton(
                       padding: EdgeInsets.zero,
                       minSize: 0,
-                      onPressed: null,
+                      onPressed: _showCategoryMenu,
                       child: Text(
                         _selectedCategory,
                         style: const TextStyle(
@@ -604,7 +740,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
                     ),
                     child: CupertinoButton(
                       padding: EdgeInsets.zero,
-                      onPressed: _showCategoryMenu,
+                      onPressed: _showSettingsMenu,
                       child: const Icon(
                         CupertinoIcons.ellipsis,
                         size: 16,
@@ -689,6 +825,61 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
     );
   }
 
+  void _showSettingsMenu() {
+    showCupertinoModalPopup(
+      context: context,
+      builder: (BuildContext context) {
+        return CupertinoActionSheet(
+          title: const Text(
+            'Settings',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          message: const Text('App preferences and settings'),
+          actions: [
+            CupertinoActionSheetAction(
+              onPressed: () {
+                Navigator.pop(context);
+                print('Show feed preferences');
+              },
+              child: const Text('Feed Preferences'),
+            ),
+            CupertinoActionSheetAction(
+              onPressed: () {
+                Navigator.pop(context);
+                print('Show language settings');
+              },
+              child: const Text('Language'),
+            ),
+            CupertinoActionSheetAction(
+              onPressed: () {
+                Navigator.pop(context);
+                print('Show notification settings');
+              },
+              child: const Text('Notifications'),
+            ),
+            CupertinoActionSheetAction(
+              onPressed: () {
+                Navigator.pop(context);
+                print('Show reading history');
+              },
+              child: const Text('Reading History'),
+            ),
+          ],
+          cancelButton: CupertinoActionSheetAction(
+            isDefaultAction: true,
+            onPressed: () {
+              Navigator.pop(context);
+            },
+            child: const Text('Cancel'),
+          ),
+        );
+      },
+    );
+  }
+
   void _selectCategory(String category) {
     setState(() {
       _selectedCategory = category;
@@ -702,6 +893,120 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
     }
     
     print('Switched to $category');
+  }
+
+  void _selectCategoryWithSwipeContext(String category, bool isRightSwipe) {
+    setState(() {
+      _selectedCategory = category;
+      _currentIndex = 0;
+    });
+    
+    if (category == 'All') {
+      _loadNewsArticles();
+    } else {
+      _loadArticlesByCategoryWithSwipeContext(category, isRightSwipe);
+    }
+    
+    print('Switched to $category via ${isRightSwipe ? 'right' : 'left'} swipe');
+  }
+
+  void _handleHorizontalSwipe(DragEndDetails details) {
+    final velocity = details.primaryVelocity ?? 0;
+    
+    // Only handle swipes if they're fast enough (minimum velocity)
+    if (velocity.abs() < 500) return;
+    
+    final categories = [
+      'All',
+      'Technology',
+      'Science',
+      'Environment',
+      'Energy',
+      'Lifestyle',
+      'Business',
+      'Entertainment',
+      'Health',
+      'Sports',
+      'World',
+      'Trending'
+    ];
+    
+    final currentIndex = categories.indexOf(_selectedCategory);
+    if (currentIndex == -1) return;
+    
+    int newIndex;
+    bool isRightSwipe = velocity > 0;
+    
+    if (isRightSwipe) {
+      // Right swipe - go to previous category
+      newIndex = currentIndex > 0 ? currentIndex - 1 : categories.length - 1;
+    } else {
+      // Left swipe - go to next category
+      newIndex = currentIndex < categories.length - 1 ? currentIndex + 1 : 0;
+    }
+    
+    final newCategory = categories[newIndex];
+    _selectCategoryWithSwipeContext(newCategory, isRightSwipe);
+    
+    // Show a brief toast to indicate category change (only for left swipes)
+    if (!isRightSwipe) {
+      _showCategoryChangeToast(newCategory);
+    }
+  }
+
+  void _showCategoryChangeToast(String category) {
+    // Create a simple overlay toast
+    final overlay = Overlay.of(context);
+    late OverlayEntry overlayEntry;
+    
+    overlayEntry = OverlayEntry(
+      builder: (context) => Positioned(
+        top: MediaQuery.of(context).padding.top + 80,
+        left: 20,
+        right: 20,
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.8),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: Colors.white.withOpacity(0.2),
+                width: 1,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  CupertinoIcons.arrow_left_right,
+                  color: Colors.white,
+                  size: 16,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Switched to $category',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    
+    overlay.insert(overlayEntry);
+    
+    // Remove the toast after 1.5 seconds
+    Future.delayed(const Duration(milliseconds: 1500), () {
+      overlayEntry.remove();
+    });
   }
 
   String _formatTimestamp(DateTime timestamp) {
@@ -782,6 +1087,11 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
                 isDefaultAction: true,
                 onPressed: () {
                   Navigator.of(context).pop();
+                  // If we're showing a "no articles" message and not on "All" category,
+                  // automatically switch back to "All"
+                  if (_selectedCategory != 'All' && _articles.isEmpty) {
+                    _selectCategory('All');
+                  }
                 },
                 child: const Text('OK'),
               ),
@@ -790,10 +1100,15 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
         },
       );
       
-      // Auto-dismiss after 3 seconds
+      // Auto-dismiss after 3 seconds and handle category switch
       Future.delayed(const Duration(seconds: 3), () {
         if (mounted && Navigator.canPop(context)) {
           Navigator.of(context).pop();
+          // If we're showing a "no articles" message and not on "All" category,
+          // automatically switch back to "All"
+          if (_selectedCategory != 'All' && _articles.isEmpty) {
+            _selectCategory('All');
+          }
         }
       });
     }
