@@ -122,18 +122,6 @@ class NewsDetailScreen extends StatelessWidget {
                             },
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        CupertinoButton(
-                          padding: const EdgeInsets.all(12),
-                          color: CupertinoColors.systemGrey5,
-                          child: const Icon(
-                            CupertinoIcons.heart,
-                            color: CupertinoColors.systemRed,
-                          ),
-                          onPressed: () {
-                            // Like functionality
-                          },
-                        ),
                       ],
                     ),
                   ],

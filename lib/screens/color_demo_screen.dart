@@ -413,18 +413,6 @@ class _ColorDemoScreenState extends State<ColorDemoScreen> with TickerProviderSt
     });
   }
   
-  void _swipeCard(bool liked) {
-    if (_currentIndex < _articles.length && !_isDragging) {
-      _animateSwipe(liked);
-    }
-  }
-
-  void _bookmarkCard() {
-    if (_currentIndex < _articles.length) {
-      _showFeedback('Bookmarked!', true);
-      // Add bookmark logic here
-    }
-  }
 
   void _showFeedback(String message, bool positive) {
     final color = positive ? CupertinoColors.systemGreen : CupertinoColors.systemRed;
@@ -645,22 +633,6 @@ class _ColorDemoScreenState extends State<ColorDemoScreen> with TickerProviderSt
                               Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  _buildInshortsActionButton(
-                                    CupertinoIcons.heart_fill,
-                                    palette.onPrimary,
-                                    () {
-                                      // Like action
-                                    },
-                                  ),
-                                  const SizedBox(width: 12),
-                                  _buildInshortsActionButton(
-                                    CupertinoIcons.bookmark_fill,
-                                    palette.onPrimary,
-                                    () {
-                                      // Bookmark action
-                                    },
-                                  ),
-                                  const SizedBox(width: 12),
                                   _buildInshortsActionButton(
                                     CupertinoIcons.share_up,
                                     palette.onPrimary,

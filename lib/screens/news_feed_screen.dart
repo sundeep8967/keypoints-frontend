@@ -579,10 +579,10 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
                     child: CupertinoButton(
                       padding: EdgeInsets.zero,
                       minSize: 0,
-                      onPressed: _showMyFeed,
-                      child: const Text(
-                        'My Feed',
-                        style: TextStyle(
+                      onPressed: null,
+                      child: Text(
+                        _selectedCategory,
+                        style: const TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.w600,
                           color: Colors.black,
@@ -618,47 +618,6 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
           ),
         ),
       ),
-    );
-  }
-
-  void _showMyFeed() {
-    showCupertinoModalPopup(
-      context: context,
-      builder: (BuildContext context) {
-        return CupertinoActionSheet(
-          title: const Text(
-            'My Feed',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          message: const Text('Manage your personalized news feed'),
-          actions: [
-            CupertinoActionSheetAction(
-              onPressed: () {
-                Navigator.pop(context);
-                print('Show reading history');
-              },
-              child: const Text('Reading History'),
-            ),
-            CupertinoActionSheetAction(
-              onPressed: () {
-                Navigator.pop(context);
-                print('Show feed preferences');
-              },
-              child: const Text('Feed Preferences'),
-            ),
-          ],
-          cancelButton: CupertinoActionSheetAction(
-            isDefaultAction: true,
-            onPressed: () {
-              Navigator.pop(context);
-            },
-            child: const Text('Cancel'),
-          ),
-        );
-      },
     );
   }
 
