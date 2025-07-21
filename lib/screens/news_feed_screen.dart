@@ -1,8 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import '../models/news_article.dart';
-import '../widgets/dynamic_color_news_card.dart';
-import '../services/firebase_service.dart';
 import '../services/supabase_service.dart';
 import '../services/color_extraction_service.dart';
 import '../services/read_articles_service.dart';
@@ -26,12 +24,6 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
   
   // Animation controllers for swipe
   late AnimationController _animationController;
-  late Animation<Offset> _slideAnimation;
-  late Animation<double> _rotationAnimation;
-  
-  // Drag state
-  Offset _dragOffset = Offset.zero;
-  bool _isDragging = false;
 
   @override
   void initState() {
@@ -45,22 +37,6 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
       duration: const Duration(milliseconds: 300),
       vsync: this,
     );
-    
-    _slideAnimation = Tween<Offset>(
-      begin: Offset.zero,
-      end: const Offset(2.0, 0.0),
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeInOut,
-    ));
-    
-    _rotationAnimation = Tween<double>(
-      begin: 0.0,
-      end: 0.3,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeInOut,
-    ));
   }
   
   @override
@@ -463,7 +439,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
       color: palette.primary,
       child: Column(
         children: [
-          SizedBox(height: MediaQuery.of(context).padding.top + 50),
+          SizedBox(height: MediaQuery.of(context).padding.top + 70),
           Container(
             height: MediaQuery.of(context).size.height * 0.3,
             width: double.infinity,
@@ -578,16 +554,18 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 12),
-                  Text(
-                    article.description,
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: palette.onPrimary.withOpacity(0.9),
-                      height: 1.5,
-                      letterSpacing: 0.1,
+                  Expanded(
+                    child: Text(
+                      article.description,
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: palette.onPrimary.withOpacity(0.9),
+                        height: 1.5,
+                        letterSpacing: 0.1,
+                      ),
+                      maxLines: 6,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    maxLines: 8,
-                    overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 20),
                   Column(
@@ -673,85 +651,30 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.15),
-                      blurRadius: 6,
-                      offset: const Offset(0, 1),
-                    ),
-                  ],
-                ),
-                child: const Text(
-                  'KeyPoints',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.black,
-                    letterSpacing: -0.2,
-                  ),
-                ),
+              // Horizontal categories - takes most of the space
+              Expanded(
+                child: _buildHorizontalCategories(),
               ),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // My Feed button
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.9),
-                      borderRadius: BorderRadius.circular(8),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.15),
-                          blurRadius: 4,
-                          offset: const Offset(0, 1),
-                        ),
-                      ],
-                    ),
-                    child: CupertinoButton(
-                      padding: EdgeInsets.zero,
-                      minSize: 0,
-                      onPressed: _showCategoryMenu,
-                      child: Text(
-                        _selectedCategory,
-                        style: const TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black,
-                          letterSpacing: -0.1,
-                        ),
-                      ),
-                    ),
+              const SizedBox(width: 12),
+              // Three dot menu button
+              CupertinoButton(
+                padding: EdgeInsets.zero,
+                minSize: 32,
+                onPressed: _showSettingsMenu,
+                child: Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  
-                  const SizedBox(width: 8),
-                  
-                  // Category menu button
-                  Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: CupertinoButton(
-                      padding: EdgeInsets.zero,
-                      onPressed: _showSettingsMenu,
-                      child: const Icon(
-                        CupertinoIcons.ellipsis,
-                        size: 16,
-                        color: Colors.white,
-                      ),
-                    ),
+                  child: const Icon(
+                    CupertinoIcons.ellipsis,
+                    size: 16,
+                    color: Colors.white,
                   ),
-                ],
+                ),
               ),
             ],
           ),
@@ -760,10 +683,10 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
     );
   }
 
-  void _showCategoryMenu() {
+  Widget _buildHorizontalCategories() {
     final categories = [
       'All',
-      'Technology',
+      'Tech',
       'Science',
       'Environment',
       'Energy',
@@ -776,57 +699,45 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
       'Trending'
     ];
 
-    showCupertinoModalPopup(
-      context: context,
-      builder: (BuildContext context) {
-        return CupertinoActionSheet(
-          title: const Text(
-            'Select News Category',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          message: Text('Currently showing: $_selectedCategory'),
-          actions: categories.map((category) {
-            final isSelected = category == _selectedCategory;
-            return CupertinoActionSheetAction(
-              onPressed: () {
-                Navigator.pop(context);
-                _selectCategory(category);
-              },
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  if (isSelected)
-                    const Icon(
-                      CupertinoIcons.checkmark,
-                      size: 18,
-                      color: CupertinoColors.systemBlue,
-                    ),
-                  if (isSelected) const SizedBox(width: 8),
-                  Text(
-                    category,
-                    style: TextStyle(
-                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                      color: isSelected ? CupertinoColors.systemBlue : null,
-                    ),
+    return SizedBox(
+      height: 44,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        itemCount: categories.length,
+        itemBuilder: (context, index) {
+          final category = categories[index];
+          final isSelected = category == _selectedCategory;
+          
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: CupertinoButton(
+              padding: EdgeInsets.zero,
+              minSize: 0,
+              onPressed: () => _selectCategory(category),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: isSelected 
+                    ? Colors.white 
+                    : Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Text(
+                  category,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                    color: isSelected ? Colors.black : Colors.white,
                   ),
-                ],
+                ),
               ),
-            );
-          }).toList(),
-          cancelButton: CupertinoActionSheetAction(
-            isDefaultAction: true,
-            onPressed: () {
-              Navigator.pop(context);
-            },
-            child: const Text('Cancel'),
-          ),
-        );
-      },
+            ),
+          );
+        },
+      ),
     );
   }
+
 
   void _showSettingsMenu() {
     showCupertinoModalPopup(
@@ -1124,7 +1035,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
       color: const Color(0xFF1a1a1a),
       child: Column(
         children: [
-          SizedBox(height: MediaQuery.of(context).padding.top + 50),
+          SizedBox(height: MediaQuery.of(context).padding.top + 70),
           Expanded(
             child: Center(
               child: Column(
@@ -1170,7 +1081,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
       color: const Color(0xFF2a2a2a),
       child: Column(
         children: [
-          SizedBox(height: MediaQuery.of(context).padding.top + 50),
+          SizedBox(height: MediaQuery.of(context).padding.top + 70),
           Expanded(
             child: Center(
               child: Column(

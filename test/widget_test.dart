@@ -11,12 +11,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:keypoints/main.dart';
 
 void main() {
-  testWidgets('KeyPoints app smoke test', (WidgetTester tester) async {
+  testWidgets('News app smoke test', (WidgetTester tester) async {
     // Build our app and trigger a frame.
-    await tester.pumpWidget(const KeyPointsApp());
+    await tester.pumpWidget(const NewsApp());
 
     // Verify that our app loads with the correct title
-    expect(find.text('KeyPoints'), findsOneWidget);
+    expect(find.text('News'), findsOneWidget);
     
     // Verify that the app shows loading or empty state initially
     expect(find.byType(CupertinoActivityIndicator), findsWidgets);

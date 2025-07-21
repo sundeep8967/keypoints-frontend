@@ -1,8 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'firebase_options.dart';
 import 'screens/news_feed_screen.dart';
 import 'screens/language_selection_screen.dart';
 import 'services/supabase_service.dart';
@@ -47,16 +45,16 @@ void main() async {
     print('Firebase initialization error: $e');
   }
   
-  runApp(const KeyPointsApp());
+  runApp(const NewsApp());
 }
 
-class KeyPointsApp extends StatelessWidget {
-  const KeyPointsApp({super.key});
+class NewsApp extends StatelessWidget {
+  const NewsApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return CupertinoApp(
-      title: 'KeyPoints',
+      title: 'News',
       theme: const CupertinoThemeData(
         brightness: Brightness.light,
         primaryColor: CupertinoColors.systemBlue,
@@ -116,7 +114,7 @@ class _AppInitializerState extends State<AppInitializer> {
               ),
               SizedBox(height: 16),
               Text(
-                'KeyPoints',
+                'News',
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
