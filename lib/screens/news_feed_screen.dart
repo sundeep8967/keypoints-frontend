@@ -22,14 +22,47 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
   // Cache for preloaded color palettes
   final Map<String, ColorPalette> _colorCache = {};
   
+  // Cache for category articles - pre-load all categories
+  final Map<String, List<NewsArticle>> _categoryArticles = {};
+  final Map<String, bool> _categoryLoading = {};
+  
   // Animation controllers for swipe
   late AnimationController _animationController;
+  late PageController _categoryPageController;
 
   @override
   void initState() {
     super.initState();
     _setupAnimations();
+    _initializeCategories();
     _loadNewsArticles();
+  }
+
+  void _initializeCategories() {
+    final categories = [
+      'All',
+      'Tech',
+      'Science',
+      'Environment',
+      'Energy',
+      'Lifestyle',
+      'Business',
+      'Entertainment',
+      'Health',
+      'Sports',
+      'World',
+      'Trending'
+    ];
+    
+    // Initialize category page controller
+    final currentCategoryIndex = categories.indexOf(_selectedCategory);
+    _categoryPageController = PageController(initialPage: currentCategoryIndex >= 0 ? currentCategoryIndex : 0);
+    
+    // Pre-load all categories
+    for (String category in categories) {
+      _categoryArticles[category] = [];
+      _categoryLoading[category] = false;
+    }
   }
   
   void _setupAnimations() {
@@ -42,6 +75,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
   @override
   void dispose() {
     _animationController.dispose();
+    _categoryPageController.dispose();
     super.dispose();
   }
 
@@ -333,23 +367,76 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
       backgroundColor: CupertinoColors.black,
-      child: GestureDetector(
-        onHorizontalDragEnd: (details) {
-          print('DEBUG: Horizontal swipe detected');
-          _handleHorizontalSwipe(details);
-        },
-        child: Stack(
-          children: [
-            _buildBody(),
-            _buildCleanHeader(),
-          ],
-        ),
+      child: Stack(
+        children: [
+          _buildCategoryPageView(),
+          _buildCleanHeader(),
+        ],
       ),
     );
   }
 
-  Widget _buildBody() {
-    if (_isLoading) {
+  Widget _buildCategoryPageView() {
+    final categories = [
+      'All',
+      'Tech',
+      'Science',
+      'Environment',
+      'Energy',
+      'Lifestyle',
+      'Business',
+      'Entertainment',
+      'Health',
+      'Sports',
+      'World',
+      'Trending'
+    ];
+    
+    return PageView.builder(
+      scrollDirection: Axis.horizontal,
+      physics: const PageScrollPhysics(),
+      itemCount: categories.length,
+      controller: _categoryPageController,
+      onPageChanged: (categoryIndex) {
+        final newCategory = categories[categoryIndex];
+        if (newCategory != _selectedCategory) {
+          print('RIGHT SWIPE DETECTED: Switching from $_selectedCategory to $newCategory');
+          setState(() {
+            _selectedCategory = newCategory;
+            _currentIndex = 0;
+          });
+          
+          // Pre-load this category if not already loaded
+          _preloadCategoryIfNeeded(newCategory);
+        }
+      },
+      itemBuilder: (context, categoryIndex) {
+        final category = categories[categoryIndex];
+        return _buildCategoryContent(category);
+      },
+    );
+  }
+
+  void _preloadCategoryIfNeeded(String category) {
+    if (_categoryArticles[category]?.isEmpty == true && _categoryLoading[category] != true) {
+      _categoryLoading[category] = true;
+      
+      if (category == 'All') {
+        _loadNewsArticlesForCategory(category);
+      } else {
+        _loadArticlesByCategoryForCache(category);
+      }
+    }
+  }
+
+  Widget _buildCategoryContent(String category) {
+    final categoryArticles = _categoryArticles[category] ?? [];
+    final isLoading = _categoryLoading[category] ?? false;
+    
+    // If this is the current category, use the main articles list
+    final articlesToShow = category == _selectedCategory ? _articles : categoryArticles;
+    
+    if (isLoading && articlesToShow.isEmpty) {
       return const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -368,40 +455,42 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
       );
     }
 
-    if (_error.isNotEmpty || _articles.isEmpty) {
+    if (articlesToShow.isEmpty) {
       return _buildNoArticlesPage();
     }
 
     return PageView.builder(
       scrollDirection: Axis.vertical,
       physics: const PageScrollPhysics(),
-      itemCount: _articles.length + 1, // +1 for "end of articles" page
+      itemCount: articlesToShow.length + 1, // +1 for "end of articles" page
       pageSnapping: true,
       onPageChanged: (index) async {
-        print('PAGE CHANGED: Moving to article $index');
+        print('PAGE CHANGED: Moving to article $index in $category');
         
         // Mark previous article as read when moving to next article
-        if (index > 0 && index <= _articles.length && _articles.isNotEmpty) {
-          final previousArticle = _articles[index - 1];
+        if (index > 0 && index <= articlesToShow.length && articlesToShow.isNotEmpty) {
+          final previousArticle = articlesToShow[index - 1];
           await ReadArticlesService.markAsRead(previousArticle.id);
           print('Marked article "${previousArticle.title}" as read');
         }
         
-        setState(() {
-          _currentIndex = index;
-        });
+        if (category == _selectedCategory) {
+          setState(() {
+            _currentIndex = index;
+          });
+        }
         
-        if (index < _articles.length && index % 3 == 0) {
+        if (index < articlesToShow.length && index % 3 == 0) {
           _preloadColors();
         }
       },
       itemBuilder: (context, index) {
         // Show "end of articles" page after last article
-        if (index >= _articles.length) {
+        if (index >= articlesToShow.length) {
           return _buildEndOfArticlesPage();
         }
         
-        final article = _articles[index];
+        final article = articlesToShow[index];
         return Container(
           width: double.infinity,
           height: double.infinity,
@@ -555,16 +644,16 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
                   ),
                   const SizedBox(height: 12),
                   Expanded(
-                    child: Text(
-                      article.description,
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: palette.onPrimary.withOpacity(0.9),
-                        height: 1.5,
-                        letterSpacing: 0.1,
+                    child: SingleChildScrollView(
+                      child: Text(
+                        article.description,
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: palette.onPrimary.withOpacity(0.9),
+                          height: 1.5,
+                          letterSpacing: 0.1,
+                        ),
                       ),
-                      maxLines: 6,
-                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   const SizedBox(height: 20),
@@ -600,6 +689,44 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
                                 CupertinoIcons.share_up,
                                 palette.onPrimary,
                                 () {},
+                              ),
+                              const SizedBox(width: 8),
+                              // Category swipe indicator
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: palette.onPrimary.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: palette.onPrimary.withOpacity(0.2),
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      CupertinoIcons.arrow_left,
+                                      size: 12,
+                                      color: palette.onPrimary.withOpacity(0.7),
+                                    ),
+                                    const SizedBox(width: 2),
+                                    Text(
+                                      'Categories',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: palette.onPrimary.withOpacity(0.7),
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 2),
+                                    Icon(
+                                      CupertinoIcons.arrow_right,
+                                      size: 12,
+                                      color: palette.onPrimary.withOpacity(0.7),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ],
                           ),
@@ -795,18 +922,96 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
   }
 
   void _selectCategory(String category) {
+    final categories = [
+      'All',
+      'Tech',
+      'Science',
+      'Environment',
+      'Energy',
+      'Lifestyle',
+      'Business',
+      'Entertainment',
+      'Health',
+      'Sports',
+      'World',
+      'Trending'
+    ];
+    
+    final categoryIndex = categories.indexOf(category);
+    if (categoryIndex != -1) {
+      _categoryPageController.animateToPage(
+        categoryIndex,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    }
+    
     setState(() {
       _selectedCategory = category;
       _currentIndex = 0;
     });
     
-    if (category == 'All') {
-      _loadNewsArticles();
-    } else {
-      _loadArticlesByCategory(category);
-    }
+    _preloadCategoryIfNeeded(category);
     
     print('Switched to $category');
+  }
+
+  Future<void> _loadNewsArticlesForCategory(String category) async {
+    try {
+      final allArticles = await SupabaseService.getNews(limit: 100);
+      if (allArticles.isNotEmpty) {
+        final readIds = await ReadArticlesService.getReadArticleIds();
+        final unreadArticles = allArticles.where((article) => 
+          !readIds.contains(article.id)
+        ).toList();
+        
+        _categoryArticles[category] = unreadArticles;
+        _categoryLoading[category] = false;
+        
+        if (category == _selectedCategory) {
+          setState(() {
+            _articles = unreadArticles;
+            _isLoading = false;
+          });
+        }
+        
+        print('Pre-loaded $category: ${unreadArticles.length} articles');
+      }
+    } catch (e) {
+      _categoryLoading[category] = false;
+      print('Error pre-loading $category: $e');
+    }
+  }
+
+  Future<void> _loadArticlesByCategoryForCache(String category) async {
+    try {
+      final readIds = await ReadArticlesService.getReadArticleIds();
+      
+      final allCategoryArticles = await SupabaseService.getNewsByCategory(category, limit: 100);
+      if (allCategoryArticles.isNotEmpty) {
+        final unreadCategoryArticles = allCategoryArticles.where((article) => 
+          !readIds.contains(article.id)
+        ).toList();
+        
+        _categoryArticles[category] = unreadCategoryArticles;
+        _categoryLoading[category] = false;
+        
+        if (category == _selectedCategory) {
+          setState(() {
+            _articles = unreadCategoryArticles;
+            _isLoading = false;
+          });
+        }
+        
+        print('Pre-loaded $category: ${unreadCategoryArticles.length} articles');
+      } else {
+        _categoryArticles[category] = [];
+        _categoryLoading[category] = false;
+      }
+    } catch (e) {
+      _categoryLoading[category] = false;
+      print('Error pre-loading $category: $e');
+    }
   }
 
   void _selectCategoryWithSwipeContext(String category, bool isRightSwipe) {
@@ -821,107 +1026,10 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
       _loadArticlesByCategoryWithSwipeContext(category, isRightSwipe);
     }
     
-    print('Switched to $category via ${isRightSwipe ? 'right' : 'left'} swipe');
   }
 
-  void _handleHorizontalSwipe(DragEndDetails details) {
-    final velocity = details.primaryVelocity ?? 0;
-    
-    // Only handle swipes if they're fast enough (minimum velocity)
-    if (velocity.abs() < 500) return;
-    
-    final categories = [
-      'All',
-      'Technology',
-      'Science',
-      'Environment',
-      'Energy',
-      'Lifestyle',
-      'Business',
-      'Entertainment',
-      'Health',
-      'Sports',
-      'World',
-      'Trending'
-    ];
-    
-    final currentIndex = categories.indexOf(_selectedCategory);
-    if (currentIndex == -1) return;
-    
-    int newIndex;
-    bool isRightSwipe = velocity > 0;
-    
-    if (isRightSwipe) {
-      // Right swipe - go to next category  
-      newIndex = currentIndex < categories.length - 1 ? currentIndex + 1 : 0;
-    } else {
-      // Left swipe - go to previous category
-      newIndex = currentIndex > 0 ? currentIndex - 1 : categories.length - 1;
-    }
-    
-    final newCategory = categories[newIndex];
-    _selectCategoryWithSwipeContext(newCategory, isRightSwipe);
-    
-    // Show a brief toast to indicate category change (only for left swipes)
-    if (!isRightSwipe) {
-      _showCategoryChangeToast(newCategory);
-    }
-  }
 
-  void _showCategoryChangeToast(String category) {
-    // Create a simple overlay toast
-    final overlay = Overlay.of(context);
-    late OverlayEntry overlayEntry;
-    
-    overlayEntry = OverlayEntry(
-      builder: (context) => Positioned(
-        top: MediaQuery.of(context).padding.top + 80,
-        left: 20,
-        right: 20,
-        child: Material(
-          color: Colors.transparent,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.8),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: Colors.white.withOpacity(0.2),
-                width: 1,
-              ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(
-                  CupertinoIcons.arrow_left_right,
-                  color: Colors.white,
-                  size: 16,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  'Switched to $category',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-    
-    overlay.insert(overlayEntry);
-    
-    // Remove the toast after 1.5 seconds
-    Future.delayed(const Duration(milliseconds: 1500), () {
-      overlayEntry.remove();
-    });
-  }
+
 
   String _formatTimestamp(DateTime timestamp) {
     final now = DateTime.now();
