@@ -29,6 +29,11 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
   // Animation controllers for swipe
   late AnimationController _animationController;
   late PageController _categoryPageController;
+  late ScrollController _categoryScrollController;
+  
+  // Store category pill positions for accurate scrolling
+  final List<GlobalKey> _categoryKeys = [];
+  final Map<int, double> _categoryPositions = {};
 
   @override
   void initState() {
@@ -61,6 +66,9 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
     final currentCategoryIndex = categories.indexOf(_selectedCategory);
     _categoryPageController = PageController(initialPage: currentCategoryIndex >= 0 ? currentCategoryIndex : 0);
     
+    // Initialize category scroll controller for horizontal pills
+    _categoryScrollController = ScrollController();
+    
     // Pre-load all categories
     for (String category in categories) {
       _categoryArticles[category] = [];
@@ -79,6 +87,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
   void dispose() {
     _animationController.dispose();
     _categoryPageController.dispose();
+    _categoryScrollController.dispose();
     super.dispose();
   }
 
@@ -419,6 +428,9 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
             _currentIndex = 0;
           });
           
+          // Auto-scroll category pills to keep selected category visible
+          _scrollToSelectedCategoryAccurate(categoryIndex);
+          
           // Pre-load this category if not already loaded
           _preloadCategoryIfNeeded(newCategory);
           
@@ -668,19 +680,19 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
                   ),
                   const SizedBox(height: 12),
                   Expanded(
-                    child: SingleChildScrollView(
-                      child: Text(
-                        // Prioritize keypoints, fallback to description
-                        article.keypoints?.isNotEmpty == true 
-                          ? article.keypoints! 
-                          : article.description,
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: palette.onPrimary.withOpacity(0.9),
-                          height: 1.5,
-                          letterSpacing: 0.1,
-                        ),
+                    child: Text(
+                      // Prioritize keypoints, fallback to description
+                      article.keypoints?.isNotEmpty == true 
+                        ? article.keypoints! 
+                        : article.description,
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: palette.onPrimary.withOpacity(0.9),
+                        height: 1.5,
+                        letterSpacing: 0.1,
                       ),
+                      maxLines: 8,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   const SizedBox(height: 20),
@@ -815,6 +827,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
     return SizedBox(
       height: 44,
       child: ListView.builder(
+        controller: _categoryScrollController,
         scrollDirection: Axis.horizontal,
         itemCount: categories.length,
         itemBuilder: (context, index) {
@@ -823,24 +836,31 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
           
           return Padding(
             padding: const EdgeInsets.only(right: 8),
-            child: CupertinoButton(
-              padding: EdgeInsets.zero,
-              minSize: 0,
-              onPressed: () => _selectCategory(category),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: isSelected 
-                    ? Colors.white 
-                    : Colors.white.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Text(
-                  category,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                    color: isSelected ? Colors.black : Colors.white,
+            child: Container(
+              key: index < _categoryKeys.length ? _categoryKeys[index] : null,
+              child: CupertinoButton(
+                padding: EdgeInsets.zero,
+                minSize: 0,
+                onPressed: () {
+                  _selectCategory(category);
+                  // Also scroll to tapped category
+                  _scrollToSelectedCategoryAccurate(index);
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: isSelected 
+                      ? Colors.white 
+                      : Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Text(
+                    category,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                      color: isSelected ? Colors.black : Colors.white,
+                    ),
                   ),
                 ),
               ),
@@ -1540,5 +1560,136 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
     }
     
     return null;
+  }
+
+  void _scrollToSelectedCategoryAccurate(int categoryIndex) {
+    // Use a more aggressive approach - scroll to ensure visibility
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_categoryScrollController.hasClients) return;
+      
+      try {
+        // Get actual category widths dynamically
+        final categories = [
+          'All', 'Sports', 'Top', 'Trending', 'Science', 'World', 'Health', 'Business', 
+          'Tech', 'Entertainment', 'Travel', 'Startups', 'Politics', 'National', 
+          'India', 'Education', 'Celebrity', 'Scandal', 'Viral'
+        ];
+        
+        final double screenWidth = MediaQuery.of(context).size.width;
+        final double spacing = 8.0; // Space between items
+        final double padding = 20.0; // Left padding
+        
+        // Calculate cumulative position by measuring each category
+        double itemPosition = padding;
+        for (int i = 0; i < categoryIndex; i++) {
+          final double itemWidth = _estimateCategoryWidth(categories[i]);
+          itemPosition += itemWidth + spacing;
+        }
+        
+        // Get current category width
+        final double currentItemWidth = _estimateCategoryWidth(categories[categoryIndex]);
+        
+        final double currentScroll = _categoryScrollController.position.pixels;
+        final double maxScroll = _categoryScrollController.position.maxScrollExtent;
+        
+        // Calculate visible area
+        final double visibleStart = currentScroll;
+        final double visibleEnd = currentScroll + screenWidth - 40;
+        
+        double targetScroll = currentScroll;
+        
+        // If category is going off-screen to the RIGHT, scroll right
+        if (itemPosition + currentItemWidth > visibleEnd) {
+          targetScroll = itemPosition + currentItemWidth - screenWidth + 60;
+        }
+        // If category is off-screen to the LEFT, scroll left
+        else if (itemPosition < visibleStart + 40) {
+          targetScroll = itemPosition - 60;
+        }
+        
+        // Ensure we stay within bounds
+        targetScroll = targetScroll.clamp(0.0, maxScroll);
+        
+        print('Category "$categories[categoryIndex]" ($categoryIndex): pos=$itemPosition, width=$currentItemWidth, visible=$visibleStart-$visibleEnd, scroll=$currentScroll->$targetScroll');
+        
+        // Only animate if we need to scroll significantly
+        if ((targetScroll - currentScroll).abs() > 10) {
+          _categoryScrollController.animateTo(
+            targetScroll,
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOut,
+          );
+        }
+      } catch (e) {
+        print('Scroll error: $e');
+      }
+    });
+  }
+
+  double _estimateCategoryWidth(String categoryName) {
+    // Estimate width based on text length and padding
+    const double charWidth = 8.0; // Average character width
+    const double horizontalPadding = 24.0; // 12px on each side
+    
+    // Calculate based on actual text length
+    final double textWidth = categoryName.length * charWidth;
+    return textWidth + horizontalPadding;
+  }
+
+  void _scrollToSelectedCategory(int categoryIndex) {
+    // Add delay to ensure the scroll controller is ready
+    Future.delayed(const Duration(milliseconds: 150), () {
+      if (!_categoryScrollController.hasClients) {
+        print('ScrollController not ready yet');
+        return;
+      }
+      
+      try {
+        // Get current scroll position and viewport info
+        final double currentPosition = _categoryScrollController.position.pixels;
+        final double viewportWidth = _categoryScrollController.position.viewportDimension;
+        final double maxScroll = _categoryScrollController.position.maxScrollExtent;
+        
+        // Calculate item position more accurately
+        const double itemWidth = 90.0; // Wider estimate for category pills
+        const double itemSpacing = 8.0; // Space between pills
+        const double leftPadding = 20.0; // Initial padding
+        
+        // Calculate where the selected category starts
+        final double itemStartPosition = leftPadding + (categoryIndex * (itemWidth + itemSpacing));
+        final double itemEndPosition = itemStartPosition + itemWidth;
+        
+        // Check if item is already visible
+        final double visibleStart = currentPosition;
+        final double visibleEnd = currentPosition + viewportWidth;
+        
+        double targetScroll = currentPosition;
+        
+        // If item is off-screen to the right, scroll to show it
+        if (itemEndPosition > visibleEnd) {
+          targetScroll = itemEndPosition - viewportWidth + 40; // 40px margin
+        }
+        // If item is off-screen to the left, scroll to show it  
+        else if (itemStartPosition < visibleStart) {
+          targetScroll = itemStartPosition - 40; // 40px margin
+        }
+        
+        // Ensure we don't scroll beyond bounds
+        targetScroll = targetScroll.clamp(0.0, maxScroll);
+        
+        print('Category $categoryIndex: start=$itemStartPosition, end=$itemEndPosition, visible=$visibleStart-$visibleEnd, scrollTo=$targetScroll');
+        
+        // Only scroll if we need to
+        if ((targetScroll - currentPosition).abs() > 5) {
+          _categoryScrollController.animateTo(
+            targetScroll,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+          );
+        }
+      } catch (e) {
+        print('Error scrolling to category: $e');
+      }
+    });
   }
 }
