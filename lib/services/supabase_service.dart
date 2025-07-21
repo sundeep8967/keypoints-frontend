@@ -83,13 +83,49 @@ class SupabaseService {
       final response = await client
           .from('news_articles')
           .select()
-          .eq('category', category)
+          .ilike('category', category)
           .order('published', ascending: false)
           .limit(limit);
 
       return response.map<NewsArticle>((json) => NewsArticle.fromSupabase(json)).toList();
     } catch (e) {
       print('Error fetching news by category from Supabase: $e');
+      return [];
+    }
+  }
+
+  /// Get unread news by category (excludes read article IDs)
+  static Future<List<NewsArticle>> getUnreadNewsByCategory(String category, List<String> readIds, {int limit = 100}) async {
+    try {
+      var query = client
+          .from('news_articles')
+          .select()
+          .ilike('category', category);
+      
+      // Exclude read articles if we have any - use neq for each ID or filter client-side
+      if (readIds.isNotEmpty) {
+        // For now, let's fetch more and filter client-side since Supabase syntax is tricky
+        final response = await query
+            .order('published', ascending: false)
+            .limit(limit * 3); // Fetch more to account for filtering
+            
+        final allArticles = response.map<NewsArticle>((json) => NewsArticle.fromSupabase(json)).toList();
+        
+        // Filter out read articles client-side
+        final unreadArticles = allArticles.where((article) => 
+          !readIds.contains(article.id)
+        ).take(limit).toList();
+        
+        return unreadArticles;
+      } else {
+        final response = await query
+            .order('published', ascending: false)
+            .limit(limit);
+            
+        return response.map<NewsArticle>((json) => NewsArticle.fromSupabase(json)).toList();
+      }
+    } catch (e) {
+      print('Error fetching unread news by category from Supabase: $e');
       return [];
     }
   }

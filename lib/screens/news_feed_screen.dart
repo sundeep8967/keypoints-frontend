@@ -36,6 +36,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
     _setupAnimations();
     _initializeCategories();
     _loadNewsArticles();
+    _preloadAllCategories();
   }
 
   void _initializeCategories() {
@@ -408,6 +409,13 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
           
           // Pre-load this category if not already loaded
           _preloadCategoryIfNeeded(newCategory);
+          
+          // Update main articles list to match current category
+          if (_categoryArticles[newCategory]?.isNotEmpty == true) {
+            setState(() {
+              _articles = _categoryArticles[newCategory]!;
+            });
+          }
         }
       },
       itemBuilder: (context, categoryIndex) {
@@ -433,21 +441,25 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
     final categoryArticles = _categoryArticles[category] ?? [];
     final isLoading = _categoryLoading[category] ?? false;
     
-    // If this is the current category, use the main articles list
-    final articlesToShow = category == _selectedCategory ? _articles : categoryArticles;
+    // Always use category-specific articles, not the main _articles list
+    final articlesToShow = categoryArticles;
     
     if (isLoading && articlesToShow.isEmpty) {
       return const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            CupertinoActivityIndicator(radius: 20),
+            CupertinoActivityIndicator(
+              radius: 20,
+              color: Colors.white,
+            ),
             SizedBox(height: 16),
             Text(
               'Loading articles...',
               style: TextStyle(
                 fontSize: 16,
-                color: CupertinoColors.secondaryLabel,
+                color: Colors.white,
+                fontWeight: FontWeight.w500,
               ),
             ),
           ],
@@ -956,6 +968,46 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
     print('Switched to $category');
   }
 
+  void _preloadAllCategories() {
+    final categories = [
+      'All',
+      'Tech',
+      'Science',
+      'Environment',
+      'Energy',
+      'Lifestyle',
+      'Business',
+      'Entertainment',
+      'Health',
+      'Sports',
+      'World',
+      'Trending'
+    ];
+    
+    // First, let's see what categories exist in the database
+    _debugDatabaseCategories();
+    
+    // Pre-load all categories in background
+    for (String category in categories) {
+      _preloadCategoryIfNeeded(category);
+    }
+  }
+
+  Future<void> _debugDatabaseCategories() async {
+    try {
+      final allArticles = await SupabaseService.getNews(limit: 200);
+      final uniqueCategories = allArticles.map((article) => article.category).toSet().toList();
+      print('=== DATABASE CATEGORIES FOUND ===');
+      for (String cat in uniqueCategories) {
+        final count = allArticles.where((a) => a.category == cat).length;
+        print('Category: "$cat" - $count articles');
+      }
+      print('=== END DATABASE CATEGORIES ===');
+    } catch (e) {
+      print('Error debugging categories: $e');
+    }
+  }
+
   Future<void> _loadNewsArticlesForCategory(String category) async {
     try {
       final allArticles = await SupabaseService.getNews(limit: 100);
@@ -968,6 +1020,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
         _categoryArticles[category] = unreadArticles;
         _categoryLoading[category] = false;
         
+        // Always update the main articles if this is for the current category
         if (category == _selectedCategory) {
           setState(() {
             _articles = unreadArticles;
@@ -987,26 +1040,52 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
     try {
       final readIds = await ReadArticlesService.getReadArticleIds();
       
-      final allCategoryArticles = await SupabaseService.getNewsByCategory(category, limit: 100);
-      if (allCategoryArticles.isNotEmpty) {
-        final unreadCategoryArticles = allCategoryArticles.where((article) => 
-          !readIds.contains(article.id)
-        ).toList();
-        
-        _categoryArticles[category] = unreadCategoryArticles;
-        _categoryLoading[category] = false;
-        
-        if (category == _selectedCategory) {
-          setState(() {
-            _articles = unreadCategoryArticles;
-            _isLoading = false;
-          });
-        }
-        
-        print('Pre-loaded $category: ${unreadCategoryArticles.length} articles');
+      // Map UI category names to database category names
+      String dbCategory = category;
+      if (category == 'Tech') {
+        dbCategory = 'Technology';
+      } else if (category == 'Entertainment') {
+        dbCategory = 'Entertainment';
+      } else if (category == 'Business') {
+        dbCategory = 'Business';
+      } else if (category == 'Health') {
+        dbCategory = 'Health';
+      } else if (category == 'Sports') {
+        dbCategory = 'Sports';
+      } else if (category == 'Science') {
+        dbCategory = 'Science';
+      } else if (category == 'World') {
+        dbCategory = 'World';
+      }
+      
+      print('Loading category: $category (DB: $dbCategory)');
+      
+      // Use the new method that directly fetches unread articles
+      final unreadCategoryArticles = await SupabaseService.getUnreadNewsByCategory(dbCategory, readIds, limit: 100);
+      print('Found ${unreadCategoryArticles.length} unread articles for $dbCategory');
+      
+      _categoryArticles[category] = unreadCategoryArticles;
+      _categoryLoading[category] = false;
+      
+      // Always update the main articles if this is for the current category
+      if (category == _selectedCategory) {
+        setState(() {
+          _articles = unreadCategoryArticles;
+          _isLoading = false;
+        });
+      }
+      
+      if (unreadCategoryArticles.isNotEmpty) {
+        print('Pre-loaded $category: ${unreadCategoryArticles.length} unread articles available');
       } else {
-        _categoryArticles[category] = [];
-        _categoryLoading[category] = false;
+        print('No unread $category articles found - checking if category exists...');
+        // Check if category exists at all by getting a small sample
+        final sampleCategoryArticles = await SupabaseService.getNewsByCategory(dbCategory, limit: 5);
+        if (sampleCategoryArticles.isNotEmpty) {
+          print('$category exists in database but all articles have been read');
+        } else {
+          print('No $category articles found in database at all');
+        }
       }
     } catch (e) {
       _categoryLoading[category] = false;
