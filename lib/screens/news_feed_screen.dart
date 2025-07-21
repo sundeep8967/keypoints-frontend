@@ -800,28 +800,17 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
   }
 
   Widget _buildHorizontalCategories() {
-    final categories = [
+    // Base categories + dynamically detected states
+    final baseCategories = [
       'All',
-      'Sports',      // 58 articles
-      'Top',         // 56 articles  
-      'Trending',    // 53 articles
-      'Science',     // 51 articles
-      'World',       // 51 articles
-      'Health',      // 49 articles
-      'Business',    // 47 articles
-      'Tech',        // 46 articles
-      'Entertainment', // 35 articles
-      'Travel',      // 9 articles
-      'Startups',    // 6 articles
-      'Politics',    // 5 articles
-      'National',    // 5 articles
-      'India',       // 5 articles
-      'Education',   // 5 articles
-      'Celebrity',   // New category
-      'Scandal',     // New category
-      'Viral',       // New category
-      'State',       // New category
+      'Sports', 'Top', 'Trending', 'Science', 'World', 'Health', 'Business', 
+      'Tech', 'Entertainment', 'Travel', 'Startups', 'Politics', 'National', 
+      'India', 'Education', 'Celebrity', 'Scandal', 'Viral'
     ];
+    
+    // Add detected states from current articles
+    final detectedStates = _getDetectedStatesFromArticles();
+    final categories = [...baseCategories, ...detectedStates];
 
     return SizedBox(
       height: 44,
@@ -1063,6 +1052,9 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
         dbCategory = 'Viral';
       } else if (category == 'State') {
         dbCategory = 'State';
+      } else {
+        // For detected state names, use them as-is
+        dbCategory = category;
       }
       
       print('Loading category: $category (DB: $dbCategory)');
@@ -1357,6 +1349,12 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
   }
 
   bool _hasValidContent(NewsArticle article) {
+    // Check if article has valid image URL
+    if (!_hasValidImage(article.imageUrl)) {
+      print('Invalid image for article: "${article.title}" - URL: "${article.imageUrl}"');
+      return false;
+    }
+    
     // Check if article has keypoints
     if (article.keypoints != null && article.keypoints!.trim().isNotEmpty) {
       return true;
@@ -1369,6 +1367,41 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
     
     // No valid content found
     return false;
+  }
+
+  bool _hasValidImage(String imageUrl) {
+    // Check if image URL is not empty
+    if (imageUrl.trim().isEmpty) {
+      return false;
+    }
+    
+    // Check if it's a valid URL format
+    try {
+      final uri = Uri.parse(imageUrl);
+      if (!uri.hasScheme || (!uri.scheme.startsWith('http'))) {
+        return false;
+      }
+    } catch (e) {
+      return false;
+    }
+    
+    // Check if URL ends with common image extensions
+    final lowercaseUrl = imageUrl.toLowerCase();
+    final validExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'];
+    
+    // If URL has query parameters, check before the '?'
+    final urlWithoutQuery = lowercaseUrl.split('?')[0];
+    
+    // Allow URLs without extensions (many news sites use dynamic image URLs)
+    // But reject obviously invalid ones
+    if (lowercaseUrl.contains('placeholder') || 
+        lowercaseUrl.contains('default') ||
+        lowercaseUrl.contains('no-image') ||
+        lowercaseUrl.contains('missing')) {
+      return false;
+    }
+    
+    return true;
   }
 
   Future<void> _showAllSupabaseArticles() async {
@@ -1460,5 +1493,52 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
     } catch (e) {
       print('ERROR fetching categories: $e');
     }
+  }
+
+  List<String> _getDetectedStatesFromArticles() {
+    final states = <String>{};
+    
+    // Check current articles for state mentions
+    for (final article in _articles) {
+      final detectedState = _detectStateInContent(article);
+      if (detectedState != null) {
+        states.add(detectedState);
+      }
+    }
+    
+    return states.toList()..sort();
+  }
+
+  String? _detectStateInContent(NewsArticle article) {
+    final content = '${article.title} ${article.description} ${article.keypoints ?? ''}'.toLowerCase();
+    
+    // US States (major ones)
+    final usStates = {
+      'california': 'California',
+      'texas': 'Texas', 
+      'florida': 'Florida',
+      'new york': 'New York',
+      'illinois': 'Illinois',
+    };
+    
+    // Indian States (major ones)
+    final indianStates = {
+      'maharashtra': 'Maharashtra',
+      'uttar pradesh': 'Uttar Pradesh',
+      'tamil nadu': 'Tamil Nadu',
+      'karnataka': 'Karnataka',
+      'delhi': 'Delhi'
+    };
+    
+    final allStates = {...usStates, ...indianStates};
+    
+    // Check for state mentions in content
+    for (final entry in allStates.entries) {
+      if (content.contains(entry.key)) {
+        return entry.value;
+      }
+    }
+    
+    return null;
   }
 }
