@@ -37,6 +37,8 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
     _initializeCategories();
     _loadNewsArticles();
     _preloadAllCategories();
+    // Debug: Show categories in database
+    _showSupabaseCategories();
   }
 
   void _initializeCategories() {
@@ -383,17 +385,24 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
   Widget _buildCategoryPageView() {
     final categories = [
       'All',
-      'Tech',
-      'Science',
-      'Environment',
-      'Energy',
-      'Lifestyle',
-      'Business',
-      'Entertainment',
-      'Health',
-      'Sports',
-      'World',
-      'Trending'
+      'Sports',      // 58 articles
+      'Top',         // 56 articles  
+      'Trending',    // 53 articles
+      'Science',     // 51 articles
+      'World',       // 51 articles
+      'Health',      // 49 articles
+      'Business',    // 47 articles
+      'Tech',        // 46 articles
+      'Entertainment', // 35 articles
+      'Travel',      // 9 articles
+      'Startups',    // 6 articles
+      'Politics',    // 5 articles
+      'National',    // 5 articles
+      'India',       // 5 articles
+      'Education',   // 5 articles
+      'Celebrity',   // New category
+      'Scandal',     // New category
+      'Viral',       // New category
     ];
     
     return PageView.builder(
@@ -793,17 +802,25 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
   Widget _buildHorizontalCategories() {
     final categories = [
       'All',
-      'Tech',
-      'Science',
-      'Environment',
-      'Energy',
-      'Lifestyle',
-      'Business',
-      'Entertainment',
-      'Health',
-      'Sports',
-      'World',
-      'Trending'
+      'Sports',      // 58 articles
+      'Top',         // 56 articles  
+      'Trending',    // 53 articles
+      'Science',     // 51 articles
+      'World',       // 51 articles
+      'Health',      // 49 articles
+      'Business',    // 47 articles
+      'Tech',        // 46 articles
+      'Entertainment', // 35 articles
+      'Travel',      // 9 articles
+      'Startups',    // 6 articles
+      'Politics',    // 5 articles
+      'National',    // 5 articles
+      'India',       // 5 articles
+      'Education',   // 5 articles
+      'Celebrity',   // New category
+      'Scandal',     // New category
+      'Viral',       // New category
+      'State',       // New category
     ];
 
     return SizedBox(
@@ -1024,6 +1041,28 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
         dbCategory = 'Science';
       } else if (category == 'World') {
         dbCategory = 'World';
+      } else if (category == 'Top') {
+        dbCategory = 'Top';
+      } else if (category == 'Travel') {
+        dbCategory = 'Travel';
+      } else if (category == 'Startups') {
+        dbCategory = 'Startups';
+      } else if (category == 'Politics') {
+        dbCategory = 'Politics';
+      } else if (category == 'National') {
+        dbCategory = 'National';
+      } else if (category == 'India') {
+        dbCategory = 'India';
+      } else if (category == 'Education') {
+        dbCategory = 'Education';
+      } else if (category == 'Celebrity') {
+        dbCategory = 'Celebrity';
+      } else if (category == 'Scandal') {
+        dbCategory = 'Scandal';
+      } else if (category == 'Viral') {
+        dbCategory = 'Viral';
+      } else if (category == 'State') {
+        dbCategory = 'State';
       }
       
       print('Loading category: $category (DB: $dbCategory)');
@@ -1330,5 +1369,96 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
     
     // No valid content found
     return false;
+  }
+
+  Future<void> _showAllSupabaseArticles() async {
+    try {
+      print('=== FETCHING ALL ARTICLES FROM SUPABASE ===');
+      
+      // Get all articles (increase limit to see more)
+      final allArticles = await SupabaseService.getNews(limit: 200);
+      
+      print('TOTAL ARTICLES FOUND: ${allArticles.length}');
+      print('');
+      
+      for (int i = 0; i < allArticles.length; i++) {
+        final article = allArticles[i];
+        
+        print('--- ARTICLE ${i + 1} ---');
+        print('ID: ${article.id}');
+        print('Title: ${article.title}');
+        print('Category: ${article.category}');
+        print('Published: ${article.timestamp}');
+        
+        // Check keypoints
+        if (article.keypoints != null && article.keypoints!.isNotEmpty) {
+          print('Keypoints: ${article.keypoints!.substring(0, article.keypoints!.length > 100 ? 100 : article.keypoints!.length)}...');
+        } else {
+          print('Keypoints: [NONE]');
+        }
+        
+        // Check description
+        if (article.description.isNotEmpty) {
+          print('Description: ${article.description.substring(0, article.description.length > 100 ? 100 : article.description.length)}...');
+        } else {
+          print('Description: [EMPTY]');
+        }
+        
+        // Content validation
+        final hasKeypoints = article.keypoints != null && article.keypoints!.trim().isNotEmpty;
+        final hasDescription = article.description.trim().isNotEmpty;
+        final isValid = hasKeypoints || hasDescription;
+        
+        print('Content Status: ${isValid ? "VALID" : "INVALID (would be auto-marked as read)"}');
+        print('Image URL: ${article.imageUrl}');
+        print('');
+      }
+      
+      // Summary
+      final validCount = allArticles.where((a) => 
+        (a.keypoints != null && a.keypoints!.trim().isNotEmpty) || 
+        a.description.trim().isNotEmpty
+      ).length;
+      
+      print('=== SUMMARY ===');
+      print('Total Articles: ${allArticles.length}');
+      print('Valid Articles: $validCount');
+      print('Invalid Articles: ${allArticles.length - validCount}');
+      print('=== END ===');
+      
+    } catch (e) {
+      print('ERROR fetching articles: $e');
+    }
+  }
+
+  Future<void> _showSupabaseCategories() async {
+    try {
+      print('=== CATEGORIES IN SUPABASE DATABASE ===');
+      
+      final allArticles = await SupabaseService.getNews(limit: 500);
+      final categoryMap = <String, int>{};
+      
+      // Count articles per category
+      for (var article in allArticles) {
+        categoryMap[article.category] = (categoryMap[article.category] ?? 0) + 1;
+      }
+      
+      // Sort by count (most articles first)
+      final sortedCategories = categoryMap.entries.toList()
+        ..sort((a, b) => b.value.compareTo(a.value));
+      
+      print('AVAILABLE CATEGORIES (sorted by article count):');
+      for (var entry in sortedCategories) {
+        print('  "${entry.key}" -> ${entry.value} articles');
+      }
+      
+      print('');
+      print('CATEGORY LIST: ${sortedCategories.map((e) => e.key).join(", ")}');
+      print('TOTAL CATEGORIES: ${sortedCategories.length}');
+      print('=== END CATEGORIES ===');
+      
+    } catch (e) {
+      print('ERROR fetching categories: $e');
+    }
   }
 }
