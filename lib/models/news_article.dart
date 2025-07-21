@@ -5,6 +5,7 @@ class NewsArticle {
   final String imageUrl;
   final DateTime timestamp;
   final String category;
+  final String? keypoints; // Add keypoints field
 
   NewsArticle({
     required this.id,
@@ -13,6 +14,7 @@ class NewsArticle {
     required this.imageUrl,
     required this.timestamp,
     this.category = 'General',
+    this.keypoints,
   });
 
   factory NewsArticle.fromFirestore(Map<String, dynamic> data, String id) {
@@ -23,6 +25,7 @@ class NewsArticle {
       imageUrl: data['image'] ?? '',
       timestamp: data['timestamp']?.toDate() ?? DateTime.now(),
       category: data['category'] ?? 'General',
+      keypoints: data['keypoints'],
     );
   }
 
@@ -36,6 +39,7 @@ class NewsArticle {
           ? DateTime.tryParse(data['published']) ?? DateTime.now()
           : DateTime.now(),
       category: data['category'] ?? 'General',
+      keypoints: data['keypoints'], // Get keypoints from database
     );
   }
 
@@ -56,6 +60,7 @@ class NewsArticle {
       'image_url': imageUrl,
       'published': timestamp.toIso8601String(),
       'category': category,
+      'keypoints': keypoints,
     };
   }
 }

@@ -97,15 +97,18 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
             !readIds.contains(article.id)
           ).toList();
           
+          // Filter out articles with no content and mark them as read
+          final validArticles = await _filterValidArticles(unreadArticles);
+          
           setState(() {
-            _articles = unreadArticles;
+            _articles = validArticles;
             _isLoading = false;
           });
           
-          print('SUCCESS: Loaded ${allArticles.length} total articles, ${unreadArticles.length} unread from Supabase');
-          print('INFO: ${readIds.length} articles already read');
+          print('SUCCESS: Loaded ${allArticles.length} total articles, ${unreadArticles.length} unread, ${validArticles.length} valid from Supabase');
+          print('INFO: ${readIds.length} articles already read, ${unreadArticles.length - validArticles.length} auto-marked as read (no content)');
           
-          if (unreadArticles.isEmpty) {
+          if (validArticles.isEmpty) {
             setState(() {
               _error = 'All articles have been read! You\'ve caught up with all the news. Check back later for new articles.';
             });
@@ -658,7 +661,10 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
                   Expanded(
                     child: SingleChildScrollView(
                       child: Text(
-                        article.description,
+                        // Prioritize keypoints, fallback to description
+                        article.keypoints?.isNotEmpty == true 
+                          ? article.keypoints! 
+                          : article.description,
                         style: TextStyle(
                           fontSize: 16,
                           color: palette.onPrimary.withOpacity(0.9),
@@ -701,44 +707,6 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
                                 CupertinoIcons.share_up,
                                 palette.onPrimary,
                                 () {},
-                              ),
-                              const SizedBox(width: 8),
-                              // Category swipe indicator
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: palette.onPrimary.withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: palette.onPrimary.withOpacity(0.2),
-                                    width: 1,
-                                  ),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      CupertinoIcons.arrow_left,
-                                      size: 12,
-                                      color: palette.onPrimary.withOpacity(0.7),
-                                    ),
-                                    const SizedBox(width: 2),
-                                    Text(
-                                      'Categories',
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        color: palette.onPrimary.withOpacity(0.7),
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 2),
-                                    Icon(
-                                      CupertinoIcons.arrow_right,
-                                      size: 12,
-                                      color: palette.onPrimary.withOpacity(0.7),
-                                    ),
-                                  ],
-                                ),
                               ),
                             ],
                           ),
@@ -1064,19 +1032,23 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
       final unreadCategoryArticles = await SupabaseService.getUnreadNewsByCategory(dbCategory, readIds, limit: 100);
       print('Found ${unreadCategoryArticles.length} unread articles for $dbCategory');
       
-      _categoryArticles[category] = unreadCategoryArticles;
+      // Filter out articles with no content and mark them as read
+      final validCategoryArticles = await _filterValidArticles(unreadCategoryArticles);
+      print('Filtered to ${validCategoryArticles.length} valid articles for $dbCategory');
+      
+      _categoryArticles[category] = validCategoryArticles;
       _categoryLoading[category] = false;
       
       // Always update the main articles if this is for the current category
       if (category == _selectedCategory) {
         setState(() {
-          _articles = unreadCategoryArticles;
+          _articles = validCategoryArticles;
           _isLoading = false;
         });
       }
       
-      if (unreadCategoryArticles.isNotEmpty) {
-        print('Pre-loaded $category: ${unreadCategoryArticles.length} unread articles available');
+      if (validCategoryArticles.isNotEmpty) {
+        print('Pre-loaded $category: ${validCategoryArticles.length} valid articles available');
       } else {
         print('No unread $category articles found - checking if category exists...');
         // Check if category exists at all by getting a small sample
@@ -1321,5 +1293,42 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
         ],
       ),
     );
+  }
+
+  Future<List<NewsArticle>> _filterValidArticles(List<NewsArticle> articles) async {
+    final validArticles = <NewsArticle>[];
+    final invalidArticles = <NewsArticle>[];
+    
+    for (final article in articles) {
+      if (_hasValidContent(article)) {
+        validArticles.add(article);
+      } else {
+        invalidArticles.add(article);
+        // Mark invalid articles as read automatically
+        await ReadArticlesService.markAsRead(article.id);
+        print('Auto-marked as read (no content): "${article.title}"');
+      }
+    }
+    
+    if (invalidArticles.isNotEmpty) {
+      print('Filtered out ${invalidArticles.length} articles with no content');
+    }
+    
+    return validArticles;
+  }
+
+  bool _hasValidContent(NewsArticle article) {
+    // Check if article has keypoints
+    if (article.keypoints != null && article.keypoints!.trim().isNotEmpty) {
+      return true;
+    }
+    
+    // Check if article has description/summary
+    if (article.description.trim().isNotEmpty) {
+      return true;
+    }
+    
+    // No valid content found
+    return false;
   }
 }
