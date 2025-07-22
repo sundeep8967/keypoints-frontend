@@ -51,7 +51,8 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
     super.initState();
     _setupAnimations();
     _initializeCategories();
-    _loadNewsArticles();
+    // Load "All" category first
+    _loadArticlesByCategoryForCache('All');
     _preloadAllCategories();
     // Debug: Show categories in database
     NewsLoadingService.showSupabaseCategories();
@@ -266,12 +267,24 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
       _categoryLoading,
       _error,
       (newCategory) {
+        print('DEBUG: Switching to category: $newCategory');
         setState(() {
           _selectedCategory = newCategory;
-          if (_categoryArticles[newCategory]?.isNotEmpty == true) {
+          
+          // Special handling for "All" category - always reload fresh mix
+          if (newCategory == 'All') {
+            print('DEBUG: All category selected - forcing fresh load');
+            _isLoading = true;
+            // Clear cached "All" articles to force fresh load
+            _categoryArticles.remove('All');
+            // Trigger fresh load for "All" category
+            _loadArticlesByCategoryForCache('All');
+          } else if (_categoryArticles[newCategory]?.isNotEmpty == true) {
+            print('DEBUG: Using cached articles for $newCategory: ${_categoryArticles[newCategory]!.length} articles');
             _articles = _categoryArticles[newCategory]!;
             _isLoading = false;
           } else {
+            print('DEBUG: No cached articles for $newCategory - loading...');
             _isLoading = true;
           }
         });
@@ -371,6 +384,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
   }
 
   void _selectCategory(String category) {
+    print('DEBUG TAP: _selectCategory called for: $category');
     final categories = NewsUIService.getHorizontalCategories();
     
     final categoryIndex = categories.indexOf(category);
@@ -387,7 +401,16 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
       _currentIndex = 0;
     });
     
-    _preloadCategoryIfNeeded(category);
+    // Special handling for "All" category when tapped
+    if (category == 'All') {
+      print('DEBUG TAP: All category tapped - forcing fresh load');
+      // Clear cached "All" articles to force fresh load
+      _categoryArticles.remove('All');
+      // Trigger fresh load for "All" category
+      _loadArticlesByCategoryForCache('All');
+    } else {
+      _preloadCategoryIfNeeded(category);
+    }
     
     print('Switched to $category');
   }
@@ -444,20 +467,24 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
       
       // Special handling for "All" category - load random mix from all categories
       if (category == 'All') {
-        print('Loading ALL categories - random mix from all sources');
+        print('DEBUG ALL: Loading ALL categories - random mix from all sources');
         
         // Get all articles from all categories and shuffle them
         final allArticles = await SupabaseService.getNews(limit: 200);
+        print('DEBUG ALL: Total articles from database: ${allArticles.length}');
+        
         final unreadArticles = allArticles.where((article) => 
           !readIds.contains(article.id)
         ).toList();
+        print('DEBUG ALL: Unread articles: ${unreadArticles.length}');
         
         // Shuffle to create random mix
         unreadArticles.shuffle();
+        print('DEBUG ALL: Shuffled ${unreadArticles.length} articles');
         
         // Filter out articles with no content and mark them as read
         final validArticles = await _filterValidArticles(unreadArticles);
-        print('Loaded ${validArticles.length} valid articles from ALL categories (shuffled)');
+        print('DEBUG ALL: Valid articles after filtering: ${validArticles.length}');
         
         _categoryArticles[category] = validArticles;
         _categoryLoading[category] = false;
@@ -468,8 +495,10 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
             _articles = validArticles;
             _isLoading = false;
           });
-          print('Updated UI for ALL: ${validArticles.length} mixed articles displayed');
+          print('DEBUG ALL: Updated UI for ALL: ${validArticles.length} mixed articles displayed');
         }
+        
+        print('DEBUG ALL: Pre-loaded All: ${validArticles.length} articles');
         return;
       }
       
