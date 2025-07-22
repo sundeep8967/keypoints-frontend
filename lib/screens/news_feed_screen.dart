@@ -548,7 +548,8 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
           });
         }
         
-        if (index < articlesToShow.length && index % 3 == 0) {
+        // Only preload colors if we haven't done it recently
+        if (index < articlesToShow.length && index % 5 == 0 && index > 0) {
           _preloadColors();
         }
       },
@@ -1203,11 +1204,16 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
   }
 
   Future<void> _preloadColors() async {
+    // Only preload if we have articles and haven't preloaded recently
+    if (_articles.isEmpty) return;
+    
     final startIndex = _currentIndex;
-    final endIndex = (_currentIndex + 10).clamp(0, _articles.length);
+    final endIndex = (_currentIndex + 5).clamp(0, _articles.length); // Reduced from 10 to 5
+    
+    print('Preloading colors for articles $startIndex to $endIndex');
     
     for (int i = startIndex; i < endIndex; i++) {
-      if (!_colorCache.containsKey(_articles[i].imageUrl)) {
+      if (i < _articles.length && !_colorCache.containsKey(_articles[i].imageUrl)) {
         try {
           final palette = await ColorExtractionService.extractColorsFromImage(_articles[i].imageUrl);
           _colorCache[_articles[i].imageUrl] = palette;
@@ -1219,12 +1225,15 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
   }
 
   Future<void> _tryLoadMoreArticles() async {
-    print('INFO: Running low on articles, trying to load more...');
-    
-    if (_selectedCategory == 'All') {
-      await _loadNewsArticles();
-    } else {
-      await _loadArticlesByCategory(_selectedCategory);
+    // Only try to load more if we're actually at the end
+    if (_currentIndex >= _articles.length - 2) {
+      print('INFO: Near end of articles, trying to load more...');
+      
+      if (_selectedCategory == 'All') {
+        await _loadNewsArticles();
+      } else {
+        await _loadArticlesByCategory(_selectedCategory);
+      }
     }
   }
 
