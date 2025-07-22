@@ -44,6 +44,9 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
     _preloadAllCategories();
     // Debug: Show categories in database
     _showSupabaseCategories();
+    // Pre-load popular categories for instant switching
+    _preloadPopularCategories();
+    // Smart read tracking enabled
   }
 
   void _initializeCategories() {
@@ -431,8 +434,33 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
           // Auto-scroll category pills to keep selected category visible
           _scrollToSelectedCategoryAccurate(categoryIndex);
           
-          // Pre-load this category if not already loaded
-          _preloadCategoryIfNeeded(newCategory);
+          // Force load the specific category
+          if (newCategory == 'All') {
+            _loadNewsArticles();
+          } else {
+            print('Loading specific category: $newCategory');
+            _loadArticlesByCategoryForCache(newCategory);
+          }
+          
+          // Check if category is already pre-loaded
+          if (_categoryArticles[newCategory]?.isNotEmpty == true) {
+            // Category is ready - switch immediately
+            setState(() {
+              _selectedCategory = newCategory;
+              _articles = _categoryArticles[newCategory]!;
+              _currentIndex = 0;
+              _isLoading = false;
+            });
+            print('Instant switch to $newCategory: ${_categoryArticles[newCategory]!.length} articles ready');
+          } else {
+            // Category not ready - show loading state
+            setState(() {
+              _selectedCategory = newCategory;
+              _isLoading = true;
+              _currentIndex = 0;
+            });
+            print('Loading $newCategory on-demand...');
+          }
           
           // Update main articles list to match current category
           if (_categoryArticles[newCategory]?.isNotEmpty == true) {
@@ -507,7 +535,11 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
         if (index > 0 && index <= articlesToShow.length && articlesToShow.isNotEmpty) {
           final previousArticle = articlesToShow[index - 1];
           await ReadArticlesService.markAsRead(previousArticle.id);
-          print('Marked article "${previousArticle.title}" as read');
+          
+          // Smart read tracking: Remove this article from all category caches
+          _removeReadArticleFromCaches(previousArticle.id);
+          
+          print('Marked article "${previousArticle.title}" as read and removed from all categories');
         }
         
         if (category == _selectedCategory) {
@@ -1072,16 +1104,37 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
         dbCategory = 'Viral';
       } else if (category == 'State') {
         dbCategory = 'State';
+      } else if (category == 'Top') {
+        dbCategory = 'top'; // Note: lowercase 'top' in database
       } else {
         // For detected state names, use them as-is
         dbCategory = category;
       }
       
-      print('Loading category: $category (DB: $dbCategory)');
+      print('=== LOADING CATEGORY: $category ===');
+      print('UI Category: "$category" -> DB Category: "$dbCategory"');
+      print('Read articles count: ${readIds.length}');
       
-      // Use the new method that directly fetches unread articles
-      final unreadCategoryArticles = await SupabaseService.getUnreadNewsByCategory(dbCategory, readIds, limit: 100);
-      print('Found ${unreadCategoryArticles.length} unread articles for $dbCategory');
+      // Use the new method that directly fetches unread articles - get more to ensure enough unread
+      final unreadCategoryArticles = await SupabaseService.getUnreadNewsByCategory(dbCategory, readIds, limit: 200);
+      print('Found ${unreadCategoryArticles.length} unread articles for "$dbCategory"');
+      
+      // Debug: Also try the old method to compare
+      final allCategoryArticles = await SupabaseService.getNewsByCategory(dbCategory, limit: 100);
+      print('DEBUG: Total articles in "$dbCategory" category: ${allCategoryArticles.length}');
+      
+      if (allCategoryArticles.isNotEmpty) {
+        final readCount = allCategoryArticles.where((article) => readIds.contains(article.id)).length;
+        print('DEBUG: $dbCategory breakdown - Total: ${allCategoryArticles.length}, Read: $readCount, Should be unread: ${allCategoryArticles.length - readCount}');
+        
+        // Show first few article titles for debugging
+        print('DEBUG: First 3 articles in $dbCategory:');
+        for (int i = 0; i < allCategoryArticles.length && i < 3; i++) {
+          final article = allCategoryArticles[i];
+          final isRead = readIds.contains(article.id);
+          print('  ${i+1}. "${article.title}" (ID: ${article.id}) - ${isRead ? "READ" : "UNREAD"}');
+        }
+      }
       
       // Filter out articles with no content and mark them as read
       final validCategoryArticles = await _filterValidArticles(unreadCategoryArticles);
@@ -1096,6 +1149,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
           _articles = validCategoryArticles;
           _isLoading = false;
         });
+        print('Updated UI for $category: ${validCategoryArticles.length} articles displayed');
       }
       
       if (validCategoryArticles.isNotEmpty) {
@@ -1357,6 +1411,10 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
         invalidArticles.add(article);
         // Mark invalid articles as read automatically
         await ReadArticlesService.markAsRead(article.id);
+        
+        // Smart read tracking: Remove from all category caches
+        _removeReadArticleFromCaches(article.id);
+        
         print('Auto-marked as read (no content): "${article.title}"');
       }
     }
@@ -1691,5 +1749,31 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
         print('Error scrolling to category: $e');
       }
     });
+  }
+
+
+  void _preloadPopularCategories() {
+    // Pre-load the most commonly accessed categories
+    final popularCategories = ['Sports', 'Top', 'Trending', 'Science', 'Tech'];
+    
+    Future.delayed(const Duration(milliseconds: 1000), () async {
+      for (String category in popularCategories) {
+        if (_categoryArticles[category]?.isEmpty != false) {
+          print('Pre-loading popular category: $category');
+          await _loadArticlesByCategoryForCache(category);
+          await Future.delayed(const Duration(milliseconds: 300)); // Small delay between loads
+        }
+      }
+      print('Popular categories pre-loaded successfully');
+    });
+  }
+
+  void _removeReadArticleFromCaches(String articleId) {
+    for (String category in _categoryArticles.keys) {
+      final categoryList = _categoryArticles[category];
+      if (categoryList != null) {
+        categoryList.removeWhere((article) => article.id == articleId);
+      }
+    }
   }
 }
