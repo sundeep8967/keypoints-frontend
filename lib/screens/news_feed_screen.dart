@@ -323,9 +323,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
   }
 
   Widget _buildCategoryPageView() {
-    final categories = NewsUIService.getHorizontalCategories();
-    
-    print('🎨 PAGE VIEW: Building with _categoryArticles["All"] = ${_categoryArticles["All"]?.length ?? 0} articles');
+    final categories = NewsUIService.getInitializeCategories();
     
     return NewsFeedPageBuilder.buildCategoryPageView(
       context,
@@ -453,8 +451,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
   }
 
   void _selectCategory(String category) {
-    print('DEBUG TAP: _selectCategory called for: $category');
-    final categories = NewsUIService.getHorizontalCategories();
+    final categories = NewsUIService.getInitializeCategories();
     
     final categoryIndex = categories.indexOf(category);
     if (categoryIndex != -1) {
