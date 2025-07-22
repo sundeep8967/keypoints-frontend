@@ -1,7 +1,7 @@
 import 'package:dartz/dartz.dart';
 import '../../core/error/failures.dart';
 import '../../core/usecases/usecase.dart';
-import '../repositories/news_repository.dart';
+import '../repositories/news_repository.dart' ;
 
 class MarkArticleAsRead implements UseCase<void, MarkArticleAsReadParams> {
   final NewsRepository repository;
