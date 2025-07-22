@@ -30,6 +30,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
   String _error = '';
   int _currentIndex = 0;
   String _selectedCategory = 'All'; // Track selected category
+  bool _isInitialLoad = true; // Track if this is the first load
   
   // Cache for preloaded color palettes
   final Map<String, ColorPalette> _colorCache = {};
@@ -52,17 +53,8 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
     super.initState();
     _setupAnimations();
     _initializeCategories();
-    // Load "All" category first with immediate loading state
-    _loadArticlesByCategoryForCache('All');
-    // Start background preloading (don't wait for these)
-    _preloadAllCategoriesInBackground();
-    // Debug: Show categories in database
-    NewsLoadingService.showSupabaseCategories();
-    // Pre-load popular categories for instant switching
-    _preloadPopularCategoriesInBackground();
-    // Smart read tracking enabled
-    // Initialize preference tracking
-    CategoryPreferenceService.initializeCategoryTracking();
+    // Load "All" category immediately and simply
+    _loadAllCategorySimple();
   }
 
   void _initializeCategories() {
@@ -149,17 +141,17 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
       setState(() {
         _articles = validArticles;
         _isLoading = false;
+        _isInitialLoad = false;
+        // Only show error if we have no articles AND this is not the initial load
+        _error = validArticles.isEmpty ? 'All articles have been read! You have caught up with all the news. Check back later for new articles.' : '';
       });
       print('DEBUG: Set _articles to ${_articles.length} articles from all categories');
       
-      if (validArticles.isEmpty) {
-        setState(() {
-          _error = 'All articles have been read! You have caught up with all the news. Check back later for new articles.';
-        });
-        print('DEBUG: No valid articles - showing error message');
-      } else {
+      if (validArticles.isNotEmpty) {
         _preloadColors();
         print('DEBUG SUCCESS: Loaded ${validArticles.length} mixed articles from ALL categories for All feed');
+      } else {
+        print('DEBUG: No valid articles - showing error message');
       }
     } catch (e) {
       print('DEBUG ERROR in _loadNewsArticles: $e');
@@ -268,6 +260,57 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
 
   @override
   Widget build(BuildContext context) {
+    print('🎨 BUILD: _isLoading=$_isLoading, _articles.length=${_articles.length}, _error="$_error"');
+    
+    // Show loading shimmer during initial load
+    if (_isInitialLoad && _isLoading && _articles.isEmpty) {
+      print('🎨 BUILD: Showing loading shimmer');
+      return CupertinoPageScaffold(
+        backgroundColor: CupertinoColors.black,
+        child: Stack(
+          children: [
+            _buildLoadingShimmer(),
+            _buildCleanHeader(),
+          ],
+        ),
+      );
+    }
+
+    // Show error if no articles and not loading
+    if (_articles.isEmpty && !_isLoading && _error.isNotEmpty) {
+      print('🎨 BUILD: Showing error state');
+      return CupertinoPageScaffold(
+        backgroundColor: CupertinoColors.black,
+        child: Stack(
+          children: [
+            Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    CupertinoIcons.news,
+                    size: 64,
+                    color: CupertinoColors.systemGrey,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    _error,
+                    style: const TextStyle(
+                      color: CupertinoColors.white,
+                      fontSize: 18,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+            _buildCleanHeader(),
+          ],
+        ),
+      );
+    }
+
+    print('🎨 BUILD: Showing main content with ${_articles.length} articles');
     return CupertinoPageScaffold(
       backgroundColor: CupertinoColors.black,
       child: Stack(
@@ -281,6 +324,8 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
 
   Widget _buildCategoryPageView() {
     final categories = NewsUIService.getHorizontalCategories();
+    
+    print('🎨 PAGE VIEW: Building with _categoryArticles["All"] = ${_categoryArticles["All"]?.length ?? 0} articles');
     
     return NewsFeedPageBuilder.buildCategoryPageView(
       context,
@@ -296,15 +341,10 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
         setState(() {
           _selectedCategory = newCategory;
           
-          // Special handling for "All" category - always reload fresh mix
+          // Special handling for "All" category - use simple reload
           if (newCategory == 'All') {
-            print('DEBUG: All category selected - clearing cache and forcing fresh load');
-            _isLoading = true;
-            // Clear ALL cached articles to force fresh load
-            _categoryArticles.clear();
-            _categoryLoading.clear();
-            // Trigger fresh load for "All" category
-            _loadArticlesByCategoryForCache('All');
+            print('DEBUG: All category selected - using simple reload');
+            _loadAllCategorySimple();
           } else if (_categoryArticles[newCategory]?.isNotEmpty == true) {
             print('DEBUG: Using cached articles for $newCategory: ${_categoryArticles[newCategory]!.length} articles');
             _articles = _categoryArticles[newCategory]!;
@@ -312,6 +352,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
           } else {
             print('DEBUG: No cached articles for $newCategory - loading...');
             _isLoading = true;
+            _loadArticlesByCategoryForCache(newCategory);
           }
         });
         
@@ -324,7 +365,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
       },
       (index) => setState(() => _currentIndex = index),
       _loadArticlesByCategoryForCache,
-      _loadNewsArticles,
+      _loadAllCategorySimple,  // Use simple load for "All" category
       _colorCache,
     );
   }
@@ -561,7 +602,9 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
           setState(() {
             _articles = validArticles;
             _isLoading = false;
-            _error = validArticles.isEmpty ? 'No unread articles available. Check back later for new content!' : '';
+            _isInitialLoad = false;
+            // Only show error if we have no articles AND this is not the initial load
+            _error = validArticles.isEmpty && !_isInitialLoad ? 'No unread articles available. Check back later for new content!' : '';
           });
           print('DEBUG ALL: Updated UI for ALL: ${validArticles.length} mixed articles from all categories displayed');
           
@@ -731,6 +774,97 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
     });
   }
 
+  Future<void> _loadAllCategorySimple() async {
+    print('🚀 SIMPLE LOAD: Starting All category load');
+    
+    // Show loading immediately
+    setState(() {
+      _isLoading = true;
+      _error = '';
+      _articles = []; // Clear any existing articles
+    });
+
+    try {
+      // Get all articles from database (simple approach)
+      final allArticles = await SupabaseService.getNews(limit: 200);
+      print('🚀 SIMPLE LOAD: Got ${allArticles.length} total articles from database');
+      
+      if (allArticles.isNotEmpty) {
+        // Get read article IDs
+        final readIds = await ReadArticlesService.getReadArticleIds();
+        
+        // Filter unread articles
+        final unreadArticles = allArticles.where((article) => 
+          !readIds.contains(article.id)
+        ).toList();
+        
+        // Shuffle for variety
+        unreadArticles.shuffle();
+        
+        print('🚀 SIMPLE LOAD: Filtered to ${unreadArticles.length} unread articles');
+        
+        // Cache for "All" category FIRST - THIS IS CRITICAL!
+        _categoryArticles['All'] = unreadArticles;
+        _categoryLoading['All'] = false;
+        
+        // Update UI immediately
+        setState(() {
+          _articles = unreadArticles;
+          _isLoading = false;
+          _isInitialLoad = false;
+          _error = unreadArticles.isEmpty ? 'All articles have been read!' : '';
+        });
+        
+        // FORCE UPDATE: Make sure the page builder sees the articles
+        print('🚀 SIMPLE LOAD: Setting _categoryArticles["All"] = ${unreadArticles.length} articles');
+        print('🚀 SIMPLE LOAD: _categoryArticles["All"].length = ${_categoryArticles["All"]?.length ?? 0}');
+        
+        print('🚀 SIMPLE LOAD: SUCCESS - Displaying ${unreadArticles.length} articles');
+        print('🚀 SIMPLE LOAD: _articles.length = ${_articles.length}');
+        print('🚀 SIMPLE LOAD: _isLoading = $_isLoading');
+        print('🚀 SIMPLE LOAD: _error = "$_error"');
+        
+        // Debug: Print first few article titles
+        if (unreadArticles.isNotEmpty) {
+          print('🚀 SIMPLE LOAD: First 3 articles:');
+          for (int i = 0; i < unreadArticles.length && i < 3; i++) {
+            print('  ${i+1}. "${unreadArticles[i].title}"');
+          }
+        }
+        
+        // Preload colors in background
+        if (unreadArticles.isNotEmpty) {
+          _preloadColors();
+        }
+        
+        // Start background preloading of individual categories
+        _startBackgroundPreloading();
+      } else {
+        setState(() {
+          _isLoading = false;
+          _isInitialLoad = false;
+          _error = 'No articles available';
+        });
+      }
+    } catch (e) {
+      print('🚀 SIMPLE LOAD ERROR: $e');
+      setState(() {
+        _error = 'Failed to load articles: $e';
+        _isLoading = false;
+        _isInitialLoad = false;
+      });
+    }
+  }
+
+  void _startBackgroundPreloading() {
+    // Start preloading individual categories in background after main content loads
+    Future.delayed(Duration(milliseconds: 2000), () {
+      print('🔄 Starting background preloading of individual categories');
+      _preloadPopularCategories();
+      _preloadAllCategories();
+    });
+  }
+
   Widget _buildSettingsButton() {
     return CupertinoButton(
       padding: EdgeInsets.zero,
@@ -754,6 +888,83 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
           color: Colors.white,
           size: 20,
         ),
+      ),
+    );
+  }
+
+  Widget _buildLoadingShimmer() {
+    return Container(
+      color: CupertinoColors.black,
+      child: Column(
+        children: [
+          const SizedBox(height: 100), // Space for header
+          Expanded(
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 20),
+              child: Column(
+                children: [
+                  const SizedBox(height: 40),
+                  // Image placeholder
+                  Container(
+                    width: double.infinity,
+                    height: 200,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF2C2C2E),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  // Title placeholders
+                  Container(
+                    width: double.infinity,
+                    height: 20,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF2C2C2E),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Container(
+                    width: double.infinity,
+                    height: 20,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF2C2C2E),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Container(
+                    width: 200,
+                    height: 20,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF2C2C2E),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                  const SizedBox(height: 40),
+                  // Loading indicator
+                  const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      CupertinoActivityIndicator(
+                        radius: 15,
+                        color: CupertinoColors.white,
+                      ),
+                      SizedBox(width: 16),
+                      Text(
+                        'Loading latest news...',
+                        style: TextStyle(
+                          color: CupertinoColors.white,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
