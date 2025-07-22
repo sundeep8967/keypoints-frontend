@@ -93,6 +93,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
 
   Future<void> _loadNewsArticles() async {
     try {
+      print('DEBUG: LOADING ALL CATEGORY - Starting...');
       setState(() {
         _isLoading = true;
         _error = '';
@@ -100,33 +101,42 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
 
       // For "All" category, load random mix from all categories
       final readIds = await ReadArticlesService.getReadArticleIds();
+      print('DEBUG: Read articles count: ${readIds.length}');
       
       // Get all articles from all categories and shuffle them
       final allArticles = await SupabaseService.getNews(limit: 200);
+      print('DEBUG: Total articles from database: ${allArticles.length}');
+      
       final unreadArticles = allArticles.where((article) => 
         !readIds.contains(article.id)
       ).toList();
+      print('DEBUG: Unread articles: ${unreadArticles.length}');
       
       // Shuffle to create random mix
       unreadArticles.shuffle();
+      print('DEBUG: Shuffled ${unreadArticles.length} articles');
       
       // Filter out articles with no content and mark them as read
       final validArticles = await _filterValidArticles(unreadArticles);
+      print('DEBUG: Valid articles after filtering: ${validArticles.length}');
       
       setState(() {
         _articles = validArticles;
         _isLoading = false;
       });
+      print('DEBUG: Set _articles to ${_articles.length} articles');
       
       if (validArticles.isEmpty) {
         setState(() {
-          _error = 'All articles have been read! You\'ve caught up with all the news. Check back later for new articles.';
+          _error = 'All articles have been read! You have caught up with all the news. Check back later for new articles.';
         });
+        print('DEBUG: No valid articles - showing error message');
       } else {
         _preloadColors();
-        print('Loaded ${validArticles.length} mixed articles from ALL categories for "All" feed');
+        print('DEBUG SUCCESS: Loaded ${validArticles.length} mixed articles from ALL categories for All feed');
       }
     } catch (e) {
+      print('DEBUG ERROR in _loadNewsArticles: $e');
       setState(() {
         _error = 'Failed to load articles: $e';
         _isLoading = false;
