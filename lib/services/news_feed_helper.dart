@@ -27,24 +27,26 @@ class NewsFeedHelper {
   }
 
   static bool hasValidContent(NewsArticle article) {
-    // Check if article has valid image URL
-    if (!hasValidImage(article.imageUrl)) {
-      print('Invalid image for article: "${article.title}" - URL: "${article.imageUrl}"');
+    // Check if article has title
+    if (article.title.trim().isEmpty) {
+      print('Invalid article: no title');
       return false;
     }
     
-    // Check if article has keypoints
-    if (article.keypoints != null && article.keypoints!.trim().isNotEmpty) {
-      return true;
-    }
-    
     // Check if article has description/summary
-    if (article.description.trim().isNotEmpty) {
-      return true;
+    if (article.description.trim().isEmpty) {
+      print('Invalid article: no description - "${article.title}"');
+      return false;
     }
     
-    // No valid content found
-    return false;
+    // Check if article has valid image URL (but don't be too strict)
+    if (article.imageUrl.trim().isEmpty) {
+      print('Invalid article: no image URL - "${article.title}"');
+      return false;
+    }
+    
+    // Article is valid if it has title, description, and some image URL
+    return true;
   }
 
   static bool hasValidImage(String imageUrl) {

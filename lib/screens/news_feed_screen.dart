@@ -15,6 +15,7 @@ import '../services/category_loading_service.dart';
 import '../services/category_management_service.dart';
 import '../widgets/news_feed_widgets.dart';
 import '../widgets/news_feed_page_builder.dart';
+import 'settings_screen.dart';
 
 class NewsFeedScreen extends StatefulWidget {
   const NewsFeedScreen({super.key});
@@ -104,28 +105,45 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
       final readIds = await ReadArticlesService.getReadArticleIds();
       print('DEBUG: Read articles count: ${readIds.length}');
       
-      // Get all articles from all categories and shuffle them
-      final allArticles = await SupabaseService.getNews(limit: 200);
-      print('DEBUG: Total articles from database: ${allArticles.length}');
+      // Define all available categories to fetch from
+      final allCategories = [
+        'Technology', 'Business', 'Sports', 'Health', 'Science', 
+        'Entertainment', 'World', 'Top', 'Travel', 'Politics', 
+        'National', 'India', 'Education'
+      ];
       
-      final unreadArticles = allArticles.where((article) => 
-        !readIds.contains(article.id)
-      ).toList();
-      print('DEBUG: Unread articles: ${unreadArticles.length}');
+      final List<NewsArticle> allCombinedArticles = [];
       
-      // Shuffle to create random mix
-      unreadArticles.shuffle();
-      print('DEBUG: Shuffled ${unreadArticles.length} articles');
+      // Fetch articles from each category
+      for (final cat in allCategories) {
+        try {
+          final categoryArticles = await SupabaseService.getUnreadNewsByCategory(cat, readIds, limit: 30);
+          print('DEBUG: Fetched ${categoryArticles.length} unread articles from $cat');
+          allCombinedArticles.addAll(categoryArticles);
+        } catch (e) {
+          print('DEBUG: Error fetching $cat articles: $e');
+        }
+      }
       
-      // Filter out articles with no content and mark them as read
-      final validArticles = await _filterValidArticles(unreadArticles);
-      print('DEBUG: Valid articles after filtering: ${validArticles.length}');
+      print('DEBUG: Total combined articles from all categories: ${allCombinedArticles.length}');
+      
+      // Remove duplicates based on article ID
+      final uniqueArticles = <String, NewsArticle>{};
+      for (final article in allCombinedArticles) {
+        uniqueArticles[article.id] = article;
+      }
+      final validArticles = uniqueArticles.values.toList();
+      print('DEBUG: After deduplication: ${validArticles.length} unique articles');
+      
+      // Shuffle to create random mix from all categories
+      validArticles.shuffle();
+      print('DEBUG: Shuffled ${validArticles.length} articles from all categories');
       
       setState(() {
         _articles = validArticles;
         _isLoading = false;
       });
-      print('DEBUG: Set _articles to ${_articles.length} articles');
+      print('DEBUG: Set _articles to ${_articles.length} articles from all categories');
       
       if (validArticles.isEmpty) {
         setState(() {
@@ -273,10 +291,11 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
           
           // Special handling for "All" category - always reload fresh mix
           if (newCategory == 'All') {
-            print('DEBUG: All category selected - forcing fresh load');
+            print('DEBUG: All category selected - clearing cache and forcing fresh load');
             _isLoading = true;
-            // Clear cached "All" articles to force fresh load
-            _categoryArticles.remove('All');
+            // Clear ALL cached articles to force fresh load
+            _categoryArticles.clear();
+            _categoryLoading.clear();
             // Trigger fresh load for "All" category
             _loadArticlesByCategoryForCache('All');
           } else if (_categoryArticles[newCategory]?.isNotEmpty == true) {
@@ -320,6 +339,8 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
                 child: _buildHorizontalCategories(),
               ),
               const SizedBox(width: 12),
+              // Settings button
+              _buildSettingsButton(),
             ],
           ),
         ),
@@ -403,9 +424,10 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
     
     // Special handling for "All" category when tapped
     if (category == 'All') {
-      print('DEBUG TAP: All category tapped - forcing fresh load');
-      // Clear cached "All" articles to force fresh load
-      _categoryArticles.remove('All');
+      print('DEBUG TAP: All category tapped - clearing cache and forcing fresh load');
+      // Clear ALL cached articles to force fresh load
+      _categoryArticles.clear();
+      _categoryLoading.clear();
       // Trigger fresh load for "All" category
       _loadArticlesByCategoryForCache('All');
     } else {
@@ -467,24 +489,48 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
       
       // Special handling for "All" category - load random mix from all categories
       if (category == 'All') {
-        print('DEBUG ALL: Loading ALL categories - random mix from all sources');
+        print('DEBUG ALL: Loading ALL categories - fetching from all available categories');
         
-        // Get all articles from all categories and shuffle them
-        final allArticles = await SupabaseService.getNews(limit: 200);
-        print('DEBUG ALL: Total articles from database: ${allArticles.length}');
+        // Define all available categories to fetch from
+        final allCategories = [
+          'Technology', 'Business', 'Sports', 'Health', 'Science', 
+          'Entertainment', 'World', 'Top', 'Travel', 'Politics', 
+          'National', 'India', 'Education'
+        ];
         
-        final unreadArticles = allArticles.where((article) => 
-          !readIds.contains(article.id)
+        final List<NewsArticle> allCombinedArticles = [];
+        
+        // Fetch articles from each category
+        for (final cat in allCategories) {
+          try {
+            final categoryArticles = await SupabaseService.getUnreadNewsByCategory(cat, readIds, limit: 50);
+            print('DEBUG ALL: Fetched ${categoryArticles.length} unread articles from $cat');
+            allCombinedArticles.addAll(categoryArticles);
+          } catch (e) {
+            print('DEBUG ALL: Error fetching $cat articles: $e');
+          }
+        }
+        
+        print('DEBUG ALL: Total combined articles from all categories: ${allCombinedArticles.length}');
+        
+        // Remove duplicates based on article ID
+        final uniqueArticles = <String, NewsArticle>{};
+        for (final article in allCombinedArticles) {
+          uniqueArticles[article.id] = article;
+        }
+        final deduplicatedArticles = uniqueArticles.values.toList();
+        print('DEBUG ALL: After deduplication: ${deduplicatedArticles.length} unique articles');
+        
+        // Simple validation - just check for basic content
+        final validArticles = deduplicatedArticles.where((article) => 
+          article.title.trim().isNotEmpty && 
+          article.description.trim().isNotEmpty
         ).toList();
-        print('DEBUG ALL: Unread articles: ${unreadArticles.length}');
+        print('DEBUG ALL: Valid articles after basic filtering: ${validArticles.length}');
         
-        // Shuffle to create random mix
-        unreadArticles.shuffle();
-        print('DEBUG ALL: Shuffled ${unreadArticles.length} articles');
-        
-        // Filter out articles with no content and mark them as read
-        final validArticles = await _filterValidArticles(unreadArticles);
-        print('DEBUG ALL: Valid articles after filtering: ${validArticles.length}');
+        // Shuffle to create random mix from all categories
+        validArticles.shuffle();
+        print('DEBUG ALL: Shuffled ${validArticles.length} articles from all categories');
         
         _categoryArticles[category] = validArticles;
         _categoryLoading[category] = false;
@@ -494,11 +540,12 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
           setState(() {
             _articles = validArticles;
             _isLoading = false;
+            _error = validArticles.isEmpty ? 'No unread articles available. Check back later for new content!' : '';
           });
-          print('DEBUG ALL: Updated UI for ALL: ${validArticles.length} mixed articles displayed');
+          print('DEBUG ALL: Updated UI for ALL: ${validArticles.length} mixed articles from all categories displayed');
         }
         
-        print('DEBUG ALL: Pre-loaded All: ${validArticles.length} articles');
+        print('DEBUG ALL: Pre-loaded All: ${validArticles.length} articles from all categories');
         return;
       }
       
@@ -641,6 +688,33 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
       popularCategories,
       _categoryArticles,
       _loadArticlesByCategoryForCache,
+    );
+  }
+
+  Widget _buildSettingsButton() {
+    return CupertinoButton(
+      padding: EdgeInsets.zero,
+      minSize: 0,
+      onPressed: () {
+        Navigator.of(context).push(
+          CupertinoPageRoute(
+            builder: (context) => const SettingsScreen(),
+          ),
+        );
+      },
+      child: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.2),
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: const Icon(
+          CupertinoIcons.settings,
+          color: Colors.white,
+          size: 20,
+        ),
+      ),
     );
   }
 }
