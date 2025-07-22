@@ -98,7 +98,20 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
         _error = '';
       });
 
-      final validArticles = await NewsLoadingService.loadNewsArticles();
+      // For "All" category, load random mix from all categories
+      final readIds = await ReadArticlesService.getReadArticleIds();
+      
+      // Get all articles from all categories and shuffle them
+      final allArticles = await SupabaseService.getNews(limit: 200);
+      final unreadArticles = allArticles.where((article) => 
+        !readIds.contains(article.id)
+      ).toList();
+      
+      // Shuffle to create random mix
+      unreadArticles.shuffle();
+      
+      // Filter out articles with no content and mark them as read
+      final validArticles = await _filterValidArticles(unreadArticles);
       
       setState(() {
         _articles = validArticles;
@@ -111,6 +124,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
         });
       } else {
         _preloadColors();
+        print('Loaded ${validArticles.length} mixed articles from ALL categories for "All" feed');
       }
     } catch (e) {
       setState(() {
@@ -230,7 +244,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
   }
 
   Widget _buildCategoryPageView() {
-    final categories = NewsUIService.getBaseCategories();
+    final categories = NewsUIService.getHorizontalCategories();
     
     return NewsFeedPageBuilder.buildCategoryPageView(
       context,
@@ -347,7 +361,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
   }
 
   void _selectCategory(String category) {
-    final categories = NewsUIService.getSelectCategories();
+    final categories = NewsUIService.getHorizontalCategories();
     
     final categoryIndex = categories.indexOf(category);
     if (categoryIndex != -1) {
@@ -415,7 +429,41 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
     try {
       final readIds = await ReadArticlesService.getReadArticleIds();
       
-      // Map UI category names to database category names
+      print('=== LOADING CATEGORY: $category ===');
+      print('Read articles count: ${readIds.length}');
+      
+      // Special handling for "All" category - load random mix from all categories
+      if (category == 'All') {
+        print('Loading ALL categories - random mix from all sources');
+        
+        // Get all articles from all categories and shuffle them
+        final allArticles = await SupabaseService.getNews(limit: 200);
+        final unreadArticles = allArticles.where((article) => 
+          !readIds.contains(article.id)
+        ).toList();
+        
+        // Shuffle to create random mix
+        unreadArticles.shuffle();
+        
+        // Filter out articles with no content and mark them as read
+        final validArticles = await _filterValidArticles(unreadArticles);
+        print('Loaded ${validArticles.length} valid articles from ALL categories (shuffled)');
+        
+        _categoryArticles[category] = validArticles;
+        _categoryLoading[category] = false;
+        
+        // Always update the main articles if this is for the current category
+        if (category == _selectedCategory) {
+          setState(() {
+            _articles = validArticles;
+            _isLoading = false;
+          });
+          print('Updated UI for ALL: ${validArticles.length} mixed articles displayed');
+        }
+        return;
+      }
+      
+      // For specific categories, map UI category names to database category names
       String dbCategory = category;
       if (category == 'Tech') {
         dbCategory = 'Technology';
@@ -453,16 +501,12 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
         dbCategory = 'Viral';
       } else if (category == 'State') {
         dbCategory = 'State';
-      } else if (category == 'Top') {
-        dbCategory = 'top'; // Note: lowercase 'top' in database
       } else {
         // For detected state names, use them as-is
         dbCategory = category;
       }
       
-      print('=== LOADING CATEGORY: $category ===');
       print('UI Category: "$category" -> DB Category: "$dbCategory"');
-      print('Read articles count: ${readIds.length}');
       
       // Use the new method that directly fetches unread articles - get more to ensure enough unread
       final unreadCategoryArticles = await SupabaseService.getUnreadNewsByCategory(dbCategory, readIds, limit: 200);
