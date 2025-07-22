@@ -52,13 +52,14 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
     super.initState();
     _setupAnimations();
     _initializeCategories();
-    // Load "All" category first
+    // Load "All" category first with immediate loading state
     _loadArticlesByCategoryForCache('All');
-    _preloadAllCategories();
+    // Start background preloading (don't wait for these)
+    _preloadAllCategoriesInBackground();
     // Debug: Show categories in database
     NewsLoadingService.showSupabaseCategories();
     // Pre-load popular categories for instant switching
-    _preloadPopularCategories();
+    _preloadPopularCategoriesInBackground();
     // Smart read tracking enabled
     // Initialize preference tracking
     CategoryPreferenceService.initializeCategoryTracking();
@@ -114,15 +115,21 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
       
       final List<NewsArticle> allCombinedArticles = [];
       
-      // Fetch articles from each category
-      for (final cat in allCategories) {
+      // Fetch articles from each category in parallel for faster loading
+      final futures = allCategories.map((cat) async {
         try {
-          final categoryArticles = await SupabaseService.getUnreadNewsByCategory(cat, readIds, limit: 30);
+          final categoryArticles = await SupabaseService.getUnreadNewsByCategory(cat, readIds, limit: 20);
           print('DEBUG: Fetched ${categoryArticles.length} unread articles from $cat');
-          allCombinedArticles.addAll(categoryArticles);
+          return categoryArticles;
         } catch (e) {
           print('DEBUG: Error fetching $cat articles: $e');
+          return <NewsArticle>[];
         }
+      });
+      
+      final results = await Future.wait(futures);
+      for (final articles in results) {
+        allCombinedArticles.addAll(articles);
       }
       
       print('DEBUG: Total combined articles from all categories: ${allCombinedArticles.length}');
@@ -482,6 +489,14 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
 
   Future<void> _loadArticlesByCategoryForCache(String category) async {
     try {
+      // Set loading state immediately for current category
+      if (category == _selectedCategory) {
+        setState(() {
+          _isLoading = true;
+          _error = '';
+        });
+      }
+      
       final readIds = await ReadArticlesService.getReadArticleIds();
       
       print('=== LOADING CATEGORY: $category ===');
@@ -500,15 +515,21 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
         
         final List<NewsArticle> allCombinedArticles = [];
         
-        // Fetch articles from each category
-        for (final cat in allCategories) {
+        // Fetch articles from each category in parallel for faster loading
+        final futures = allCategories.map((cat) async {
           try {
-            final categoryArticles = await SupabaseService.getUnreadNewsByCategory(cat, readIds, limit: 50);
+            final categoryArticles = await SupabaseService.getUnreadNewsByCategory(cat, readIds, limit: 30);
             print('DEBUG ALL: Fetched ${categoryArticles.length} unread articles from $cat');
-            allCombinedArticles.addAll(categoryArticles);
+            return categoryArticles;
           } catch (e) {
             print('DEBUG ALL: Error fetching $cat articles: $e');
+            return <NewsArticle>[];
           }
+        });
+        
+        final results = await Future.wait(futures);
+        for (final articles in results) {
+          allCombinedArticles.addAll(articles);
         }
         
         print('DEBUG ALL: Total combined articles from all categories: ${allCombinedArticles.length}');
@@ -543,6 +564,11 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
             _error = validArticles.isEmpty ? 'No unread articles available. Check back later for new content!' : '';
           });
           print('DEBUG ALL: Updated UI for ALL: ${validArticles.length} mixed articles from all categories displayed');
+          
+          // Preload colors for immediate display
+          if (validArticles.isNotEmpty) {
+            _preloadColors();
+          }
         }
         
         print('DEBUG ALL: Pre-loaded All: ${validArticles.length} articles from all categories');
@@ -689,6 +715,20 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
       _categoryArticles,
       _loadArticlesByCategoryForCache,
     );
+  }
+
+  void _preloadPopularCategoriesInBackground() {
+    // Run in background without blocking UI
+    Future.delayed(Duration(milliseconds: 500), () {
+      _preloadPopularCategories();
+    });
+  }
+
+  void _preloadAllCategoriesInBackground() {
+    // Run in background without blocking UI
+    Future.delayed(Duration(milliseconds: 1000), () {
+      _preloadAllCategories();
+    });
   }
 
   Widget _buildSettingsButton() {
