@@ -45,6 +45,8 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
   // Store category pill positions for accurate scrolling
   final List<GlobalKey> _categoryKeys = [];
   final Map<int, double> _categoryPositions = {};
+  
+  // Smart category preference tracking - moved to CategoryPreferenceService
 
   @override
   void initState() {
@@ -120,7 +122,138 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
     }
   }
 
-  // Add all the missing methods from the backup
+  Future<void> _loadArticlesByCategoryWithSwipeContext(String category, bool isRightSwipe) async {
+    try {
+      setState(() {
+        _isLoading = true;
+        _error = '';
+      });
+
+      // Get read articles to filter them out
+      final readIds = await ReadArticlesService.getReadArticleIds();
+
+      // PRIORITY 1: Try Supabase category filter
+      try {
+        final allCategoryArticles = await SupabaseService.getNewsByCategory(category, limit: 100);
+        if (allCategoryArticles.isNotEmpty) {
+          final unreadCategoryArticles = allCategoryArticles.where((article) => 
+            !readIds.contains(article.id)
+          ).toList();
+          
+          setState(() {
+            _articles = unreadCategoryArticles;
+            _isLoading = false;
+          });
+          
+          if (unreadCategoryArticles.isEmpty) {
+            if (isRightSwipe) {
+              // Right swipe: Just show "You read all" in UI, no popup
+              setState(() {
+                _articles = [];
+                _error = 'You have read all articles in $category category.';
+                _isLoading = false;
+              });
+            } else {
+              // Left swipe: Show toast and load all other unread articles
+              _showToast('You have read all articles in $category category');
+              await _loadAllOtherUnreadArticles();
+            }
+            return;
+          } else {
+            _preloadColors();
+          }
+          
+          print('SUCCESS: Loaded ${allCategoryArticles.length} total $category articles, ${unreadCategoryArticles.length} unread from Supabase');
+          return;
+        }
+      } catch (e) {
+        print('ERROR: Supabase category filter failed: $e');
+      }
+
+      // PRIORITY 2: Try filtering all Supabase articles locally
+      try {
+        final allSupabaseArticles = await SupabaseService.getNews(limit: 100);
+        if (allSupabaseArticles.isNotEmpty) {
+          final filteredArticles = allSupabaseArticles.where((article) => 
+            article.category.toLowerCase() == category.toLowerCase()
+          ).toList();
+          
+          final unreadFilteredArticles = filteredArticles.where((article) => 
+            !readIds.contains(article.id)
+          ).toList();
+          
+          if (unreadFilteredArticles.isNotEmpty) {
+            setState(() {
+              _articles = unreadFilteredArticles;
+              _isLoading = false;
+            });
+            print('SUCCESS: Filtered ${unreadFilteredArticles.length} unread $category articles from ${filteredArticles.length} total');
+            _preloadColors();
+            return;
+          } else if (filteredArticles.isNotEmpty) {
+            if (isRightSwipe) {
+              // Right swipe: Just show "You read all" in UI, no popup
+              setState(() {
+                _articles = [];
+                _error = 'You have read all articles in $category category.';
+                _isLoading = false;
+              });
+            } else {
+              // Left swipe: Show toast and load all other unread articles
+              _showToast('You have read all articles in $category category');
+              await _loadAllOtherUnreadArticles();
+            }
+            return;
+          } else {
+            if (isRightSwipe) {
+              // Right swipe: Just show "No articles" in UI, no popup
+              setState(() {
+                _articles = [];
+                _error = 'No $category articles found.';
+                _isLoading = false;
+              });
+            } else {
+              // Left swipe: Show toast and switch back to All category
+              setState(() {
+                _articles = [];
+                _error = 'No $category articles found.';
+                _isLoading = false;
+              });
+              _showToast('No $category articles found. Switching back to All categories.');
+            }
+            return;
+          }
+        }
+      } catch (e) {
+        print('ERROR: Failed to filter Supabase articles: $e');
+      }
+
+      // PRIORITY 3: If Supabase completely fails
+      if (isRightSwipe) {
+        // Right swipe: Just show error in UI, no popup
+        setState(() {
+          _articles = [];
+          _error = 'Unable to load $category articles.';
+          _isLoading = false;
+        });
+      } else {
+        // Left swipe: Show toast and prepare to switch back to All
+        setState(() {
+          _articles = [];
+          _error = 'Unable to load $category articles.';
+          _isLoading = false;
+        });
+        _showToast('Unable to load $category articles. Switching back to All categories.');
+      }
+      print('ERROR: Supabase completely unavailable for $category');
+    } catch (e) {
+      setState(() {
+        _error = 'Failed to load articles for $category: $e';
+        _isLoading = false;
+      });
+    }
+  }
+
   Future<void> _loadArticlesByCategory(String category) async {
     try {
       setState(() {
@@ -216,6 +349,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
     }
   }
 
+
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
@@ -265,6 +399,19 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
       _colorCache,
     );
   }
+
+  void _preloadCategoryIfNeeded(String category) {
+    CategoryManagementService.preloadCategoryIfNeeded(
+      category, 
+      _categoryArticles, 
+      _categoryLoading, 
+      _loadArticlesByCategoryForCache,
+      () => _loadNewsArticlesForCategory(category),
+    );
+  }
+
+
+
 
   Widget _buildCleanHeader() {
     return Positioned(
@@ -346,6 +493,8 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
     );
   }
 
+
+
   void _selectCategory(String category) {
     final categories = NewsUIService.getSelectCategories();
     
@@ -368,16 +517,6 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
     print('Switched to $category');
   }
 
-  void _preloadCategoryIfNeeded(String category) {
-    CategoryManagementService.preloadCategoryIfNeeded(
-      category, 
-      _categoryArticles, 
-      _categoryLoading, 
-      _loadArticlesByCategoryForCache,
-      () => _loadNewsArticlesForCategory(category),
-    );
-  }
-
   void _preloadAllCategories() {
     final categories = NewsUIService.getPreloadCategories();
     
@@ -389,6 +528,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
       () => _loadNewsArticlesForCategory('All'),
     );
   }
+
 
   Future<void> _loadNewsArticlesForCategory(String category) async {
     try {
@@ -519,13 +659,25 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
     }
   }
 
-  Future<List<NewsArticle>> _filterValidArticles(List<NewsArticle> articles) async {
-    return await NewsFeedHelper.filterValidArticles(articles);
-  }
+
+
+
+
 
   Future<void> _preloadColors() async {
     await ArticleManagementService.preloadColors(_articles, _currentIndex, _colorCache);
   }
+
+  Future<void> _tryLoadMoreArticles() async {
+    await ArticleManagementService.tryLoadMoreArticles(
+      _articles, 
+      _currentIndex, 
+      _selectedCategory, 
+      _loadNewsArticles, 
+      (category) => _loadArticlesByCategory(category),
+    );
+  }
+
 
   Future<void> _loadAllOtherUnreadArticles() async {
     try {
@@ -551,6 +703,15 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
     });
   }
 
+
+
+
+
+
+
+
+
+
   void _preloadPopularCategories() {
     final popularCategories = NewsUIService.getPopularCategories();
     
@@ -560,4 +721,9 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
       _loadArticlesByCategoryForCache,
     );
   }
+
+
+
+
+
 }
