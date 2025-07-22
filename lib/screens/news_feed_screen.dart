@@ -4,6 +4,7 @@ import '../models/news_article.dart';
 import '../services/supabase_service.dart';
 import '../services/color_extraction_service.dart';
 import '../services/read_articles_service.dart';
+import '../services/local_storage_service.dart';
 
 class NewsFeedScreen extends StatefulWidget {
   const NewsFeedScreen({super.key});
@@ -34,6 +35,12 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
   // Store category pill positions for accurate scrolling
   final List<GlobalKey> _categoryKeys = [];
   final Map<int, double> _categoryPositions = {};
+  
+  // Smart category preference tracking
+  final Map<String, int> _categoryViewTime = {}; // Time spent in each category
+  final Map<String, int> _categoryArticlesRead = {}; // Articles read per category
+  final Map<String, int> _categoryVisitCount = {}; // How often user visits category
+  DateTime? _categoryStartTime; // When user entered current category
 
   @override
   void initState() {
@@ -47,6 +54,8 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
     // Pre-load popular categories for instant switching
     _preloadPopularCategories();
     // Smart read tracking enabled
+    // Initialize preference tracking
+    _categoryStartTime = DateTime.now();
   }
 
   void _initializeCategories() {
@@ -426,6 +435,9 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
         final newCategory = categories[categoryIndex];
         if (newCategory != _selectedCategory) {
           print('RIGHT SWIPE DETECTED: Switching from $_selectedCategory to $newCategory');
+          
+          // Track category switch for preference learning
+          _trackCategorySwitch(_selectedCategory, newCategory);
           setState(() {
             _selectedCategory = newCategory;
             _currentIndex = 0;
@@ -538,6 +550,9 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
           
           // Smart read tracking: Remove this article from all category caches
           _removeReadArticleFromCaches(previousArticle.id);
+          
+          // Track article read for preference learning
+          _trackArticleRead(previousArticle);
           
           print('Marked article "${previousArticle.title}" as read and removed from all categories');
         }
@@ -1784,5 +1799,123 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
         categoryList.removeWhere((article) => article.id == articleId);
       }
     }
+  }
+
+  void _trackCategorySwitch(String fromCategory, String toCategory) {
+    // Track time spent in previous category
+    if (_categoryStartTime != null && fromCategory.isNotEmpty) {
+      final timeSpent = DateTime.now().difference(_categoryStartTime!).inSeconds;
+      _categoryViewTime[fromCategory] = (_categoryViewTime[fromCategory] ?? 0) + timeSpent;
+    }
+    
+    // Track visit to new category
+    _categoryVisitCount[toCategory] = (_categoryVisitCount[toCategory] ?? 0) + 1;
+    _categoryStartTime = DateTime.now();
+    
+    print('User preference: Spent ${_categoryViewTime[fromCategory] ?? 0}s in $fromCategory, visiting $toCategory (${_categoryVisitCount[toCategory]} times)');
+    
+    // Update category preferences periodically
+    _updateCategoryPreferences();
+  }
+
+  void _trackArticleRead(NewsArticle article) {
+    // Determine article category (could be from title/content analysis or database category)
+    String articleCategory = _detectArticleCategory(article);
+    
+    _categoryArticlesRead[articleCategory] = (_categoryArticlesRead[articleCategory] ?? 0) + 1;
+    _categoryArticlesRead[_selectedCategory] = (_categoryArticlesRead[_selectedCategory] ?? 0) + 1;
+    
+    print('User preference: Read article in $articleCategory (${_categoryArticlesRead[articleCategory]} total)');
+  }
+
+  String _detectArticleCategory(NewsArticle article) {
+    // Try to detect category from article content
+    final content = '${article.title} ${article.description}'.toLowerCase();
+    
+    // Category keywords mapping
+    final categoryKeywords = {
+      'Tech': ['technology', 'software', 'app', 'digital', 'ai', 'tech', 'startup', 'coding'],
+      'Sports': ['football', 'basketball', 'soccer', 'sports', 'game', 'player', 'team', 'match'],
+      'Health': ['health', 'medical', 'doctor', 'medicine', 'fitness', 'wellness', 'disease'],
+      'Business': ['business', 'company', 'market', 'economy', 'finance', 'stock', 'investment'],
+      'Science': ['science', 'research', 'study', 'discovery', 'scientist', 'experiment'],
+      'Entertainment': ['movie', 'music', 'celebrity', 'entertainment', 'film', 'actor', 'singer'],
+    };
+    
+    // Check which category has most keyword matches
+    String bestCategory = _selectedCategory;
+    int maxMatches = 0;
+    
+    for (final entry in categoryKeywords.entries) {
+      int matches = 0;
+      for (final keyword in entry.value) {
+        if (content.contains(keyword)) matches++;
+      }
+      if (matches > maxMatches) {
+        maxMatches = matches;
+        bestCategory = entry.key;
+      }
+    }
+    
+    return bestCategory;
+  }
+
+  void _updateCategoryPreferences() {
+    // Calculate preference scores based on multiple factors
+    final Map<String, double> preferenceScores = {};
+    
+    for (String category in ['All', 'Sports', 'Top', 'Trending', 'Science', 'World', 'Health', 'Business', 'Tech', 'Entertainment']) {
+      double score = 0.0;
+      
+      // Factor 1: Time spent in category (40% weight)
+      final timeSpent = _categoryViewTime[category] ?? 0;
+      score += (timeSpent / 60.0) * 0.4; // Convert to minutes
+      
+      // Factor 2: Articles read in category (35% weight)
+      final articlesRead = _categoryArticlesRead[category] ?? 0;
+      score += articlesRead * 0.35;
+      
+      // Factor 3: Visit frequency (25% weight)
+      final visitCount = _categoryVisitCount[category] ?? 0;
+      score += visitCount * 0.25;
+      
+      preferenceScores[category] = score;
+    }
+    
+    // Sort categories by preference score
+    final sortedPreferences = preferenceScores.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    
+    print('=== USER CATEGORY PREFERENCES ===');
+    for (int i = 0; i < sortedPreferences.length && i < 5; i++) {
+      final entry = sortedPreferences[i];
+      print('${i + 1}. ${entry.key}: ${entry.value.toStringAsFixed(1)} points');
+    }
+    print('=== END PREFERENCES ===');
+    
+    // Store preferences for future use
+    _saveUserPreferences(sortedPreferences);
+  }
+
+  Future<void> _saveUserPreferences(List<MapEntry<String, double>> preferences) async {
+    // Save to local storage for persistence
+    final topCategories = preferences.take(5).map((e) => e.key).toList();
+    try {
+      await LocalStorageService.setCategoryPreferences(topCategories);
+      print('Saved user preferences: ${topCategories.join(", ")}');
+    } catch (e) {
+      print('Error saving preferences: $e');
+    }
+    
+    // Reorder category list based on preferences for better UX
+    _reorderCategoriesByPreference(topCategories);
+  }
+
+  void _reorderCategoriesByPreference(List<String> preferredCategories) {
+    // This could reorder the horizontal category pills to show preferred ones first
+    print('Top preferred categories: ${preferredCategories.join(", ")}');
+    
+    // Future enhancement: Dynamically reorder the category pills
+    // to show user's favorite categories first
   }
 }
