@@ -357,8 +357,17 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
         // Auto-scroll category pills to keep selected category visible
         final categoryIndex = categories.indexOf(newCategory);
         if (categoryIndex != -1) {
-          CategoryScrollService.scrollToSelectedCategoryAccurate(
-            context, _categoryScrollController, categoryIndex, categories);
+          // Use a delayed call to ensure ScrollController is ready
+          Future.delayed(const Duration(milliseconds: 50), () {
+            if (mounted && _categoryScrollController.hasClients) {
+              try {
+                CategoryScrollService.scrollToSelectedCategoryAccurate(
+                  context, _categoryScrollController, categoryIndex, categories);
+              } catch (e) {
+                print('ScrollController error: $e');
+              }
+            }
+          });
         }
       },
       (index) => setState(() => _currentIndex = index),
@@ -421,9 +430,17 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
                 minSize: 0,
                 onPressed: () {
                   _selectCategory(category);
-                  // Also scroll to tapped category
-                  CategoryScrollService.scrollToSelectedCategoryAccurate(
-                    context, _categoryScrollController, index, categories);
+                  // Also scroll to tapped category with delay
+                  Future.delayed(const Duration(milliseconds: 50), () {
+                    if (mounted && _categoryScrollController.hasClients) {
+                      try {
+                        CategoryScrollService.scrollToSelectedCategoryAccurate(
+                          context, _categoryScrollController, index, categories);
+                      } catch (e) {
+                        print('ScrollController error on tap: $e');
+                      }
+                    }
+                  });
                 },
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),

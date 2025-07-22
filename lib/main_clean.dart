@@ -1,11 +1,11 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'injection_container.dart' as di;
 import 'presentation/pages/news_feed_page.dart';
 import 'services/local_storage_service.dart';
+import 'services/supabase_service.dart';
 import 'screens/language_selection_screen.dart';
 
 void main() async {
@@ -26,13 +26,9 @@ void main() async {
   // Enable edge-to-edge mode
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   
-  // Initialize Supabase
+  // Initialize Supabase with secure configuration
   try {
-    await Supabase.initialize(
-      url: 'https://sopxrwmeojcsclhokeuy.supabase.co',
-      anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNvcHhyd21lb2pjc2NsaG9rZXV5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk4NDAwMDMsImV4cCI6MjA2NTQxNjAwM30.3shfwkFgJPOQ_wuYvdVmIzZrNONtQiwQFoAe5tthgSQ',
-    );
-    print('Supabase initialized successfully');
+    await SupabaseService.initialize();
   } catch (e) {
     print('Supabase initialization error: $e');
   }

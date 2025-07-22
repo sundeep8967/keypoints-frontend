@@ -1,18 +1,37 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/news_article.dart';
+import '../config/app_config.dart';
 
 class SupabaseService {
-  static const String _supabaseUrl = 'https://sopxrwmeojcsclhokeuy.supabase.co';
-  static const String _supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNvcHhyd21lb2pjc2NsaG9rZXV5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk4NDAwMDMsImV4cCI6MjA2NTQxNjAwM30.3shfwkFgJPOQ_wuYvdVmIzZrNONtQiwQFoAe5tthgSQ';
-  
   static SupabaseClient get client => Supabase.instance.client;
 
-  /// Initialize Supabase
+  /// Initialize Supabase with secure configuration
   static Future<void> initialize() async {
-    await Supabase.initialize(
-      url: _supabaseUrl,
-      anonKey: _supabaseKey,
-    );
+    try {
+      // Try to use environment variables first
+      if (AppConfig.isConfigured) {
+        await Supabase.initialize(
+          url: AppConfig.supabaseUrl,
+          anonKey: AppConfig.supabaseAnonKey,
+        );
+        print('✅ Supabase initialized with environment credentials');
+      } else if (AppConfig.isUsingDevCredentials) {
+        // Fallback to development credentials (local development only)
+        await Supabase.initialize(
+          url: AppConfig.devSupabaseUrl,
+          anonKey: AppConfig.devSupabaseAnonKey,
+        );
+        print('⚠️ Supabase initialized with development credentials');
+        print('🔒 WARNING: Configure environment variables for production');
+      } else {
+        throw Exception(
+          'Supabase credentials not configured. Please set SUPABASE_URL and SUPABASE_ANON_KEY environment variables.'
+        );
+      }
+    } catch (e) {
+      print('❌ Supabase initialization failed: $e');
+      rethrow;
+    }
   }
 
   /// Get news articles from Supabase

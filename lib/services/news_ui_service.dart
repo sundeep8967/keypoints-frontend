@@ -38,89 +38,40 @@ class NewsUIService {
     }
   }
 
-  static List<String> getBaseCategories() {
-    return [
-      'All',
-      'Sports',      // 58 articles
-      'Top',         // 56 articles  
-      'Trending',    // 53 articles
-      'Science',     // 51 articles
-      'World',       // 51 articles
-      'Health',      // 49 articles
-      'Business',    // 47 articles
-      'Tech',        // 46 articles
-      'Entertainment', // 35 articles
-      'Travel',      // 9 articles
-      'Startups',    // 6 articles
-      'Politics',    // 5 articles
-      'National',    // 5 articles
-      'India',       // 5 articles
-      'Education',   // 5 articles
-      'Celebrity',   // New category
-      'Scandal',     // New category
-      'Viral',       // New category
-    ];
-  }
+  /// Legacy method - use getCategories() instead
+  @deprecated
+  static List<String> getBaseCategories() => getCategories();
 
-  static List<String> getHorizontalCategories() {
-    return [
-      'All',
-      'Sports', 'Top', 'Trending', 'Science', 'World', 'Health', 'Business', 
-      'Tech', 'Entertainment', 'Travel', 'Startups', 'Politics', 'National', 
-      'India', 'Education', 'Celebrity', 'Scandal', 'Viral'
-    ];
-  }
-
-  static List<String> getInitializeCategories() {
+  /// Single source of truth for all categories
+  /// This prevents navigation mismatches and gesture crashes
+  static List<String> getCategories() {
     return [
       'All',
       'Tech',
       'Science',
-      'Environment',
-      'Energy',
-      'Lifestyle',
       'Business',
       'Entertainment',
       'Health',
       'Sports',
       'World',
-      'Trending'
+      'Trending',
+      'Environment',
+      'Energy',
+      'Lifestyle'
     ];
   }
 
-  static List<String> getSelectCategories() {
-    return [
-      'All',
-      'Tech',
-      'Science',
-      'Environment',
-      'Energy',
-      'Lifestyle',
-      'Business',
-      'Entertainment',
-      'Health',
-      'Sports',
-      'World',
-      'Trending'
-    ];
-  }
+  /// Get categories for horizontal pills (same as main categories)
+  static List<String> getHorizontalCategories() => getCategories();
 
-  static List<String> getPreloadCategories() {
-    return [
-      'All',
-      'Tech',
-      'Science',
-      'Environment',
-      'Energy',
-      'Lifestyle',
-      'Business',
-      'Entertainment',
-      'Health',
-      'Sports',
-      'World',
-      'Trending'
-    ];
-  }
+  /// Get categories for initialization (same as main categories)
+  static List<String> getInitializeCategories() => getCategories();
+
+  /// Get categories for selection (same as main categories)
+  static List<String> getSelectCategories() => getCategories();
+
+  /// Get categories for preloading (same as main categories)
+  static List<String> getPreloadCategories() => getCategories();
 
   static List<String> getPopularCategories() {
     // Pre-load the most commonly accessed categories

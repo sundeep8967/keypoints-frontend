@@ -8,7 +8,17 @@ class CategoryScrollService {
     int categoryIndex,
     List<String> categories,
   ) {
-    // Use a more aggressive approach - scroll to ensure visibility
+    // Add safety checks and delay to ensure ScrollController is ready
+    if (!categoryScrollController.hasClients) {
+      // Try again after a short delay
+      Future.delayed(const Duration(milliseconds: 100), () {
+        if (categoryScrollController.hasClients) {
+          scrollToSelectedCategoryAccurate(context, categoryScrollController, categoryIndex, categories);
+        }
+      });
+      return;
+    }
+    
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!categoryScrollController.hasClients) return;
       

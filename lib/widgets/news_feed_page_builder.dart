@@ -124,7 +124,7 @@ class NewsFeedPageBuilder {
   ) {
     return PageView.builder(
       scrollDirection: Axis.horizontal,
-      physics: const PageScrollPhysics(),
+      physics: const BouncingScrollPhysics(),
       itemCount: categories.length,
       controller: categoryPageController,
       onPageChanged: (categoryIndex) {

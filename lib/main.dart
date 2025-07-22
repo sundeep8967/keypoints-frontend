@@ -34,16 +34,7 @@ void main() async {
     print('Supabase initialization error: $e');
   }
 
-  // Initialize Firebase (optional fallback)
-  try {
-    // Commented out for now since we're using Supabase
-    // await Firebase.initializeApp(
-    //   options: DefaultFirebaseOptions.currentPlatform,
-    // );
-    print('Firebase initialization skipped - using Supabase');
-  } catch (e) {
-    print('Firebase initialization error: $e');
-  }
+  // Firebase removed - using Supabase only
   
   runApp(const NewsApp());
 }
@@ -135,11 +126,4 @@ class _AppInitializerState extends State<AppInitializer> {
   }
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const NewsFeedScreen();
-  }
-}
+// Removed unused MyApp class
