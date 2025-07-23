@@ -3,14 +3,52 @@ import 'package:flutter/cupertino.dart';
 import 'package:http/http.dart' as http;
 import 'package:image/image.dart' as img;
 import 'dart:convert';
-import 'dart:typed_data';
 import 'dart:math';
 
+/// Service for extracting color palettes from images.
+/// 
+/// This service analyzes images from URLs to extract dominant colors
+/// and create harmonious color palettes for UI theming. It includes
+/// caching, fallback strategies, and graceful error handling.
 class ColorExtractionService {
+  /// Internal cache for storing extracted color palettes by image URL.
   static final Map<String, ColorPalette> _cache = {};
 
-  /// Extract a dynamic color palette from an image URL
+  /// Extracts a dynamic color palette from an image URL.
+  /// 
+  /// Analyzes the provided image to extract dominant colors and creates
+  /// a cohesive color palette. Uses multiple fallback strategies to ensure
+  /// a palette is always returned, even if the image cannot be processed.
+  /// 
+  /// The extraction process:
+  /// 1. Validates the URL format
+  /// 2. Checks cache for existing palette
+  /// 3. Attempts to download and analyze the image
+  /// 4. Falls back to URL-based generation if image analysis fails
+  /// 5. Returns default palette as final fallback
+  /// 
+  /// Parameters:
+  /// * [imageUrl] - The URL of the image to analyze (must be valid HTTP/HTTPS URL)
+  /// 
+  /// Returns:
+  /// * A [Future<ColorPalette>] containing the extracted or generated color palette
+  /// 
+  /// Throws:
+  /// * [ArgumentError] if imageUrl is empty or has invalid format
+  /// 
+  /// Note: This method never throws exceptions for network or processing errors,
+  /// instead it gracefully falls back to alternative generation methods.
   static Future<ColorPalette> extractColorsFromImage(String imageUrl) async {
+    if (imageUrl.trim().isEmpty) {
+      throw ArgumentError('Image URL cannot be empty');
+    }
+
+    // Validate URL format
+    final uri = Uri.tryParse(imageUrl);
+    if (uri == null || (!uri.hasScheme || (uri.scheme != 'http' && uri.scheme != 'https'))) {
+      throw ArgumentError('Invalid image URL format: $imageUrl');
+    }
+
     // Check cache first
     if (_cache.containsKey(imageUrl)) {
       return _cache[imageUrl]!;
@@ -21,9 +59,30 @@ class ColorExtractionService {
       final palette = await _extractColorsFromNetworkImage(imageUrl);
       _cache[imageUrl] = palette;
       return palette;
+    } on http.ClientException catch (e) {
+      // Network-specific error handling
+      try {
+        final palette = _generatePaletteFromUrl(imageUrl);
+        _cache[imageUrl] = palette;
+        return palette;
+      } catch (e2) {
+        final fallback = ColorPalette.defaultPalette();
+        _cache[imageUrl] = fallback;
+        return fallback;
+      }
+    } on FormatException catch (e) {
+      // Image format error handling
+      try {
+        final palette = _generatePaletteFromUrl(imageUrl);
+        _cache[imageUrl] = palette;
+        return palette;
+      } catch (e2) {
+        final fallback = ColorPalette.defaultPalette();
+        _cache[imageUrl] = fallback;
+        return fallback;
+      }
     } catch (e) {
-      print('Failed to extract colors from image: $e');
-      // Fallback to URL-based generation
+      // General error handling with fallback chain
       try {
         final palette = _generatePaletteFromUrl(imageUrl);
         _cache[imageUrl] = palette;
@@ -62,8 +121,8 @@ class ColorExtractionService {
         primary: mutedPrimary,
         secondary: _createMutedBackground(extractedColors.secondary),
         accent: _createMutedBackground(extractedColors.accent),
-        background: mutedPrimary.withOpacity(0.1),
-        surface: mutedPrimary.withOpacity(0.05),
+        background: mutedPrimary.withValues(alpha: 0.1),
+        surface: mutedPrimary.withValues(alpha: 0.05),
         onPrimary: Colors.white,
         onSecondary: Colors.white,
         onAccent: Colors.white,
@@ -84,10 +143,10 @@ class ColorExtractionService {
     for (int y = 0; y < resized.height; y += 2) {
       for (int x = 0; x < resized.width; x += 2) {
         final pixel = resized.getPixel(x, y);
-        final r = pixel.r.toInt();
-        final g = pixel.g.toInt();
-        final b = pixel.b.toInt();
-        final a = pixel.a.toInt();
+        final r = pixel.r;
+        final g = pixel.g;
+        final b = pixel.b;
+        final a = pixel.a;
         
         if (a > 128) {
           // Round colors to reduce similar shades
@@ -139,7 +198,7 @@ class ColorExtractionService {
       final b = int.parse(parts[2]);
       
       final distance = _colorDistance(
-        primaryColor.red, primaryColor.green, primaryColor.blue,
+        primaryColor.r.toInt(), primaryColor.g.toInt(), primaryColor.b.toInt(),
         r, g, b,
       );
       
@@ -160,11 +219,11 @@ class ColorExtractionService {
       final b = int.parse(parts[2]);
       
       final primaryDistance = _colorDistance(
-        primaryColor.red, primaryColor.green, primaryColor.blue,
+        primaryColor.r.toInt(), primaryColor.g.toInt(), primaryColor.b.toInt(),
         r, g, b,
       );
       final secondaryDistance = _colorDistance(
-        secondaryColor.red, secondaryColor.green, secondaryColor.blue,
+        secondaryColor.r.toInt(), secondaryColor.g.toInt(), secondaryColor.b.toInt(),
         r, g, b,
       );
       
@@ -197,16 +256,16 @@ class ColorExtractionService {
   }
 
   static Color _adjustColor(Color color, double factor) {
-    final r = (color.red + (color.red * factor)).clamp(0, 255).toInt();
-    final g = (color.green + (color.green * factor)).clamp(0, 255).toInt();
-    final b = (color.blue + (color.blue * factor)).clamp(0, 255).toInt();
+    final r = (color.r.toInt() + (color.r.toInt() * factor)).clamp(0, 255).toInt();
+    final g = (color.g.toInt() + (color.g.toInt() * factor)).clamp(0, 255).toInt();
+    final b = (color.b.toInt() + (color.b.toInt() * factor)).clamp(0, 255).toInt();
     return Color.fromARGB(255, r, g, b);
   }
 
   static Color _getTextColor(Color backgroundColor) {
-    final luminance = (0.299 * backgroundColor.red + 
-                     0.587 * backgroundColor.green + 
-                     0.114 * backgroundColor.blue) / 255;
+    final luminance = (0.299 * backgroundColor.r.toInt() + 
+                     0.587 * backgroundColor.g.toInt() + 
+                     0.114 * backgroundColor.b.toInt()) / 255;
     return luminance > 0.5 ? Colors.black87 : Colors.white;
   }
 
@@ -280,8 +339,8 @@ class ColorExtractionService {
   /// Generate gradient colors for backgrounds
   static List<Color> generateGradientColors(ColorPalette palette) {
     return [
-      palette.primary.withOpacity(0.1),
-      palette.secondary.withOpacity(0.05),
+      palette.primary.withValues(alpha: 0.1),
+      palette.secondary.withValues(alpha: 0.05),
       palette.surface,
     ];
   }
@@ -351,9 +410,9 @@ class ColorPalette {
   /// Create a lighter version of the palette
   ColorPalette get light {
     return ColorPalette(
-      primary: primary.withOpacity(0.8),
-      secondary: secondary.withOpacity(0.8),
-      accent: accent.withOpacity(0.8),
+      primary: primary.withValues(alpha: 0.8),
+      secondary: secondary.withValues(alpha: 0.8),
+      accent: accent.withValues(alpha: 0.8),
       background: background,
       surface: surface,
       onPrimary: onPrimary,

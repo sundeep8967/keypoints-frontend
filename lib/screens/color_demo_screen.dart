@@ -2,7 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import '../models/news_article.dart';
 import '../widgets/dynamic_color_news_card.dart';
-import '../services/firebase_service.dart';
+import '../services/news_loading_service.dart';
 import '../services/color_extraction_service.dart';
 
 class ColorDemoScreen extends StatefulWidget {
@@ -70,9 +70,9 @@ class _ColorDemoScreenState extends State<ColorDemoScreen> with TickerProviderSt
         _error = '';
       });
 
-      // Try to load from Firebase first
+      // Try to load from news service first
       try {
-        final articles = await FirebaseService.getNews();
+        final articles = await NewsLoadingService.loadNewsArticles();
         if (articles.isNotEmpty) {
           setState(() {
             _articles = articles.take(5).toList(); // Show first 5 for demo
@@ -81,7 +81,7 @@ class _ColorDemoScreenState extends State<ColorDemoScreen> with TickerProviderSt
           return;
         }
       } catch (e) {
-        print('Firebase not available, using demo data: $e');
+        print('News service not available, using demo data: $e');
       }
 
       // Fallback to demo data
@@ -230,46 +230,6 @@ class _ColorDemoScreenState extends State<ColorDemoScreen> with TickerProviderSt
     );
   }
 
-  Widget _buildSwipableStack() {
-    if (_articles.isEmpty) {
-      return const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              CupertinoIcons.news,
-              size: 60,
-              color: CupertinoColors.systemGrey,
-            ),
-            SizedBox(height: 16),
-            Text(
-              'No more articles',
-              style: TextStyle(
-                fontSize: 18,
-                color: CupertinoColors.secondaryLabel,
-              ),
-            ),
-            SizedBox(height: 8),
-            Text(
-              'Pull to refresh for more stories',
-              style: TextStyle(
-                fontSize: 14,
-                color: CupertinoColors.tertiaryLabel,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return Stack(
-      children: [
-        // Show up to 3 cards in stack
-        for (int i = _currentIndex; i < _currentIndex + 3 && i < _articles.length; i++)
-          _buildStackCard(_articles[i], i - _currentIndex),
-      ],
-    );
-  }
 
   Widget _buildStackCard(NewsArticle article, int stackIndex) {
     final scale = 1.0 - (stackIndex * 0.05);
@@ -351,33 +311,6 @@ class _ColorDemoScreenState extends State<ColorDemoScreen> with TickerProviderSt
     );
   }
 
-  Widget _buildActionButton({
-    required IconData icon,
-    required Color color,
-    required VoidCallback onPressed,
-  }) {
-    return CupertinoButton(
-      onPressed: onPressed,
-      padding: EdgeInsets.zero,
-      child: Container(
-        width: 60,
-        height: 60,
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
-          shape: BoxShape.circle,
-          border: Border.all(
-            color: color.withOpacity(0.3),
-            width: 2,
-          ),
-        ),
-        child: Icon(
-          icon,
-          color: color,
-          size: 28,
-        ),
-      ),
-    );
-  }
 
   void _animateSwipe(bool isRightSwipe) {
     _slideAnimation = Tween<Offset>(
@@ -415,8 +348,6 @@ class _ColorDemoScreenState extends State<ColorDemoScreen> with TickerProviderSt
   
 
   void _showFeedback(String message, bool positive) {
-    final color = positive ? CupertinoColors.systemGreen : CupertinoColors.systemRed;
-    
     // You can implement a toast or snackbar here
     print(message); // For now, just print
   }
@@ -474,7 +405,7 @@ class _ColorDemoScreenState extends State<ColorDemoScreen> with TickerProviderSt
                                 child: Icon(
                                   CupertinoIcons.photo_fill,
                                   size: 60,
-                                  color: palette.onPrimary.withOpacity(0.5),
+                                  color: palette.onPrimary.withValues(alpha: 0.5),
                                 ),
                               ),
                             );
@@ -509,11 +440,11 @@ class _ColorDemoScreenState extends State<ColorDemoScreen> with TickerProviderSt
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.9),
+                              color: Colors.white.withValues(alpha: 0.9),
                               borderRadius: BorderRadius.circular(16),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.2),
+                                  color: Colors.black.withValues(alpha: 0.2),
                                   blurRadius: 8,
                                   offset: const Offset(0, 2),
                                 ),
@@ -534,7 +465,7 @@ class _ColorDemoScreenState extends State<ColorDemoScreen> with TickerProviderSt
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                             decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.7),
+                              color: Colors.black.withValues(alpha: 0.7),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(
@@ -587,7 +518,7 @@ class _ColorDemoScreenState extends State<ColorDemoScreen> with TickerProviderSt
                             article.description,
                             style: TextStyle(
                               fontSize: 16,
-                              color: palette.onPrimary.withOpacity(0.9),
+                              color: palette.onPrimary.withValues(alpha: 0.9),
                               height: 1.5,
                               letterSpacing: 0.1,
                             ),
@@ -612,10 +543,10 @@ class _ColorDemoScreenState extends State<ColorDemoScreen> with TickerProviderSt
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                                 decoration: BoxDecoration(
-                                  color: palette.onPrimary.withOpacity(0.1),
+                                  color: palette.onPrimary.withValues(alpha: 0.1),
                                   borderRadius: BorderRadius.circular(14),
                                   border: Border.all(
-                                    color: palette.onPrimary.withOpacity(0.2),
+                                    color: palette.onPrimary.withValues(alpha: 0.2),
                                     width: 1,
                                   ),
                                 ),
@@ -659,35 +590,6 @@ class _ColorDemoScreenState extends State<ColorDemoScreen> with TickerProviderSt
     );
   }
 
-  Widget _buildVerticalActionButton(IconData icon, Color color, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 50,
-        height: 50,
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.2),
-          borderRadius: BorderRadius.circular(25),
-          border: Border.all(
-            color: Colors.white.withOpacity(0.3),
-            width: 2,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 10,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Icon(
-          icon,
-          size: 24,
-          color: Colors.white,
-        ),
-      ),
-    );
-  }
 
   Widget _buildInshortsActionButton(IconData icon, Color color, VoidCallback onTap) {
     return GestureDetector(
@@ -696,10 +598,10 @@ class _ColorDemoScreenState extends State<ColorDemoScreen> with TickerProviderSt
         width: 44,
         height: 44,
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
+          color: color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(22),
           border: Border.all(
-            color: color.withOpacity(0.2),
+            color: color.withValues(alpha: 0.2),
             width: 1.5,
           ),
         ),
@@ -733,7 +635,7 @@ class _ColorDemoScreenState extends State<ColorDemoScreen> with TickerProviderSt
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.15),
+                      color: Colors.black.withValues(alpha: 0.15),
                       blurRadius: 6,
                       offset: const Offset(0, 1),
                     ),
@@ -755,7 +657,7 @@ class _ColorDemoScreenState extends State<ColorDemoScreen> with TickerProviderSt
                 width: 32,
                 height: 32,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
+                  color: Colors.white.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: CupertinoButton(

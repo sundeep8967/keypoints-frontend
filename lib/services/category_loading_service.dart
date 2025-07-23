@@ -1,7 +1,6 @@
 import '../models/news_article.dart';
 import '../services/supabase_service.dart';
 import '../services/read_articles_service.dart';
-import '../services/news_loading_service.dart';
 
 class CategoryLoadingService {
   static Future<List<NewsArticle>> loadNewsArticlesForCategory(String category) async {

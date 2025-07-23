@@ -1,5 +1,4 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
 
 class NewsUIService {
   static void showToast(BuildContext context, String message, {VoidCallback? onDismiss}) {

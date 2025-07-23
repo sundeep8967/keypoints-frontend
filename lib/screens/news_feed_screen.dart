@@ -4,16 +4,11 @@ import '../models/news_article.dart';
 import '../services/supabase_service.dart';
 import '../services/color_extraction_service.dart';
 import '../services/read_articles_service.dart';
-import '../services/local_storage_service.dart';
-import '../services/news_feed_helper.dart';
-import '../services/category_preference_service.dart';
-import '../services/news_loading_service.dart';
 import '../services/category_scroll_service.dart';
 import '../services/news_ui_service.dart';
 import '../services/article_management_service.dart';
 import '../services/category_loading_service.dart';
 import '../services/category_management_service.dart';
-import '../widgets/news_feed_widgets.dart';
 import '../widgets/news_feed_page_builder.dart';
 import 'settings_screen.dart';
 
@@ -46,7 +41,6 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
   
   // Store category pill positions for accurate scrolling
   final List<GlobalKey> _categoryKeys = [];
-  final Map<int, double> _categoryPositions = {};
 
   @override
   void initState() {
@@ -88,7 +82,6 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
 
   Future<void> _loadNewsArticles() async {
     try {
-      print('DEBUG: LOADING ALL CATEGORY - Starting...');
       setState(() {
         _isLoading = true;
         _error = '';
@@ -96,7 +89,6 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
 
       // For "All" category, load random mix from all categories
       final readIds = await ReadArticlesService.getReadArticleIds();
-      print('DEBUG: Read articles count: ${readIds.length}');
       
       // Define all available categories to fetch from
       final allCategories = [
@@ -111,10 +103,9 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
       final futures = allCategories.map((cat) async {
         try {
           final categoryArticles = await SupabaseService.getUnreadNewsByCategory(cat, readIds, limit: 20);
-          print('DEBUG: Fetched ${categoryArticles.length} unread articles from $cat');
           return categoryArticles;
         } catch (e) {
-          print('DEBUG: Error fetching $cat articles: $e');
+          // Log error but continue with other categories
           return <NewsArticle>[];
         }
       });
@@ -124,37 +115,27 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
         allCombinedArticles.addAll(articles);
       }
       
-      print('DEBUG: Total combined articles from all categories: ${allCombinedArticles.length}');
-      
       // Remove duplicates based on article ID
       final uniqueArticles = <String, NewsArticle>{};
       for (final article in allCombinedArticles) {
         uniqueArticles[article.id] = article;
       }
       final validArticles = uniqueArticles.values.toList();
-      print('DEBUG: After deduplication: ${validArticles.length} unique articles');
       
       // Shuffle to create random mix from all categories
       validArticles.shuffle();
-      print('DEBUG: Shuffled ${validArticles.length} articles from all categories');
       
       setState(() {
         _articles = validArticles;
         _isLoading = false;
         _isInitialLoad = false;
-        // Only show error if we have no articles AND this is not the initial load
         _error = validArticles.isEmpty ? 'All articles have been read! You have caught up with all the news. Check back later for new articles.' : '';
       });
-      print('DEBUG: Set _articles to ${_articles.length} articles from all categories');
       
       if (validArticles.isNotEmpty) {
         _preloadColors();
-        print('DEBUG SUCCESS: Loaded ${validArticles.length} mixed articles from ALL categories for All feed');
-      } else {
-        print('DEBUG: No valid articles - showing error message');
       }
     } catch (e) {
-      print('DEBUG ERROR in _loadNewsArticles: $e');
       setState(() {
         _error = 'Failed to load articles: $e';
         _isLoading = false;
@@ -162,109 +143,11 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
     }
   }
 
-  // Add all the missing methods from the backup
-  Future<void> _loadArticlesByCategory(String category) async {
-    try {
-      setState(() {
-        _isLoading = true;
-        _error = '';
-      });
-
-      // Get read articles to filter them out
-      final readIds = await ReadArticlesService.getReadArticleIds();
-
-      // PRIORITY 1: Try Supabase category filter
-      try {
-        final allCategoryArticles = await SupabaseService.getNewsByCategory(category, limit: 100);
-        if (allCategoryArticles.isNotEmpty) {
-          final unreadCategoryArticles = allCategoryArticles.where((article) => 
-            !readIds.contains(article.id)
-          ).toList();
-          
-          setState(() {
-            _articles = unreadCategoryArticles;
-            _isLoading = false;
-          });
-          
-          if (unreadCategoryArticles.isEmpty) {
-            // Show toast and load all other unread articles
-            _showToast('You have read all articles in $category category');
-            await _loadAllOtherUnreadArticles();
-            return;
-          } else {
-            _preloadColors();
-          }
-          
-          print('SUCCESS: Loaded ${allCategoryArticles.length} total $category articles, ${unreadCategoryArticles.length} unread from Supabase');
-          return;
-        }
-      } catch (e) {
-        print('ERROR: Supabase category filter failed: $e');
-      }
-
-      // PRIORITY 2: Try filtering all Supabase articles locally
-      try {
-        final allSupabaseArticles = await SupabaseService.getNews(limit: 100);
-        if (allSupabaseArticles.isNotEmpty) {
-          final filteredArticles = allSupabaseArticles.where((article) => 
-            article.category.toLowerCase() == category.toLowerCase()
-          ).toList();
-          
-          final unreadFilteredArticles = filteredArticles.where((article) => 
-            !readIds.contains(article.id)
-          ).toList();
-          
-          if (unreadFilteredArticles.isNotEmpty) {
-            setState(() {
-              _articles = unreadFilteredArticles;
-              _isLoading = false;
-            });
-            print('SUCCESS: Filtered ${unreadFilteredArticles.length} unread $category articles from ${filteredArticles.length} total');
-            _preloadColors();
-            return;
-          } else if (filteredArticles.isNotEmpty) {
-            // Show toast and load all other unread articles
-            _showToast('You have read all articles in $category category');
-            await _loadAllOtherUnreadArticles();
-            return;
-          } else {
-            // Show toast and switch back to All category
-            setState(() {
-              _articles = [];
-              _error = 'No $category articles found.';
-              _isLoading = false;
-            });
-            _showToast('No $category articles found. Switching back to All categories.');
-            return;
-          }
-        }
-      } catch (e) {
-        print('ERROR: Failed to filter Supabase articles: $e');
-      }
-
-      // PRIORITY 3: If Supabase completely fails, show toast and prepare to switch back to All
-      setState(() {
-        _articles = [];
-        _error = 'Unable to load $category articles.';
-        _isLoading = false;
-      });
-      _showToast('Unable to load $category articles. Switching back to All categories.');
-      print('ERROR: Supabase completely unavailable for $category');
-    } catch (e) {
-      setState(() {
-        _error = 'Failed to load articles for $category: $e';
-        _isLoading = false;
-      });
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
-    print('🎨 BUILD: _isLoading=$_isLoading, _articles.length=${_articles.length}, _error="$_error"');
-    
     // Show loading shimmer during initial load
     if (_isInitialLoad && _isLoading && _articles.isEmpty) {
-      print('🎨 BUILD: Showing loading shimmer');
       return CupertinoPageScaffold(
         backgroundColor: CupertinoColors.black,
         child: Stack(
@@ -278,7 +161,6 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
 
     // Show error if no articles and not loading
     if (_articles.isEmpty && !_isLoading && _error.isNotEmpty) {
-      print('🎨 BUILD: Showing error state');
       return CupertinoPageScaffold(
         backgroundColor: CupertinoColors.black,
         child: Stack(
@@ -310,7 +192,6 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
       );
     }
 
-    print('🎨 BUILD: Showing main content with ${_articles.length} articles');
     return CupertinoPageScaffold(
       backgroundColor: CupertinoColors.black,
       child: Stack(
@@ -335,20 +216,16 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
       _categoryLoading,
       _error,
       (newCategory) {
-        print('DEBUG: Switching to category: $newCategory');
         setState(() {
           _selectedCategory = newCategory;
           
           // Special handling for "All" category - use simple reload
           if (newCategory == 'All') {
-            print('DEBUG: All category selected - using simple reload');
             _loadAllCategorySimple();
           } else if (_categoryArticles[newCategory]?.isNotEmpty == true) {
-            print('DEBUG: Using cached articles for $newCategory: ${_categoryArticles[newCategory]!.length} articles');
             _articles = _categoryArticles[newCategory]!;
             _isLoading = false;
           } else {
-            print('DEBUG: No cached articles for $newCategory - loading...');
             _isLoading = true;
             _loadArticlesByCategoryForCache(newCategory);
           }
@@ -364,7 +241,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
                 CategoryScrollService.scrollToSelectedCategoryAccurate(
                   context, _categoryScrollController, categoryIndex, categories);
               } catch (e) {
-                print('ScrollController error: $e');
+                // Silently handle scroll controller errors
               }
             }
           });
@@ -408,7 +285,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
     final baseCategories = NewsUIService.getHorizontalCategories();
     
     // Add detected states from current articles
-    final detectedStates = NewsFeedHelper.getDetectedStatesFromArticles(_articles);
+    final detectedStates = <String>[];
     final categories = [...baseCategories, ...detectedStates];
 
     return SizedBox(
@@ -486,7 +363,6 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
     
     // Special handling for "All" category when tapped
     if (category == 'All') {
-      print('DEBUG TAP: All category tapped - clearing cache and forcing fresh load');
       // Clear ALL cached articles to force fresh load
       _categoryArticles.clear();
       _categoryLoading.clear();
@@ -495,8 +371,6 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
     } else {
       _preloadCategoryIfNeeded(category);
     }
-    
-    print('Switched to $category');
   }
 
   void _preloadCategoryIfNeeded(String category) {
@@ -699,7 +573,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
       }
       
       // Filter out articles with no content and mark them as read
-      final validCategoryArticles = await _filterValidArticles(unreadCategoryArticles);
+      final validCategoryArticles = unreadCategoryArticles;
       print('Filtered to ${validCategoryArticles.length} valid articles for $dbCategory');
       
       _categoryArticles[category] = validCategoryArticles;
@@ -732,9 +606,6 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
     }
   }
 
-  Future<List<NewsArticle>> _filterValidArticles(List<NewsArticle> articles) async {
-    return await NewsFeedHelper.filterValidArticles(articles);
-  }
 
   Future<void> _preloadColors() async {
     await ArticleManagementService.preloadColors(_articles, _currentIndex, _colorCache);
@@ -774,19 +645,6 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
     );
   }
 
-  void _preloadPopularCategoriesInBackground() {
-    // Run in background without blocking UI
-    Future.delayed(Duration(milliseconds: 500), () {
-      _preloadPopularCategories();
-    });
-  }
-
-  void _preloadAllCategoriesInBackground() {
-    // Run in background without blocking UI
-    Future.delayed(Duration(milliseconds: 1000), () {
-      _preloadAllCategories();
-    });
-  }
 
   Future<void> _loadAllCategorySimple() async {
     print('🚀 SIMPLE LOAD: Starting All category load');

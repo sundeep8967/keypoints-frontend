@@ -1,8 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import '../services/local_storage_service.dart';
 import '../services/read_articles_service.dart';
-import 'category_preferences_screen.dart';
-import 'language_selection_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});

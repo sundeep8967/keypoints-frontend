@@ -67,18 +67,18 @@ class _DynamicColorNewsCardState extends State<DynamicColorNewsCard> {
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                _dominantColor.withOpacity(0.08),
-                _dominantColor.withOpacity(0.12),
+                _dominantColor.withValues(alpha: 0.08),
+                _dominantColor.withValues(alpha: 0.12),
               ],
             ),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: _dominantColor.withOpacity(0.15),
+              color: _dominantColor.withValues(alpha: 0.15),
               width: 1,
             ),
             boxShadow: [
               BoxShadow(
-                color: _dominantColor.withOpacity(0.15),
+                color: _dominantColor.withValues(alpha: 0.15),
                 blurRadius: 20,
                 offset: const Offset(0, 8),
                 spreadRadius: 0,

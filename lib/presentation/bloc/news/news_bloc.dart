@@ -12,6 +12,11 @@ class NewsBloc extends Bloc<NewsEvent, NewsState> {
   final GetNews getNews;
   final GetNewsByCategory getNewsByCategory;
   final MarkArticleAsRead markArticleAsRead;
+  
+  // Internal caches to maintain state
+  final Map<String, List<NewsArticleEntity>> _categoryCache = {};
+  final Map<String, bool> _categoryLoading = {};
+  int _currentIndex = 0;
 
   NewsBloc({
     required this.getNews,
@@ -22,7 +27,19 @@ class NewsBloc extends Bloc<NewsEvent, NewsState> {
     on<LoadNewsByCategoryEvent>(_onLoadNewsByCategory);
     on<MarkArticleAsReadEvent>(_onMarkArticleAsRead);
     on<RefreshNewsEvent>(_onRefreshNews);
+    on<LoadAllCategoriesEvent>(_onLoadAllCategories);
+    on<PreloadCategoryEvent>(_onPreloadCategory);
+    on<UpdateCurrentIndexEvent>(_onUpdateCurrentIndex);
+    on<ClearCacheEvent>(_onClearCache);
   }
+
+  /// Gets cached articles for a category
+  List<NewsArticleEntity> getCachedArticles(String category) {
+    return _categoryCache[category] ?? [];
+  }
+
+  /// Gets current index
+  int get currentIndex => _currentIndex;
 
   Future<void> _onLoadNews(LoadNewsEvent event, Emitter<NewsState> emit) async {
     emit(NewsLoading());
@@ -84,5 +101,66 @@ class NewsBloc extends Bloc<NewsEvent, NewsState> {
       (failure) => emit(NewsError(failure.message)),
       (articles) => emit(NewsLoaded(articles)),
     );
+  }
+
+  Future<void> _onLoadAllCategories(LoadAllCategoriesEvent event, Emitter<NewsState> emit) async {
+    emit(NewsLoading());
+    
+    final result = await getNews(GetNewsParams(limit: event.limit));
+    
+    result.fold(
+      (failure) => emit(NewsError(failure.message)),
+      (articles) {
+        // Cache articles for "All" category
+        _categoryCache['All'] = articles;
+        _categoryLoading['All'] = false;
+        emit(NewsAllCategoriesLoaded(articles, Map.from(_categoryCache)));
+      },
+    );
+  }
+
+  Future<void> _onPreloadCategory(PreloadCategoryEvent event, Emitter<NewsState> emit) async {
+    // Check if already cached
+    if (_categoryCache.containsKey(event.category)) {
+      emit(NewsCategoryPreloaded(event.category, _categoryCache[event.category]!));
+      return;
+    }
+
+    _categoryLoading[event.category] = true;
+    
+    final result = await getNewsByCategory(
+      GetNewsByCategoryParams(category: event.category, limit: event.limit),
+    );
+    
+    result.fold(
+      (failure) {
+        _categoryLoading[event.category] = false;
+        emit(NewsError(failure.message));
+      },
+      (articles) {
+        _categoryCache[event.category] = articles;
+        _categoryLoading[event.category] = false;
+        emit(NewsCategoryPreloaded(event.category, articles));
+      },
+    );
+  }
+
+  Future<void> _onUpdateCurrentIndex(UpdateCurrentIndexEvent event, Emitter<NewsState> emit) async {
+    _currentIndex = event.index;
+    
+    // Get current articles from state
+    final currentState = state;
+    if (currentState is NewsLoaded) {
+      emit(NewsIndexUpdated(_currentIndex, currentState.articles));
+    } else if (currentState is NewsByCategoryLoaded) {
+      emit(NewsIndexUpdated(_currentIndex, currentState.articles));
+    }
+  }
+
+  Future<void> _onClearCache(ClearCacheEvent event, Emitter<NewsState> emit) async {
+    _categoryCache.clear();
+    _categoryLoading.clear();
+    _currentIndex = 0;
+    emit(const NewsCacheCleared());
   }
 }

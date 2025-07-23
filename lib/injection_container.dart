@@ -15,6 +15,8 @@ import 'domain/repositories/news_repository.dart';
 import 'domain/usecases/get_news.dart';
 import 'domain/usecases/get_news_by_category.dart';
 import 'domain/usecases/mark_article_as_read.dart';
+import 'domain/usecases/load_main_news_feed.dart';
+import 'domain/usecases/refresh_news_feed.dart';
 
 // Presentation
 import 'presentation/bloc/news/news_bloc.dart';
@@ -36,6 +38,10 @@ Future<void> init() async {
   sl.registerLazySingleton(() => GetNews(sl()));
   sl.registerLazySingleton(() => GetNewsByCategory(sl()));
   sl.registerLazySingleton(() => MarkArticleAsRead(sl()));
+  
+  // New consolidated use cases
+  sl.registerLazySingleton(() => LoadMainNewsFeed(sl()));
+  sl.registerLazySingleton(() => RefreshNewsFeed(sl()));
 
   // Repository
   sl.registerLazySingleton<NewsRepository>(

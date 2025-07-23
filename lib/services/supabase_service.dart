@@ -1,11 +1,26 @@
+import 'dart:io';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/news_article.dart';
 import '../config/app_config.dart';
 
+/// Service class for handling all Supabase database operations.
+/// 
+/// This service provides methods for fetching, adding, updating, and deleting
+/// news articles from the Supabase database. It includes proper error handling
+/// and caching mechanisms for optimal performance.
 class SupabaseService {
+  /// Gets the current Supabase client instance.
   static SupabaseClient get client => Supabase.instance.client;
 
-  /// Initialize Supabase with secure configuration
+  /// Initializes Supabase with secure configuration.
+  /// 
+  /// Attempts to use environment variables first, then falls back to
+  /// development credentials for local development. Throws an exception
+  /// if no valid credentials are found.
+  /// 
+  /// Throws:
+  /// * [Exception] if Supabase credentials are not configured
+  /// * [Exception] if initialization fails
   static Future<void> initialize() async {
     try {
       // Try to use environment variables first
@@ -34,7 +49,22 @@ class SupabaseService {
     }
   }
 
-  /// Get news articles from Supabase
+  /// Fetches news articles from the Supabase database.
+  /// 
+  /// Retrieves articles ordered by publication date (newest first).
+  /// Includes comprehensive error handling for network and database issues.
+  /// 
+  /// Parameters:
+  /// * [limit] - Maximum number of articles to fetch (default: 100)
+  /// 
+  /// Returns:
+  /// * A [Future<List<NewsArticle>>] containing the fetched articles
+  /// 
+  /// Throws:
+  /// * [Exception] with "No articles found" if database is empty
+  /// * [Exception] with "Database error" for Supabase-specific issues
+  /// * [Exception] with "Network connection failed" for connectivity issues
+  /// * [Exception] with "Failed to load news articles" for other errors
   static Future<List<NewsArticle>> getNews({int limit = 100}) async {
     try {
       final response = await client
@@ -43,10 +73,17 @@ class SupabaseService {
           .order('published', ascending: false)
           .limit(limit);
 
+      if (response.isEmpty) {
+        throw Exception('No articles found in the database');
+      }
+
       return response.map<NewsArticle>((json) => NewsArticle.fromSupabase(json)).toList();
+    } on PostgrestException catch (e) {
+      throw Exception('Database error: ${e.message}');
+    } on SocketException catch (e) {
+      throw Exception('Network connection failed. Please check your internet connection.');
     } catch (e) {
-      print('Error fetching news from Supabase: $e');
-      return [];
+      throw Exception('Failed to load news articles: ${e.toString()}');
     }
   }
 
@@ -96,8 +133,28 @@ class SupabaseService {
     }
   }
 
-  /// Get news by category
+  /// Fetches news articles filtered by category.
+  /// 
+  /// Retrieves articles from a specific category, ordered by publication date.
+  /// Performs case-insensitive category matching.
+  /// 
+  /// Parameters:
+  /// * [category] - The category to filter by (cannot be empty)
+  /// * [limit] - Maximum number of articles to fetch (default: 50)
+  /// 
+  /// Returns:
+  /// * A [Future<List<NewsArticle>>] containing articles from the specified category
+  /// 
+  /// Throws:
+  /// * [ArgumentError] if category is empty or null
+  /// * [Exception] with "Database error" for Supabase-specific issues
+  /// * [Exception] with "Network connection failed" for connectivity issues
+  /// * [Exception] with "Failed to load [category] articles" for other errors
   static Future<List<NewsArticle>> getNewsByCategory(String category, {int limit = 50}) async {
+    if (category.trim().isEmpty) {
+      throw ArgumentError('Category cannot be empty');
+    }
+
     try {
       final response = await client
           .from('news_articles')
@@ -107,14 +164,25 @@ class SupabaseService {
           .limit(limit);
 
       return response.map<NewsArticle>((json) => NewsArticle.fromSupabase(json)).toList();
+    } on PostgrestException catch (e) {
+      throw Exception('Database error while fetching $category articles: ${e.message}');
+    } on SocketException catch (e) {
+      throw Exception('Network connection failed. Please check your internet connection.');
     } catch (e) {
-      print('Error fetching news by category from Supabase: $e');
-      return [];
+      throw Exception('Failed to load $category articles: ${e.toString()}');
     }
   }
 
   /// Get unread news by category (excludes read article IDs)
   static Future<List<NewsArticle>> getUnreadNewsByCategory(String category, List<String> readIds, {int limit = 100}) async {
+    if (category.trim().isEmpty) {
+      throw ArgumentError('Category cannot be empty');
+    }
+
+    if (limit <= 0) {
+      throw ArgumentError('Limit must be greater than 0');
+    }
+
     try {
       var query = client
           .from('news_articles')
@@ -143,9 +211,14 @@ class SupabaseService {
             
         return response.map<NewsArticle>((json) => NewsArticle.fromSupabase(json)).toList();
       }
+    } on PostgrestException catch (e) {
+      throw Exception('Database error while fetching unread $category articles: ${e.message}');
+    } on SocketException catch (e) {
+      throw Exception('Network connection failed. Please check your internet connection.');
+    } on FormatException catch (e) {
+      throw Exception('Invalid data format received from server: ${e.message}');
     } catch (e) {
-      print('Error fetching unread news by category from Supabase: $e');
-      return [];
+      throw Exception('Failed to load unread $category articles: ${e.toString()}');
     }
   }
 
