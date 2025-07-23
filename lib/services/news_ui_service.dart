@@ -54,9 +54,7 @@ class NewsUIService {
       'Sports',
       'World',
       'Trending',
-      'Environment',
-      'Energy',
-      'Lifestyle'
+      'Environment'
     ];
   }
 

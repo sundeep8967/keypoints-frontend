@@ -62,18 +62,6 @@ class _CategoryPreferencesScreenState extends State<CategoryPreferencesScreen> {
       'description': 'Climate change and environmental news',
       'color': Colors.teal,
     },
-    {
-      'name': 'Energy',
-      'icon': CupertinoIcons.bolt,
-      'description': 'Energy sector and renewable resources',
-      'color': Colors.yellow,
-    },
-    {
-      'name': 'Lifestyle',
-      'icon': CupertinoIcons.person_2,
-      'description': 'Fashion, travel, and lifestyle trends',
-      'color': Colors.cyan,
-    },
   ];
 
   @override

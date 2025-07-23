@@ -70,77 +70,28 @@ class _ColorDemoScreenState extends State<ColorDemoScreen> with TickerProviderSt
         _error = '';
       });
 
-      // Try to load from news service first
-      try {
-        final articles = await NewsLoadingService.loadNewsArticles();
-        if (articles.isNotEmpty) {
-          setState(() {
-            _articles = articles.take(5).toList(); // Show first 5 for demo
-            _isLoading = false;
-          });
-          return;
-        }
-      } catch (e) {
-        print('News service not available, using demo data: $e');
+      // Load real articles from news service
+      final articles = await NewsLoadingService.loadNewsArticles();
+      
+      if (articles.isNotEmpty) {
+        setState(() {
+          _articles = articles.take(5).toList(); // Show first 5 for color demo
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          _error = 'No articles available. Please check your internet connection.';
+          _isLoading = false;
+        });
       }
-
-      // Fallback to demo data
-      _articles = _getDemoArticles();
-      setState(() {
-        _isLoading = false;
-      });
     } catch (e) {
       setState(() {
-        _error = 'Failed to load articles: $e';
+        _error = 'Failed to load articles. Please check your internet connection and try again.';
         _isLoading = false;
       });
     }
   }
 
-  List<NewsArticle> _getDemoArticles() {
-    return [
-      NewsArticle(
-        id: 'demo1',
-        title: 'Breaking: Revolutionary AI Technology Unveiled',
-        description: 'Scientists have developed a groundbreaking AI system that can extract colors from images in real-time, revolutionizing mobile app design.',
-        imageUrl: 'https://images.unsplash.com/photo-1677442136019-21780ecad995?w=800&h=600&fit=crop',
-        timestamp: DateTime.now().subtract(const Duration(hours: 2)),
-        category: 'Technology',
-      ),
-      NewsArticle(
-        id: 'demo2',
-        title: 'Ocean Conservation Efforts Show Promising Results',
-        description: 'Marine biologists report significant improvements in coral reef health following new conservation initiatives.',
-        imageUrl: 'https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800&h=600&fit=crop',
-        timestamp: DateTime.now().subtract(const Duration(hours: 5)),
-        category: 'Environment',
-      ),
-      NewsArticle(
-        id: 'demo3',
-        title: 'Space Exploration Reaches New Milestone',
-        description: 'NASA announces successful deployment of next-generation telescope, promising unprecedented views of distant galaxies.',
-        imageUrl: 'https://images.unsplash.com/photo-1446776877081-d282a0f896e2?w=800&h=600&fit=crop',
-        timestamp: DateTime.now().subtract(const Duration(hours: 8)),
-        category: 'Science',
-      ),
-      NewsArticle(
-        id: 'demo4',
-        title: 'Sustainable Energy Revolution Continues',
-        description: 'New solar panel technology achieves record efficiency, making renewable energy more accessible than ever.',
-        imageUrl: 'https://images.unsplash.com/photo-1509391366360-2e959784a276?w=800&h=600&fit=crop',
-        timestamp: DateTime.now().subtract(const Duration(days: 1)),
-        category: 'Energy',
-      ),
-      NewsArticle(
-        id: 'demo5',
-        title: 'Urban Gardening Movement Grows Worldwide',
-        description: 'Cities around the globe embrace vertical farming and rooftop gardens to improve food security and air quality.',
-        imageUrl: 'https://images.unsplash.com/photo-1416879595882-3373a0480b5b?w=800&h=600&fit=crop',
-        timestamp: DateTime.now().subtract(const Duration(days: 2)),
-        category: 'Lifestyle',
-      ),
-    ];
-  }
 
   @override
   Widget build(BuildContext context) {
