@@ -36,7 +36,7 @@ class NewsArticle {
     return NewsArticle(
       id: data['id']?.toString() ?? '',
       title: data['title'] ?? '',
-      description: data['summary'] ?? '',
+      description: data['description'] ?? '',
       imageUrl: data['image_url'] ?? '',
       timestamp: data['published'] != null 
           ? DateTime.tryParse(data['published']) ?? DateTime.now()
