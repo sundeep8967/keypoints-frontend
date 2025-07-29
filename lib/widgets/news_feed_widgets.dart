@@ -263,7 +263,7 @@ class NewsFeedWidgets {
                     child: Text(
                       // Prioritize keypoints, fallback to description
                       article.keypoints?.isNotEmpty == true 
-                        ? article.keypoints! 
+                        ? article.keypoints!.split('|').map((point) => '• ${point.trim()}').join('\n')
                         : article.description,
                       style: TextStyle(
                         fontSize: 16,

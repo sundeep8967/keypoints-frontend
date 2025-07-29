@@ -156,7 +156,9 @@ class _DynamicColorNewsCardState extends State<DynamicColorNewsCard> {
                     
                     // Description
                     Text(
-                      widget.article.description,
+                      widget.article.keypoints?.isNotEmpty == true 
+                        ? widget.article.keypoints!.split('|').map((point) => '• ${point.trim()}').join('\n')
+                        : widget.article.description,
                       style: TextStyle(
                         fontSize: 16,
                         color: CupertinoColors.secondaryLabel.resolveFrom(context),
