@@ -19,20 +19,16 @@ class NewsArticle {
     this.score,
   });
 
-  factory NewsArticle.fromFirestore(Map<String, dynamic> data, String id) {
-    return NewsArticle(
-      id: id,
-      title: data['title'] ?? '',
-      description: data['description'] ?? '',
-      imageUrl: data['image'] ?? '',
-      timestamp: data['timestamp']?.toDate() ?? DateTime.now(),
-      category: data['category'] ?? 'General',
-      keypoints: data['keypoints'],
-      score: data['score']?.toDouble(),
-    );
-  }
 
   factory NewsArticle.fromSupabase(Map<String, dynamic> data) {
+    // Log keypoints data to see what we're getting
+    if (data['key_points'] != null) {
+      print('🔍 KEY_POINTS FOUND: ${data['key_points']}');
+      print('🔍 KEY_POINTS TYPE: ${data['key_points'].runtimeType}');
+    } else {
+      print('❌ NO KEY_POINTS for article: ${data['title']}');
+    }
+    
     return NewsArticle(
       id: data['id']?.toString() ?? '',
       title: data['title'] ?? '',
@@ -42,20 +38,13 @@ class NewsArticle {
           ? DateTime.tryParse(data['published']) ?? DateTime.now()
           : DateTime.now(),
       category: data['category'] ?? 'General',
-      keypoints: data['keypoints'], // Get keypoints from database
+      keypoints: data['key_points'] is List 
+          ? (data['key_points'] as List).join('|') // Convert list to string temporarily
+          : data['key_points']?.toString(), // Get key_points from database
       score: data['quality_score']?.toDouble(), // Get quality_score from database
     );
   }
 
-  Map<String, dynamic> toMap() {
-    return {
-      'title': title,
-      'description': description,
-      'image': imageUrl,
-      'timestamp': timestamp,
-      'category': category,
-    };
-  }
 
   Map<String, dynamic> toSupabaseMap() {
     return {
