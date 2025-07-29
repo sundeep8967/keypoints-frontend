@@ -23,7 +23,8 @@ Future<void> _preloadColorsForUpcomingArticles(
       try {
         final palette = await ColorExtractionService.extractColorsFromImage(articles[i].imageUrl);
         colorCache[articles[i].imageUrl] = palette;
-        print('✅ PRELOADED COLOR: Article $i - ${articles[i].title.substring(0, 50)}...');
+        final titlePreview = articles[i].title.length > 50 ? articles[i].title.substring(0, 50) : articles[i].title;
+        print('✅ PRELOADED COLOR: Article $i - $titlePreview...');
       } catch (e) {
         colorCache[articles[i].imageUrl] = ColorPalette.defaultPalette();
         print('❌ COLOR FAILED: Article $i - Using default palette');
@@ -118,11 +119,13 @@ class NewsFeedPageBuilder {
     final cachedPalette = colorCache[article.imageUrl];
     
     if (cachedPalette != null) {
-      print('🎯 USING CACHED COLOR: Article $index - ${article.title.substring(0, 50)}...');
+      final titlePreview = article.title.length > 50 ? article.title.substring(0, 50) : article.title;
+      print('🎯 USING CACHED COLOR: Article $index - $titlePreview...');
       return NewsFeedWidgets.buildCardWithPalette(context, article, index, cachedPalette);
     }
     
-    print('⏳ LOADING COLOR: Article $index - ${article.title.substring(0, 50)}...');
+    final titlePreview = article.title.length > 50 ? article.title.substring(0, 50) : article.title;
+    print('⏳ LOADING COLOR: Article $index - $titlePreview...');
     return FutureBuilder<ColorPalette>(
       future: ColorExtractionService.extractColorsFromImage(article.imageUrl),
       builder: (context, snapshot) {
