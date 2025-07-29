@@ -22,7 +22,16 @@ class NewsRemoteDataSourceImpl implements NewsRemoteDataSource {
           .order('published', ascending: false)
           .limit(limit);
 
-      return response.map<NewsArticleModel>((json) => NewsArticleModel.fromSupabase(json)).toList();
+      final articles = response.map<NewsArticleModel>((json) => NewsArticleModel.fromSupabase(json)).toList();
+      
+      // Sort by quality score after fetching (highest quality first)
+      articles.sort((a, b) {
+        final scoreA = a.score ?? 0.0;
+        final scoreB = b.score ?? 0.0;
+        return scoreB.compareTo(scoreA); // Descending order (highest first)
+      });
+      
+      return articles;
     } catch (e) {
       throw Exception('Failed to fetch news: $e');
     }
@@ -38,7 +47,16 @@ class NewsRemoteDataSourceImpl implements NewsRemoteDataSource {
           .order('published', ascending: false)
           .limit(limit);
 
-      return response.map<NewsArticleModel>((json) => NewsArticleModel.fromSupabase(json)).toList();
+      final articles = response.map<NewsArticleModel>((json) => NewsArticleModel.fromSupabase(json)).toList();
+      
+      // Sort by quality score after fetching (highest quality first)
+      articles.sort((a, b) {
+        final scoreA = a.score ?? 0.0;
+        final scoreB = b.score ?? 0.0;
+        return scoreB.compareTo(scoreA); // Descending order (highest first)
+      });
+      
+      return articles;
     } catch (e) {
       throw Exception('Failed to fetch news by category: $e');
     }
@@ -54,7 +72,16 @@ class NewsRemoteDataSourceImpl implements NewsRemoteDataSource {
           .order('published', ascending: false)
           .limit(limit);
 
-      return response.map<NewsArticleModel>((json) => NewsArticleModel.fromSupabase(json)).toList();
+      final articles = response.map<NewsArticleModel>((json) => NewsArticleModel.fromSupabase(json)).toList();
+      
+      // Sort by quality score after fetching (highest quality first)
+      articles.sort((a, b) {
+        final scoreA = a.score ?? 0.0;
+        final scoreB = b.score ?? 0.0;
+        return scoreB.compareTo(scoreA); // Descending order (highest first)
+      });
+      
+      return articles;
     } catch (e) {
       throw Exception('Failed to search news: $e');
     }
@@ -67,6 +94,17 @@ class NewsRemoteDataSourceImpl implements NewsRemoteDataSource {
         .stream(primaryKey: ['id'])
         .order('published', ascending: false)
         .limit(limit)
-        .map((data) => data.map<NewsArticleModel>((json) => NewsArticleModel.fromSupabase(json)).toList());
+        .map((data) {
+          final articles = data.map<NewsArticleModel>((json) => NewsArticleModel.fromSupabase(json)).toList();
+          
+          // Sort by quality score after fetching (highest quality first)
+          articles.sort((a, b) {
+            final scoreA = a.score ?? 0.0;
+            final scoreB = b.score ?? 0.0;
+            return scoreB.compareTo(scoreA); // Descending order (highest first)
+          });
+          
+          return articles;
+        });
   }
 }

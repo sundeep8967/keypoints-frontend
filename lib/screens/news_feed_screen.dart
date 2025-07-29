@@ -210,16 +210,22 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
   Widget _buildCategoryPageView() {
     final categories = NewsUIService.getInitializeCategories();
     
-    return NewsFeedPageBuilder.buildCategoryPageView(
-      context,
-      categories,
-      _categoryPageController,
-      _selectedCategory,
-      _currentIndex,
-      _categoryArticles,
-      _categoryLoading,
-      _error,
-      (newCategory) {
+    return CustomScrollView(
+      slivers: [
+        CupertinoSliverRefreshControl(
+          onRefresh: _refreshCurrentCategory,
+        ),
+        SliverFillRemaining(
+          child: NewsFeedPageBuilder.buildCategoryPageView(
+        context,
+        categories,
+        _categoryPageController,
+        _selectedCategory,
+        _currentIndex,
+        _categoryArticles,
+        _categoryLoading,
+        _error,
+        (newCategory) {
         setState(() {
           _selectedCategory = newCategory;
           
@@ -255,6 +261,9 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
       _loadArticlesByCategoryForCache,
       _loadAllCategorySimple,  // Use simple load for "All" category
       _colorCache,
+    ),
+        ),
+      ],
     );
   }
 
@@ -567,7 +576,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
       print('UI Category: "$category" -> DB Category: "$dbCategory"');
       
       // Use the new method that directly fetches unread articles - get more to ensure enough unread
-      final unreadCategoryArticles = await SupabaseService.getUnreadNewsByCategory(dbCategory, readIds, limit: 200);
+      final unreadCategoryArticles = await SupabaseService.getUnreadNewsByCategory(dbCategory, readIds, limit: 50);
       print('Found ${unreadCategoryArticles.length} unread articles for "$dbCategory"');
       
       // Debug: Also try the old method to compare
@@ -673,7 +682,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
 
     try {
       // Get all articles from database (simple approach)
-      final allArticles = await SupabaseService.getNews(limit: 200);
+      final allArticles = await SupabaseService.getNews(limit: 50);
       print('🚀 SIMPLE LOAD: Got ${allArticles.length} total articles from database');
       
       if (allArticles.isNotEmpty) {
@@ -750,6 +759,43 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
       _preloadPopularCategories();
       _preloadAllCategories();
     });
+  }
+
+  /// Refresh the current category by clearing cache and fetching fresh data
+  Future<void> _refreshCurrentCategory() async {
+    print('🔄 REFRESH: Refreshing $_selectedCategory category');
+    
+    try {
+      // Clear cache for current category to force fresh fetch
+      _categoryArticles.remove(_selectedCategory);
+      _categoryLoading.remove(_selectedCategory);
+      
+      // Clear color cache to ensure fresh colors
+      _colorCache.clear();
+      
+      // Reset current index
+      setState(() {
+        _currentIndex = 0;
+        _isLoading = true;
+        _error = '';
+      });
+      
+      // Fetch fresh data based on category
+      if (_selectedCategory == 'All') {
+        await _loadAllCategorySimple();
+      } else {
+        await _loadArticlesByCategoryForCache(_selectedCategory);
+      }
+      
+      print('✅ REFRESH: Successfully refreshed $_selectedCategory');
+      
+    } catch (e) {
+      print('❌ REFRESH ERROR: $e');
+      setState(() {
+        _error = 'Failed to refresh: $e';
+        _isLoading = false;
+      });
+    }
   }
 
   Widget _buildSettingsButton() {

@@ -77,7 +77,16 @@ class SupabaseService {
         throw Exception('No articles found in the database');
       }
 
-      return response.map<NewsArticle>((json) => NewsArticle.fromSupabase(json)).toList();
+      final articles = response.map<NewsArticle>((json) => NewsArticle.fromSupabase(json)).toList();
+      
+      // Sort by quality score after fetching (highest quality first)
+      articles.sort((a, b) {
+        final scoreA = a.score ?? 0.0;
+        final scoreB = b.score ?? 0.0;
+        return scoreB.compareTo(scoreA); // Descending order (highest first)
+      });
+      
+      return articles;
     } on PostgrestException catch (e) {
       throw Exception('Database error: ${e.message}');
     } on SocketException catch (e) {
@@ -94,7 +103,18 @@ class SupabaseService {
         .stream(primaryKey: ['id'])
         .order('published', ascending: false)
         .limit(limit)
-        .map((data) => data.map<NewsArticle>((json) => NewsArticle.fromSupabase(json)).toList());
+        .map((data) {
+          final articles = data.map<NewsArticle>((json) => NewsArticle.fromSupabase(json)).toList();
+          
+          // Sort by quality score after fetching (highest quality first)
+          articles.sort((a, b) {
+            final scoreA = a.score ?? 0.0;
+            final scoreB = b.score ?? 0.0;
+            return scoreB.compareTo(scoreA); // Descending order (highest first)
+          });
+          
+          return articles;
+        });
   }
 
   /// Add a news article to Supabase
@@ -163,7 +183,16 @@ class SupabaseService {
           .order('published', ascending: false)
           .limit(limit);
 
-      return response.map<NewsArticle>((json) => NewsArticle.fromSupabase(json)).toList();
+      final articles = response.map<NewsArticle>((json) => NewsArticle.fromSupabase(json)).toList();
+      
+      // Sort by quality score after fetching (highest quality first)
+      articles.sort((a, b) {
+        final scoreA = a.score ?? 0.0;
+        final scoreB = b.score ?? 0.0;
+        return scoreB.compareTo(scoreA); // Descending order (highest first)
+      });
+      
+      return articles;
     } on PostgrestException catch (e) {
       throw Exception('Database error while fetching $category articles: ${e.message}');
     } on SocketException catch (e) {
@@ -203,13 +232,29 @@ class SupabaseService {
           !readIds.contains(article.id)
         ).take(limit).toList();
         
+        // Sort by quality score after filtering (highest quality first)
+        unreadArticles.sort((a, b) {
+          final scoreA = a.score ?? 0.0;
+          final scoreB = b.score ?? 0.0;
+          return scoreB.compareTo(scoreA); // Descending order (highest first)
+        });
+        
         return unreadArticles;
       } else {
         final response = await query
             .order('published', ascending: false)
             .limit(limit);
             
-        return response.map<NewsArticle>((json) => NewsArticle.fromSupabase(json)).toList();
+        final articles = response.map<NewsArticle>((json) => NewsArticle.fromSupabase(json)).toList();
+        
+        // Sort by quality score after fetching (highest quality first)
+        articles.sort((a, b) {
+          final scoreA = a.score ?? 0.0;
+          final scoreB = b.score ?? 0.0;
+          return scoreB.compareTo(scoreA); // Descending order (highest first)
+        });
+        
+        return articles;
       }
     } on PostgrestException catch (e) {
       throw Exception('Database error while fetching unread $category articles: ${e.message}');
@@ -232,7 +277,16 @@ class SupabaseService {
           .order('published', ascending: false)
           .limit(limit);
 
-      return response.map<NewsArticle>((json) => NewsArticle.fromSupabase(json)).toList();
+      final articles = response.map<NewsArticle>((json) => NewsArticle.fromSupabase(json)).toList();
+      
+      // Sort by quality score after fetching (highest quality first)
+      articles.sort((a, b) {
+        final scoreA = a.score ?? 0.0;
+        final scoreB = b.score ?? 0.0;
+        return scoreB.compareTo(scoreA); // Descending order (highest first)
+      });
+      
+      return articles;
     } catch (e) {
       print('Error searching news in Supabase: $e');
       return [];

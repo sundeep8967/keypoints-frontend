@@ -6,6 +6,7 @@ class NewsArticle {
   final DateTime timestamp;
   final String category;
   final String? keypoints; // Add keypoints field
+  final double? score; // Add score field
 
   NewsArticle({
     required this.id,
@@ -15,6 +16,7 @@ class NewsArticle {
     required this.timestamp,
     this.category = 'General',
     this.keypoints,
+    this.score,
   });
 
   factory NewsArticle.fromFirestore(Map<String, dynamic> data, String id) {
@@ -26,6 +28,7 @@ class NewsArticle {
       timestamp: data['timestamp']?.toDate() ?? DateTime.now(),
       category: data['category'] ?? 'General',
       keypoints: data['keypoints'],
+      score: data['score']?.toDouble(),
     );
   }
 
@@ -40,6 +43,7 @@ class NewsArticle {
           : DateTime.now(),
       category: data['category'] ?? 'General',
       keypoints: data['keypoints'], // Get keypoints from database
+      score: data['quality_score']?.toDouble(), // Get quality_score from database
     );
   }
 
@@ -61,6 +65,7 @@ class NewsArticle {
       'published': timestamp.toIso8601String(),
       'category': category,
       'keypoints': keypoints,
+      'quality_score': score,
     };
   }
 }
