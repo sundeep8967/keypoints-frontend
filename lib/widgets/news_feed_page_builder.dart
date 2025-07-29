@@ -4,7 +4,33 @@ import '../models/news_article.dart';
 import '../services/color_extraction_service.dart';
 import '../services/read_articles_service.dart';
 import '../services/category_preference_service.dart';
+import '../services/image_preloader_service.dart';
 import '../widgets/news_feed_widgets.dart';
+
+// Helper function to preload colors for upcoming articles
+Future<void> _preloadColorsForUpcomingArticles(
+  List<NewsArticle> articles, 
+  int currentIndex, 
+  Map<String, ColorPalette> colorCache
+) async {
+  final startIndex = currentIndex + 1;
+  final endIndex = (currentIndex + 4).clamp(0, articles.length);
+  
+  print('🎨 PRELOADING COLORS: Articles $startIndex to $endIndex');
+  
+  for (int i = startIndex; i < endIndex; i++) {
+    if (i < articles.length && !colorCache.containsKey(articles[i].imageUrl)) {
+      try {
+        final palette = await ColorExtractionService.extractColorsFromImage(articles[i].imageUrl);
+        colorCache[articles[i].imageUrl] = palette;
+        print('✅ PRELOADED COLOR: Article $i - ${articles[i].title.substring(0, 50)}...');
+      } catch (e) {
+        colorCache[articles[i].imageUrl] = ColorPalette.defaultPalette();
+        print('❌ COLOR FAILED: Article $i - Using default palette');
+      }
+    }
+  }
+}
 
 class NewsFeedPageBuilder {
   static Widget buildCategoryContent(
@@ -58,9 +84,11 @@ class NewsFeedPageBuilder {
           onCurrentIndexChanged(index);
         }
         
-        // Only preload colors if we haven't done it recently
-        if (index < articlesToShow.length && index % 5 == 0 && index > 0) {
-          // Trigger color preloading
+        // Preload images and colors for next articles when user views current article
+        if (index < articlesToShow.length) {
+          ImagePreloaderService.onArticleViewed(articlesToShow, index);
+          // Also preload colors for upcoming articles
+          _preloadColorsForUpcomingArticles(articlesToShow, index, colorCache);
         }
       },
       itemBuilder: (context, index) {
@@ -90,9 +118,11 @@ class NewsFeedPageBuilder {
     final cachedPalette = colorCache[article.imageUrl];
     
     if (cachedPalette != null) {
+      print('🎯 USING CACHED COLOR: Article $index - ${article.title.substring(0, 50)}...');
       return NewsFeedWidgets.buildCardWithPalette(context, article, index, cachedPalette);
     }
     
+    print('⏳ LOADING COLOR: Article $index - ${article.title.substring(0, 50)}...');
     return FutureBuilder<ColorPalette>(
       future: ColorExtractionService.extractColorsFromImage(article.imageUrl),
       builder: (context, snapshot) {
@@ -100,6 +130,7 @@ class NewsFeedPageBuilder {
         
         if (snapshot.data != null) {
           colorCache[article.imageUrl] = snapshot.data!;
+          print('✅ CACHED NEW COLOR: Article $index');
         }
         
         return NewsFeedWidgets.buildCardWithPalette(context, article, index, palette);

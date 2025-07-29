@@ -10,6 +10,7 @@ import '../services/article_management_service.dart';
 import '../services/category_loading_service.dart';
 import '../services/category_management_service.dart';
 import '../widgets/news_feed_page_builder.dart';
+import '../services/image_preloader_service.dart';
 import 'settings_screen.dart';
 
 class NewsFeedScreen extends StatefulWidget {
@@ -49,6 +50,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
     _initializeCategories();
     // Load "All" category immediately and simply
     _loadAllCategorySimple();
+    
   }
 
   void _initializeCategories() {
@@ -134,6 +136,8 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
       
       if (validArticles.isNotEmpty) {
         _preloadColors();
+        // Preload images for the first few articles
+        ImagePreloaderService.preloadNextArticleImages(validArticles, 0, preloadCount: 5);
       }
     } catch (e) {
       setState(() {
@@ -409,6 +413,11 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
           _articles = unreadArticles;
           _isLoading = false;
         });
+        
+        // Preload images for this category
+        if (unreadArticles.isNotEmpty) {
+          ImagePreloaderService.preloadCategoryImages(unreadArticles, maxImages: 8);
+        }
       }
     } catch (e) {
       _categoryLoading[category] = false;
@@ -542,6 +551,12 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
         dbCategory = 'Scandal';
       } else if (category == 'Viral') {
         dbCategory = 'Viral';
+      } else if (category == 'Celebrity') {
+        dbCategory = 'Celebrity';
+      } else if (category == 'Scandal') {
+        dbCategory = 'Scandal';
+      } else if (category == 'India') {
+        dbCategory = 'India';
       } else if (category == 'State') {
         dbCategory = 'State';
       } else {

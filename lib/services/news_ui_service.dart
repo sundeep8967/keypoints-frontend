@@ -54,6 +54,11 @@ class NewsUIService {
       'Sports',
       'World',
       'Trending',
+      'Viral',        // 25 articles - ADDED
+      'Celebrity',    // 20 articles - ADDED
+      'Scandal',      // 15 articles - ADDED
+      'India',        // ADDED
+      'State',        // ADDED
       'Environment'
     ];
   }
@@ -72,6 +77,6 @@ class NewsUIService {
 
   static List<String> getPopularCategories() {
     // Pre-load the most commonly accessed categories
-    return ['Sports', 'Top', 'Trending', 'Science', 'Tech'];
+    return ['Sports', 'Trending', 'Science', 'Tech', 'Viral', 'Celebrity'];
   }
 }

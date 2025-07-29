@@ -1,0 +1,176 @@
+import 'dart:async';
+import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import '../models/news_article.dart';
+
+class ImagePreloaderService {
+  static final Map<String, bool> _preloadedImages = {};
+  static final Map<String, bool> _preloadingInProgress = {};
+
+  /// Preload images for the next few articles to improve user experience
+  static Future<void> preloadNextArticleImages(
+    List<NewsArticle> articles,
+    int currentIndex, {
+    int preloadCount = 3,
+  }) async {
+    if (articles.isEmpty || currentIndex >= articles.length) return;
+
+    // Calculate the range of articles to preload
+    final startIndex = currentIndex + 1;
+    final endIndex = (startIndex + preloadCount).clamp(0, articles.length);
+
+    print('🔄 PRELOADING: Current article index: $currentIndex');
+    if (currentIndex < articles.length) {
+      print('📖 CURRENT ARTICLE: "${articles[currentIndex].title}"');
+      print('🖼️ CURRENT IMAGE: ${articles[currentIndex].imageUrl.substring(0, 50)}...');
+    }
+    
+    print('🚀 PRELOADING NEXT $preloadCount ARTICLES (indices $startIndex to ${endIndex - 1}):');
+    for (int i = startIndex; i < endIndex; i++) {
+      if (i < articles.length) {
+        print('  📄 Article $i: "${articles[i].title}"');
+        print('  🖼️ Image $i: ${articles[i].imageUrl.substring(0, 50)}...');
+      }
+    }
+
+    // Preload images in parallel for better performance
+    final preloadFutures = <Future<void>>[];
+
+    for (int i = startIndex; i < endIndex; i++) {
+      if (i < articles.length) {
+        final imageUrl = articles[i].imageUrl;
+        
+        // Skip if already preloaded or currently preloading
+        if (_preloadedImages[imageUrl] == true || _preloadingInProgress[imageUrl] == true) {
+          continue;
+        }
+
+        preloadFutures.add(_preloadSingleImage(imageUrl));
+      }
+    }
+
+    // Wait for all preloading to complete
+    await Future.wait(preloadFutures);
+  }
+
+  /// Preload a single image
+  static Future<void> _preloadSingleImage(String imageUrl) async {
+    if (imageUrl.isEmpty) return;
+
+    try {
+      _preloadingInProgress[imageUrl] = true;
+      
+      // Use CachedNetworkImage to preload and cache the image
+      final imageProvider = CachedNetworkImageProvider(imageUrl);
+      
+      // Create a completer to wait for image loading
+      final completer = Completer<void>();
+      
+      final imageStream = imageProvider.resolve(const ImageConfiguration());
+      late ImageStreamListener listener;
+      
+      listener = ImageStreamListener(
+        (ImageInfo info, bool synchronousCall) {
+          imageStream.removeListener(listener);
+          if (!completer.isCompleted) {
+            completer.complete();
+          }
+        },
+        onError: (exception, stackTrace) {
+          imageStream.removeListener(listener);
+          if (!completer.isCompleted) {
+            completer.completeError(exception);
+          }
+        },
+      );
+      
+      imageStream.addListener(listener);
+      await completer.future;
+      
+      _preloadedImages[imageUrl] = true;
+      print('✅ Successfully preloaded image: ${imageUrl.substring(0, 50)}...');
+    } catch (e) {
+      print('Failed to preload image $imageUrl: $e');
+      _preloadedImages[imageUrl] = false;
+    } finally {
+      _preloadingInProgress[imageUrl] = false;
+    }
+  }
+
+  /// Preload images when user is reading an article (triggered by page change)
+  static Future<void> onArticleViewed(
+    List<NewsArticle> articles,
+    int viewedIndex,
+  ) async {
+    print('\n🎯 USER VIEWED ARTICLE AT INDEX: $viewedIndex');
+    if (viewedIndex < articles.length) {
+      print('👀 VIEWING: "${articles[viewedIndex].title}"');
+      print('🖼️ VIEWING IMAGE: ${articles[viewedIndex].imageUrl.substring(0, 50)}...');
+    }
+    
+    // Preload next 3 images when user views an article
+    await preloadNextArticleImages(articles, viewedIndex, preloadCount: 3);
+    
+    // Also preload previous image if user might swipe back
+    if (viewedIndex > 0) {
+      final prevImageUrl = articles[viewedIndex - 1].imageUrl;
+      if (_preloadedImages[prevImageUrl] != true && _preloadingInProgress[prevImageUrl] != true) {
+        print('⬅️ Also preloading previous image for article ${viewedIndex - 1}');
+        _preloadSingleImage(prevImageUrl);
+      }
+    }
+    print('─────────────────────────────────────────────────────\n');
+  }
+
+  /// Check if an image is already preloaded
+  static bool isImagePreloaded(String imageUrl) {
+    return _preloadedImages[imageUrl] == true;
+  }
+
+  /// Clear preloaded image cache (call when memory is low)
+  static void clearPreloadCache() {
+    _preloadedImages.clear();
+    _preloadingInProgress.clear();
+    print('Cleared image preload cache');
+  }
+
+  /// Get preload statistics for debugging
+  static Map<String, int> getPreloadStats() {
+    final preloaded = _preloadedImages.values.where((v) => v == true).length;
+    final failed = _preloadedImages.values.where((v) => v == false).length;
+    final inProgress = _preloadingInProgress.values.where((v) => v == true).length;
+    
+    return {
+      'preloaded': preloaded,
+      'failed': failed,
+      'inProgress': inProgress,
+      'total': _preloadedImages.length,
+    };
+  }
+
+  /// Preload images for an entire category when it's selected
+  static Future<void> preloadCategoryImages(
+    List<NewsArticle> categoryArticles, {
+    int maxImages = 10,
+  }) async {
+    if (categoryArticles.isEmpty) return;
+
+    print('Preloading first $maxImages images for category');
+
+    final preloadFutures = <Future<void>>[];
+    final imagesToPreload = categoryArticles.take(maxImages);
+
+    for (final article in imagesToPreload) {
+      final imageUrl = article.imageUrl;
+      
+      if (_preloadedImages[imageUrl] != true && _preloadingInProgress[imageUrl] != true) {
+        preloadFutures.add(_preloadSingleImage(imageUrl));
+      }
+    }
+
+    await Future.wait(preloadFutures);
+    print('Completed category image preloading');
+  }
+}
+
+// Simple image preloading without navigation service dependency
