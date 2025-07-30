@@ -118,9 +118,11 @@ class _AppInitializerState extends State<AppInitializer> {
       );
     }
 
-    if (_isFirstTime) {
-      return const LanguageSelectionScreen();
-    }
+    // Temporarily skip onboarding - go directly to news feed
+    // TODO: Re-enable onboarding flow later
+    // if (_isFirstTime) {
+    //   return const LanguageSelectionScreen();
+    // }
 
     return const NewsFeedScreen();
   }
