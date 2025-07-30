@@ -32,7 +32,7 @@ class NewsLoadingService {
 
       // No fallback - show error if no Supabase articles
       print('ERROR: No articles found in Supabase and no fallback used');
-      return [];
+      throw Exception('NO_ARTICLES_IN_DATABASE');
     } catch (e) {
       print('ERROR: Failed to load articles: $e');
       return [];

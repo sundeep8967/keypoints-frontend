@@ -74,7 +74,7 @@ class SupabaseService {
           .limit(limit);
 
       if (response.isEmpty) {
-        throw Exception('No articles found in the database');
+        throw Exception('NO_ARTICLES_IN_DATABASE');
       }
 
       final articles = response.map<NewsArticle>((json) => NewsArticle.fromSupabase(json)).toList();

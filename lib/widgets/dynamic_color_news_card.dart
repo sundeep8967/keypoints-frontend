@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 import '../models/news_article.dart';
+import '../services/text_formatting_service.dart';
+import '../services/dynamic_text_service.dart';
 
 class DynamicColorNewsCard extends StatefulWidget {
   final NewsArticle article;
@@ -154,22 +156,23 @@ class _DynamicColorNewsCardState extends State<DynamicColorNewsCard> {
                     
                     const SizedBox(height: 12),
                     
-                    // Description
-                    Text(
-                      widget.article.keypoints?.isNotEmpty == true 
-                        ? widget.article.keypoints!.split('|').map((point) => '• ${point.trim()}').join('\n')
-                        : widget.article.description,
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: CupertinoColors.secondaryLabel.resolveFrom(context),
-                        height: 1.5,
-                        letterSpacing: 0.1,
+                    // Intelligently sized content based on available space
+                    Expanded(
+                      child: DynamicTextService.buildAdaptiveContent(
+                        keypoints: widget.article.keypoints,
+                        description: widget.article.description,
+                        baseStyle: TextStyle(
+                          fontSize: 16,
+                          color: CupertinoColors.secondaryLabel.resolveFrom(context),
+                          height: 1.4, // Compact line spacing for more content
+                          letterSpacing: 0.1,
+                        ),
+                        minLines: 3,
+                        maxLines: 8, // Allow more content in available space
                       ),
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
                     ),
                     
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 12),
                     
                     // Read More Indicator
                     Row(

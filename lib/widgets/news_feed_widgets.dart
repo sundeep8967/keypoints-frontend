@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../models/news_article.dart';
 import '../services/color_extraction_service.dart';
 import '../services/news_feed_helper.dart';
+import '../services/text_formatting_service.dart';
+import '../services/dynamic_text_service.dart';
 
 class NewsFeedWidgets {
   static Widget buildNoArticlesPage(BuildContext context, String error) {
@@ -259,23 +261,22 @@ class NewsFeedWidgets {
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 12),
-                  Expanded(
-                    child: Text(
-                      // Prioritize keypoints, fallback to description
-                      article.keypoints?.isNotEmpty == true 
-                        ? article.keypoints!.split('|').map((point) => '• ${point.trim()}').join('\n')
-                        : article.description,
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: palette.onPrimary.withOpacity(0.9),
-                        height: 1.5,
-                        letterSpacing: 0.1,
-                      ),
-                      maxLines: 8,
-                      overflow: TextOverflow.ellipsis,
+                  // Intelligently fill available space with content
+                  DynamicTextService.buildAdaptiveContent(
+                    keypoints: article.keypoints,
+                    description: article.description,
+                    baseStyle: TextStyle(
+                      fontSize: 16,
+                      color: palette.onPrimary.withOpacity(0.9),
+                      height: 1.4, // Compact line spacing for more content
+                      letterSpacing: 0.1,
                     ),
+                    minLines: 4,
+                    maxLines: 20, // Allow more lines to fill space
                   ),
-                  const SizedBox(height: 20),
+                  
+                  // Small gap before bottom content
+                  const SizedBox(height: 16),
                   Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [

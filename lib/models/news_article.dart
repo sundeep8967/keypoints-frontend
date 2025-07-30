@@ -21,13 +21,7 @@ class NewsArticle {
 
 
   factory NewsArticle.fromSupabase(Map<String, dynamic> data) {
-    // Log keypoints data to see what we're getting
-    if (data['key_points'] != null) {
-      print('🔍 KEY_POINTS FOUND: ${data['key_points']}');
-      print('🔍 KEY_POINTS TYPE: ${data['key_points'].runtimeType}');
-    } else {
-      print('❌ NO KEY_POINTS for article: ${data['title']}');
-    }
+    // Debug logging removed for cleaner console output
     
     return NewsArticle(
       id: data['id']?.toString() ?? '',

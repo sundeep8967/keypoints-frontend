@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import '../models/news_article.dart';
 import '../services/consolidated/news_facade.dart';
 import '../services/color_extraction_service.dart';
+import '../services/error_message_service.dart';
 
 /// Controller for managing news feed state and operations.
 /// 
@@ -103,11 +104,11 @@ class NewsFeedController extends ChangeNotifier {
       _setLoading(false);
       notifyListeners();
     } on FormatException catch (e) {
-      _error = 'Invalid data received from server. Please try again later.';
+      _error = ErrorMessageService.getUserFriendlyMessage('Invalid data received from server');
       _setLoading(false);
       notifyListeners();
     } catch (e) {
-      _error = 'Failed to load articles. Please try again later.';
+      _error = ErrorMessageService.getUserFriendlyMessage(e.toString());
       _setLoading(false);
       notifyListeners();
     }

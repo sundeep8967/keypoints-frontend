@@ -11,6 +11,7 @@ import '../services/category_loading_service.dart';
 import '../services/category_management_service.dart';
 import '../widgets/news_feed_page_builder.dart';
 import '../services/image_preloader_service.dart';
+import '../services/error_message_service.dart';
 import 'settings_screen.dart';
 
 class NewsFeedScreen extends StatefulWidget {
@@ -141,7 +142,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
       }
     } catch (e) {
       setState(() {
-        _error = 'Failed to load articles: $e';
+        _error = ErrorMessageService.getUserFriendlyMessage(e.toString());
         _isLoading = false;
       });
     }
@@ -745,7 +746,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
     } catch (e) {
       print('🚀 SIMPLE LOAD ERROR: $e');
       setState(() {
-        _error = 'Failed to load articles: $e';
+        _error = ErrorMessageService.getUserFriendlyMessage(e.toString());
         _isLoading = false;
         _isInitialLoad = false;
       });
