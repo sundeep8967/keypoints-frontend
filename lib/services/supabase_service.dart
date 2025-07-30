@@ -79,6 +79,11 @@ class SupabaseService {
 
       final articles = response.map<NewsArticle>((json) => NewsArticle.fromSupabase(json)).toList();
       
+      // Print source for each article
+      for (final article in articles) {
+        print('source--> ${article.source}');
+      }
+      
       // Sort by quality score after fetching (highest quality first)
       articles.sort((a, b) {
         final scoreA = a.score ?? 0.0;

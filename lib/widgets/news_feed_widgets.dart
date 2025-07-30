@@ -339,6 +339,29 @@ class NewsFeedWidgets {
                               ),
                             ),
                           ),
+                          // Source display in the middle
+                          Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                article.source ?? 'Unknown',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: palette.onPrimary,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'tap to read more!!',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: palette.onPrimary.withOpacity(0.7),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
