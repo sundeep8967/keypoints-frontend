@@ -55,6 +55,9 @@ dependencies:
   # Local storage
   shared_preferences: ^2.2.2
   
+  # URL launcher for opening articles
+  url_launcher: ^6.2.4
+  
   # Clean Architecture dependencies
   dartz: ^0.10.1
   equatable: ^2.0.5

@@ -7,6 +7,7 @@ class NewsArticle {
   final String category;
   final String? keypoints; // Add keypoints field
   final double? score; // Add score field
+  final String? sourceUrl; // Add source URL field
 
   NewsArticle({
     required this.id,
@@ -17,6 +18,7 @@ class NewsArticle {
     this.category = 'General',
     this.keypoints,
     this.score,
+    this.sourceUrl,
   });
 
 
@@ -36,6 +38,7 @@ class NewsArticle {
           ? (data['key_points'] as List).join('|') // Convert list to string temporarily
           : data['key_points']?.toString(), // Get key_points from database
       score: data['quality_score']?.toDouble(), // Get quality_score from database
+      sourceUrl: data['link'] ?? data['source_url'] ?? data['original_url'], // Get source URL from database
     );
   }
 
@@ -49,6 +52,7 @@ class NewsArticle {
       'category': category,
       'keypoints': keypoints,
       'quality_score': score,
+      'link': sourceUrl, // Store in 'link' field to match database
     };
   }
 }

@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../models/news_article.dart';
 import '../services/text_formatting_service.dart';
 import '../services/dynamic_text_service.dart';
+import '../services/url_launcher_service.dart';
 
 class DynamicColorNewsCard extends StatefulWidget {
   final NewsArticle article;
@@ -174,16 +175,47 @@ class _DynamicColorNewsCardState extends State<DynamicColorNewsCard> {
                     
                     const SizedBox(height: 12),
                     
-                    // Read More Indicator
-                    Row(
-                      children: [
-                        const Spacer(),
-                        Icon(
-                          CupertinoIcons.chevron_right,
-                          size: 16,
-                          color: _dominantColor,
+                    // Read More Indicator with clickable area
+                    GestureDetector(
+                      onTap: () {
+                        if (widget.article.sourceUrl != null && widget.article.sourceUrl!.isNotEmpty) {
+                          UrlLauncherService.showLaunchConfirmation(
+                            context, 
+                            widget.article.sourceUrl, 
+                            widget.article.title
+                          );
+                        }
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                        decoration: BoxDecoration(
+                          color: _dominantColor.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: _dominantColor.withValues(alpha: 0.3),
+                            width: 1,
+                          ),
                         ),
-                      ],
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Read Full Article',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: _dominantColor,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Icon(
+                              CupertinoIcons.arrow_up_right,
+                              size: 14,
+                              color: _dominantColor,
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ],
                 ),

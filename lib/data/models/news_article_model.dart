@@ -10,6 +10,7 @@ class NewsArticleModel extends NewsArticleEntity {
     required super.category,
     super.keypoints,
     super.isRead,
+    super.sourceUrl,
   });
 
   factory NewsArticleModel.fromSupabase(Map<String, dynamic> json) {
@@ -24,6 +25,7 @@ class NewsArticleModel extends NewsArticleEntity {
       category: json['category'] ?? 'General',
       keypoints: json['keypoints'],
       isRead: false, // Will be determined by repository
+      sourceUrl: json['link'] ?? json['source_url'] ?? json['original_url'],
     );
   }
 
@@ -74,6 +76,7 @@ class NewsArticleModel extends NewsArticleEntity {
       category: entity.category,
       keypoints: entity.keypoints,
       isRead: entity.isRead,
+      sourceUrl: entity.sourceUrl,
     );
   }
 }

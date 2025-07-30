@@ -1,10 +1,14 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'dart:ui';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../models/news_article.dart';
+import '../screens/news_detail_screen.dart';
 import '../services/color_extraction_service.dart';
 import '../services/news_feed_helper.dart';
 import '../services/text_formatting_service.dart';
 import '../services/dynamic_text_service.dart';
+import '../services/url_launcher_service.dart';
 
 class NewsFeedWidgets {
   static Widget buildNoArticlesPage(BuildContext context, String error) {
@@ -277,9 +281,42 @@ class NewsFeedWidgets {
                   
                   // Small gap before bottom content
                   const SizedBox(height: 16),
-                  Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
+                  // Blurred background with article image for bottom section
+                  GestureDetector(
+                    onTap: () {
+                      print('🔥 BLURRED BOX TAPPED!');
+                      print('🔗 Article sourceUrl: "${article.sourceUrl}"');
+                      print('📰 Article title: "${article.title}"');
+                      
+                      // Open article URL directly in internal browser
+                      if (article.sourceUrl != null && article.sourceUrl!.isNotEmpty) {
+                        print('✅ URL is available, opening directly in internal browser');
+                        UrlLauncherService.launchInternalBrowser(article.sourceUrl!);
+                      } else {
+                        print('❌ No URL available for this article');
+                      }
+                    },
+                    child: Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        image: DecorationImage(
+                          image: CachedNetworkImageProvider(article.imageUrl),
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: BackdropFilter(
+                          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                          child: Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.3),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -314,7 +351,12 @@ class NewsFeedWidgets {
                           ),
                         ],
                       ),
-                    ],
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
                   SizedBox(height: MediaQuery.of(context).padding.bottom + 4),
                 ],

@@ -7,6 +7,7 @@ class NewsArticleEntity {
   final String category;
   final String? keypoints;
   final bool isRead;
+  final String? sourceUrl;
 
   const NewsArticleEntity({
     required this.id,
@@ -17,6 +18,7 @@ class NewsArticleEntity {
     required this.category,
     this.keypoints,
     this.isRead = false,
+    this.sourceUrl,
   });
 
   NewsArticleEntity copyWith({
@@ -28,6 +30,7 @@ class NewsArticleEntity {
     String? category,
     String? keypoints,
     bool? isRead,
+    String? sourceUrl,
   }) {
     return NewsArticleEntity(
       id: id ?? this.id,
@@ -38,6 +41,7 @@ class NewsArticleEntity {
       category: category ?? this.category,
       keypoints: keypoints ?? this.keypoints,
       isRead: isRead ?? this.isRead,
+      sourceUrl: sourceUrl ?? this.sourceUrl,
     );
   }
 
