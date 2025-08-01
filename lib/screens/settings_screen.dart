@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import '../services/local_storage_service.dart';
 import '../services/read_articles_service.dart';
+import 'contact_us_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -87,6 +88,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   'App Version',
                   '1.0.0',
                   CupertinoIcons.info,
+                ),
+              ],
+            ),
+            const SizedBox(height: 30),
+            _buildSection(
+              'About',
+              [
+                _buildSettingItem(
+                  'Contact Us',
+                  '',
+                  CupertinoIcons.mail,
+                  () => _navigateToContactUs(),
                 ),
               ],
             ),
@@ -206,6 +219,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
       ),
       onTap: onTap,
+    );
+  }
+
+  void _navigateToContactUs() {
+    Navigator.of(context).push(
+      CupertinoPageRoute(
+        builder: (context) => const ContactUsScreen(),
+      ),
     );
   }
 
