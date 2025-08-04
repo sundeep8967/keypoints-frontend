@@ -5,6 +5,7 @@ import '../services/color_extraction_service.dart';
 import '../services/read_articles_service.dart';
 import '../services/category_preference_service.dart';
 import '../services/image_preloader_service.dart';
+import '../services/optimized_image_service.dart';
 import '../widgets/news_feed_widgets.dart';
 
 // Helper function to preload colors for upcoming articles
@@ -94,7 +95,8 @@ class NewsFeedPageBuilder {
         
         // Preload images and colors for next articles when user views current article
         if (index < articlesToShow.length) {
-          ImagePreloaderService.onArticleViewed(articlesToShow, index);
+          // Use optimized image service for better performance
+          OptimizedImageService.onArticleViewed(articlesToShow, index);
           // Also preload colors for upcoming articles
           _preloadColorsForUpcomingArticles(articlesToShow, index, colorCache);
         }

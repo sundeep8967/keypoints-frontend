@@ -44,10 +44,19 @@ class NewsArticleCard extends StatelessWidget {
       child: CachedNetworkImage(
         imageUrl: article.imageUrl,
         fit: BoxFit.cover,
+        // Optimized settings for full screen images
+        fadeInDuration: const Duration(milliseconds: 150),
+        fadeOutDuration: const Duration(milliseconds: 100),
+        memCacheWidth: 500,
+        memCacheHeight: 800,
         placeholder: (context, url) => Container(
           color: CupertinoColors.systemGrey6,
           child: const Center(
-            child: CupertinoActivityIndicator(),
+            child: SizedBox(
+              width: 30,
+              height: 30,
+              child: CupertinoActivityIndicator(),
+            ),
           ),
         ),
         errorWidget: (context, url, error) => Container(

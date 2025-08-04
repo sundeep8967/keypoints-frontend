@@ -172,34 +172,37 @@ class NewsFeedWidgets {
                               color: palette.onPrimary,
                             ),
                           ),
-                          Image.network(
-                            article.imageUrl,
+                          CachedNetworkImage(
+                            imageUrl: article.imageUrl,
                             fit: BoxFit.cover,
                             width: double.infinity,
                             height: double.infinity,
-                            errorBuilder: (context, error, stackTrace) {
-                              return Container(
-                                decoration: BoxDecoration(
-                                  color: palette.secondary,
-                                  borderRadius: BorderRadius.circular(16),
+                            // Optimized settings for main feed
+                            fadeInDuration: const Duration(milliseconds: 150),
+                            fadeOutDuration: const Duration(milliseconds: 100),
+                            memCacheWidth: 400,
+                            memCacheHeight: 300,
+                            placeholder: (context, url) => Container(
+                              color: palette.secondary,
+                              child: Center(
+                                child: CupertinoActivityIndicator(
+                                  color: palette.onPrimary,
                                 ),
-                                child: Center(
-                                  child: Icon(
-                                    CupertinoIcons.photo_fill,
-                                    size: 60,
-                                    color: palette.onPrimary.withOpacity(0.5),
-                                  ),
+                              ),
+                            ),
+                            errorWidget: (context, url, error) => Container(
+                              decoration: BoxDecoration(
+                                color: palette.secondary,
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Center(
+                                child: Icon(
+                                  CupertinoIcons.photo_fill,
+                                  size: 60,
+                                  color: palette.onPrimary.withOpacity(0.5),
                                 ),
-                              );
-                            },
-                            loadingBuilder: (context, child, loadingProgress) {
-                              if (loadingProgress == null) {
-                                return child;
-                              }
-                              return Container(
-                                color: Colors.transparent,
-                              );
-                            },
+                              ),
+                            ),
                           ),
                         ],
                       ),

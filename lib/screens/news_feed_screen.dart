@@ -12,6 +12,7 @@ import '../services/category_management_service.dart';
 import '../services/dynamic_category_discovery_service.dart';
 import '../widgets/news_feed_page_builder.dart';
 import '../services/image_preloader_service.dart';
+import '../services/optimized_image_service.dart';
 import '../services/error_message_service.dart';
 import 'settings_screen.dart';
 
@@ -54,6 +55,8 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
     super.initState();
     _setupAnimations();
     _initializeCategories();
+    // Initialize optimized image cache
+    OptimizedImageService.initializeCache();
     // Load "All" category immediately and simply
     _loadAllCategorySimple();
     
@@ -142,8 +145,8 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
       
       if (validArticles.isNotEmpty) {
         _preloadColors();
-        // Preload images for the first few articles
-        ImagePreloaderService.preloadNextArticleImages(validArticles, 0, preloadCount: 5);
+        // Use optimized image preloading for faster loading
+        OptimizedImageService.preloadImagesAggressively(validArticles, 0, preloadCount: 5);
       }
     } catch (e) {
       setState(() {
@@ -444,9 +447,9 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
           _isLoading = false;
         });
         
-        // Preload images for this category
+        // Use optimized preloading for this category
         if (unreadArticles.isNotEmpty) {
-          ImagePreloaderService.preloadCategoryImages(unreadArticles, maxImages: 8);
+          OptimizedImageService.preloadCategoryImages(unreadArticles, maxImages: 8);
         }
       }
     } catch (e) {

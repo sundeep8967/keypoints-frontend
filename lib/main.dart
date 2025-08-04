@@ -5,6 +5,7 @@ import 'screens/news_feed_screen.dart';
 import 'screens/language_selection_screen.dart';
 import 'services/supabase_service.dart';
 import 'services/local_storage_service.dart';
+import 'config/image_cache_config.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,6 +26,9 @@ void main() async {
   SystemChrome.setEnabledSystemUIMode(
     SystemUiMode.edgeToEdge,
   );
+  
+  // Initialize image cache for better performance
+  ImageCacheConfig.initialize();
   
   // Initialize Supabase
   try {

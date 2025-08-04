@@ -102,10 +102,19 @@ class _DynamicColorNewsCardState extends State<DynamicColorNewsCard> {
                       imageUrl: widget.article.imageUrl,
                       fit: BoxFit.cover,
                       width: double.infinity,
+                      // Optimized settings for faster loading
+                      fadeInDuration: const Duration(milliseconds: 150),
+                      fadeOutDuration: const Duration(milliseconds: 100),
+                      memCacheWidth: 400,
+                      memCacheHeight: 250,
                       placeholder: (context, url) => Container(
                         color: CupertinoColors.systemGrey6.resolveFrom(context),
                         child: const Center(
-                          child: CupertinoActivityIndicator(),
+                          child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CupertinoActivityIndicator(),
+                          ),
                         ),
                       ),
                       errorWidget: (context, url, error) => Container(
