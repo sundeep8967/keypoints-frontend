@@ -129,19 +129,7 @@ class _DynamicColorNewsCardState extends State<DynamicColorNewsCard> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Timestamp
-                    Text(
-                      _formatTimestamp(widget.article.timestamp),
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: CupertinoColors.systemGrey.resolveFrom(context),
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    
-                    const SizedBox(height: 12),
-                    
-                    // Title
+                    // Title (removed timestamp)
                     Text(
                       widget.article.title,
                       style: TextStyle(
@@ -209,7 +197,7 @@ class _DynamicColorNewsCardState extends State<DynamicColorNewsCard> {
                             ),
                             const SizedBox(width: 6),
                             Icon(
-                              CupertinoIcons.arrow_up_right,
+                              CupertinoIcons.square_arrow_up,
                               size: 14,
                               color: _dominantColor,
                             ),

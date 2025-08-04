@@ -44,6 +44,7 @@ class NewsFeedPageBuilder {
     String error,
     Function(int) onCurrentIndexChanged,
     Map<String, ColorPalette> colorCache,
+    Function(String)? loadMoreArticles, // Add callback for loading more articles
   ) {
     final categoryArticlesList = categoryArticles[category] ?? [];
     final isLoading = categoryLoading[category] ?? false;
@@ -62,13 +63,19 @@ class NewsFeedPageBuilder {
     return PageView.builder(
       scrollDirection: Axis.vertical,
       physics: const PageScrollPhysics(),
-      itemCount: articlesToShow.length + 1, // +1 for "end of articles" page
+      itemCount: null, // Allow infinite scrolling
       pageSnapping: true,
       onPageChanged: (index) async {
         print('PAGE CHANGED: Moving to article $index in $category');
         
+        // Load more articles when approaching the end (3 articles before the end)
+        if (index >= articlesToShow.length - 3 && loadMoreArticles != null) {
+          print('🔄 LOADING MORE: Approaching end at index $index, loading more articles for $category');
+          loadMoreArticles(category);
+        }
+        
         // Mark previous article as read when moving to next article
-        if (index > 0 && index <= articlesToShow.length && articlesToShow.isNotEmpty) {
+        if (index > 0 && index < articlesToShow.length && articlesToShow.isNotEmpty) {
           final previousArticle = articlesToShow[index - 1];
           await ReadArticlesService.markAsRead(previousArticle.id);
           
@@ -93,8 +100,13 @@ class NewsFeedPageBuilder {
         }
       },
       itemBuilder: (context, index) {
-        // Show "end of articles" page after last article
+        // If we've scrolled beyond available articles, show loading or end message
         if (index >= articlesToShow.length) {
+          // If we're loading more articles, show loading indicator
+          if (isLoading) {
+            return NewsFeedWidgets.buildLoadingPage();
+          }
+          // Otherwise show end of articles page
           return NewsFeedWidgets.buildEndOfArticlesPage(context, () {
             onCurrentIndexChanged(0);
           });
@@ -201,6 +213,7 @@ class NewsFeedPageBuilder {
           error,
           onCurrentIndexChanged,
           colorCache,
+          loadArticlesByCategoryForCache, // Pass the load more articles callback
         );
       },
     );

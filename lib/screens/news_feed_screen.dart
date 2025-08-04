@@ -9,6 +9,7 @@ import '../services/news_ui_service.dart';
 import '../services/article_management_service.dart';
 import '../services/category_loading_service.dart';
 import '../services/category_management_service.dart';
+import '../services/dynamic_category_discovery_service.dart';
 import '../widgets/news_feed_page_builder.dart';
 import '../services/image_preloader_service.dart';
 import '../services/error_message_service.dart';
@@ -36,6 +37,10 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
   final Map<String, List<NewsArticle>> _categoryArticles = {};
   final Map<String, bool> _categoryLoading = {};
   
+  // Dynamic categories discovered from backend
+  final Set<String> _discoveredCategories = {'All'}; // Always start with 'All'
+  final Map<String, bool> _categoryDiscoveryInProgress = {};
+  
   // Animation controllers for swipe
   late AnimationController _animationController;
   late PageController _categoryPageController;
@@ -55,17 +60,17 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
   }
 
   void _initializeCategories() {
-    final categories = NewsUIService.getInitializeCategories();
+    // Initialize with just 'All' category
+    final initialCategories = ['All'];
     
     // Initialize category page controller
-    final currentCategoryIndex = categories.indexOf(_selectedCategory);
-    _categoryPageController = PageController(initialPage: currentCategoryIndex >= 0 ? currentCategoryIndex : 0);
+    _categoryPageController = PageController(initialPage: 0);
     
     // Initialize category scroll controller for horizontal pills
     _categoryScrollController = ScrollController();
     
-    // Pre-load all categories
-    CategoryManagementService.initializeCategories(categories, _categoryArticles, _categoryLoading);
+    // Start dynamic category discovery in background
+    _startDynamicCategoryDiscovery();
   }
   
   void _setupAnimations() {
@@ -209,7 +214,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
   }
 
   Widget _buildCategoryPageView() {
-    final categories = NewsUIService.getInitializeCategories();
+    final categories = _discoveredCategories.toList();
     
     return CustomScrollView(
       slivers: [
@@ -230,9 +235,19 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
         setState(() {
           _selectedCategory = newCategory;
           
-          // Special handling for "All" category - use simple reload
+          // Special handling for "All" category - check cache first
           if (newCategory == 'All') {
-            _loadAllCategorySimple();
+            if (_categoryArticles['All']?.isNotEmpty == true) {
+              // Use cached articles immediately
+              _articles = _categoryArticles['All']!;
+              _isLoading = false;
+              _error = '';
+              print('🚀 SWIPE TO ALL: Using cached articles (${_articles.length} articles)');
+            } else {
+              // No cache, load fresh
+              print('🚀 SWIPE TO ALL: No cache, loading fresh');
+              _loadAllCategorySimple();
+            }
           } else if (_categoryArticles[newCategory]?.isNotEmpty == true) {
             _articles = _categoryArticles[newCategory]!;
             _isLoading = false;
@@ -259,7 +274,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
         }
       },
       (index) => setState(() => _currentIndex = index),
-      _loadArticlesByCategoryForCache,
+      _loadMoreArticlesForCategory,  // Use the new load more function for infinite scrolling
       _loadAllCategorySimple,  // Use simple load for "All" category
       _colorCache,
     ),
@@ -295,12 +310,8 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
   }
 
   Widget _buildHorizontalCategories() {
-    // Base categories + dynamically detected states
-    final baseCategories = NewsUIService.getHorizontalCategories();
-    
-    // Add detected states from current articles
-    final detectedStates = <String>[];
-    final categories = [...baseCategories, ...detectedStates];
+    // Use dynamically discovered categories
+    final categories = _discoveredCategories.toList();
 
     return SizedBox(
       height: 44,
@@ -359,7 +370,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
   }
 
   void _selectCategory(String category) {
-    final categories = NewsUIService.getInitializeCategories();
+    final categories = _discoveredCategories.toList();
     
     final categoryIndex = categories.indexOf(category);
     if (categoryIndex != -1) {
@@ -377,11 +388,20 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
     
     // Special handling for "All" category when tapped
     if (category == 'All') {
-      // Clear ALL cached articles to force fresh load
-      _categoryArticles.clear();
-      _categoryLoading.clear();
-      // Trigger fresh load for "All" category
-      _loadArticlesByCategoryForCache('All');
+      // Check if we already have "All" category articles cached
+      if (_categoryArticles['All']?.isNotEmpty == true) {
+        // Use cached articles immediately to avoid "no articles" flash
+        setState(() {
+          _articles = _categoryArticles['All']!;
+          _isLoading = false;
+          _error = '';
+        });
+        print('🚀 QUICK SWITCH: Using cached All articles (${_articles.length} articles)');
+      } else {
+        // No cache available, load fresh
+        print('🚀 FRESH LOAD: No All cache available, loading fresh');
+        _loadAllCategorySimple();
+      }
     } else {
       _preloadCategoryIfNeeded(category);
     }
@@ -432,6 +452,134 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
     } catch (e) {
       _categoryLoading[category] = false;
       print('Error pre-loading $category: $e');
+    }
+  }
+
+  Future<void> _loadMoreArticlesForCategory(String category) async {
+    // Prevent multiple simultaneous loads
+    if (_categoryLoading[category] == true) {
+      print('🔄 LOAD MORE: Already loading $category, skipping...');
+      return;
+    }
+    
+    try {
+      _categoryLoading[category] = true;
+      print('🔄 LOAD MORE: Loading additional articles for $category');
+      
+      final readIds = await ReadArticlesService.getReadArticleIds();
+      final currentArticles = _categoryArticles[category] ?? [];
+      
+      // Get IDs of articles we already have to avoid duplicates
+      final existingIds = currentArticles.map((a) => a.id).toSet();
+      
+      List<NewsArticle> newArticles = [];
+      
+      if (category == 'All') {
+        // For "All" category, fetch from all categories
+        final allCategories = [
+          'Technology', 'Business', 'Sports', 'Health', 'Science', 
+          'Entertainment', 'World', 'Top', 'Travel', 'Politics', 
+          'National', 'India', 'Education'
+        ];
+        
+        final List<NewsArticle> allCombinedArticles = [];
+        
+        // Fetch more articles from each category
+        final futures = allCategories.map((cat) async {
+          try {
+            // Fetch with higher limit and offset to get different articles
+            final categoryArticles = await SupabaseService.getUnreadNewsByCategory(cat, readIds, limit: 20, offset: currentArticles.length ~/ allCategories.length);
+            return categoryArticles;
+          } catch (e) {
+            return <NewsArticle>[];
+          }
+        });
+        
+        final results = await Future.wait(futures);
+        for (final articles in results) {
+          allCombinedArticles.addAll(articles);
+        }
+        
+        // Remove duplicates and articles we already have
+        final uniqueArticles = <String, NewsArticle>{};
+        for (final article in allCombinedArticles) {
+          if (!existingIds.contains(article.id)) {
+            uniqueArticles[article.id] = article;
+          }
+        }
+        
+        newArticles = uniqueArticles.values.where((article) => 
+          article.title.trim().isNotEmpty && 
+          article.description.trim().isNotEmpty
+        ).toList();
+        
+        newArticles.shuffle();
+      } else {
+        // For specific categories
+        String dbCategory = _mapUIToDatabaseCategory(category);
+        
+        // Fetch more articles with offset
+        final moreArticles = await SupabaseService.getUnreadNewsByCategory(
+          dbCategory, 
+          readIds, 
+          limit: 20, 
+          offset: currentArticles.length
+        );
+        
+        // Filter out articles we already have
+        newArticles = moreArticles.where((article) => 
+          !existingIds.contains(article.id) &&
+          article.title.trim().isNotEmpty && 
+          article.description.trim().isNotEmpty
+        ).toList();
+      }
+      
+      if (newArticles.isNotEmpty) {
+        // Append new articles to existing ones
+        final updatedArticles = [...currentArticles, ...newArticles];
+        _categoryArticles[category] = updatedArticles;
+        
+        print('🔄 LOAD MORE: Added ${newArticles.length} new articles to $category (total: ${updatedArticles.length})');
+        
+        // Update UI if this is the current category
+        if (category == _selectedCategory) {
+          setState(() {
+            _articles = updatedArticles;
+          });
+        }
+      } else {
+        print('🔄 LOAD MORE: No new articles found for $category');
+      }
+      
+      _categoryLoading[category] = false;
+    } catch (e) {
+      _categoryLoading[category] = false;
+      print('🔄 LOAD MORE ERROR: $e');
+    }
+  }
+
+  String _mapUIToDatabaseCategory(String category) {
+    // Map UI category names to database category names
+    switch (category) {
+      case 'Tech': return 'Technology';
+      case 'Entertainment': return 'Entertainment';
+      case 'Business': return 'Business';
+      case 'Health': return 'Health';
+      case 'Sports': return 'Sports';
+      case 'Science': return 'Science';
+      case 'World': return 'World';
+      case 'Top': return 'Top';
+      case 'Travel': return 'Travel';
+      case 'Startups': return 'Startups';
+      case 'Politics': return 'Politics';
+      case 'National': return 'National';
+      case 'India': return 'India';
+      case 'Education': return 'Education';
+      case 'Celebrity': return 'Celebrity';
+      case 'Scandal': return 'Scandal';
+      case 'Viral': return 'Viral';
+      case 'State': return 'State';
+      default: return category;
     }
   }
 
@@ -751,6 +899,35 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
         _isInitialLoad = false;
       });
     }
+  }
+
+  void _startDynamicCategoryDiscovery() {
+    print('🔍 DISCOVERY: Starting dynamic category discovery...');
+    
+    DynamicCategoryDiscoveryService.discoverCategoriesInParallel(
+      onCategoryDiscovered: (String dbCategory, List<NewsArticle> articles) {
+        final uiCategory = DynamicCategoryDiscoveryService.getUIFriendlyName(dbCategory);
+        
+        print('✅ DISCOVERY: Found $uiCategory ($dbCategory) with ${articles.length} articles');
+        
+        if (mounted) {
+          setState(() {
+            _discoveredCategories.add(uiCategory);
+            _categoryArticles[uiCategory] = articles;
+            _categoryLoading[uiCategory] = false;
+          });
+          
+          print('🎯 DISCOVERY: Added $uiCategory to UI. Total categories: ${_discoveredCategories.length}');
+        }
+      },
+      onCategoryEmpty: (String category) {
+        print('❌ DISCOVERY: $category is empty, skipping');
+      },
+      onDiscoveryComplete: () {
+        print('🎯 DISCOVERY: Complete! Found ${_discoveredCategories.length} total categories');
+        print('🎯 DISCOVERY: Categories: ${_discoveredCategories.toList()}');
+      },
+    );
   }
 
   void _startBackgroundPreloading() {

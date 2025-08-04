@@ -320,28 +320,10 @@ class NewsFeedWidgets {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: palette.onPrimary.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(
-                                color: palette.onPrimary.withOpacity(0.2),
-                                width: 1,
-                              ),
-                            ),
-                            child: Text(
-                              NewsFeedHelper.formatTimestamp(article.timestamp),
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: palette.onPrimary,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                          // Source display in the middle
+                          // Source display on the left (moved from center)
                           Column(
                             mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
                                 article.source ?? 'Unknown',
@@ -366,7 +348,7 @@ class NewsFeedWidgets {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               buildActionButton(
-                                CupertinoIcons.share_up,
+                                CupertinoIcons.square_arrow_up,
                                 palette.onPrimary,
                                 () {},
                               ),

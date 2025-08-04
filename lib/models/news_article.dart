@@ -36,13 +36,28 @@ class NewsArticle {
           ? DateTime.tryParse(data['published']) ?? DateTime.now()
           : DateTime.now(),
       category: data['category'] ?? 'General',
-      keypoints: data['key_points'] is List 
-          ? (data['key_points'] as List).join('|') // Convert list to string temporarily
-          : data['key_points']?.toString(), // Get key_points from database
+      keypoints: _parseKeyPoints(data['key_points']),
       score: data['quality_score']?.toDouble(), // Get quality_score from database
       sourceUrl: data['link'] ?? data['source_url'] ?? data['original_url'], // Get source URL from database
       source: data['source'], // Get source field from database
     );
+  }
+
+  static String? _parseKeyPoints(dynamic keyPointsData) {
+    if (keyPointsData == null) {
+      return null;
+    }
+
+    if (keyPointsData is String) {
+      return keyPointsData.trim().isEmpty ? null : keyPointsData.trim();
+    }
+
+    if (keyPointsData is List) {
+      final stringList = keyPointsData.map((e) => e.toString().trim()).where((e) => e.isNotEmpty).toList();
+      return stringList.isEmpty ? null : stringList.join(' | ');
+    }
+
+    return null;
   }
 
 

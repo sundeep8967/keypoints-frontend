@@ -208,13 +208,17 @@ class SupabaseService {
   }
 
   /// Get unread news by category (excludes read article IDs)
-  static Future<List<NewsArticle>> getUnreadNewsByCategory(String category, List<String> readIds, {int limit = 100}) async {
+  static Future<List<NewsArticle>> getUnreadNewsByCategory(String category, List<String> readIds, {int limit = 100, int offset = 0}) async {
     if (category.trim().isEmpty) {
       throw ArgumentError('Category cannot be empty');
     }
 
     if (limit <= 0) {
       throw ArgumentError('Limit must be greater than 0');
+    }
+
+    if (offset < 0) {
+      throw ArgumentError('Offset must be greater than or equal to 0');
     }
 
     try {
@@ -225,30 +229,35 @@ class SupabaseService {
       
       // Exclude read articles if we have any - use neq for each ID or filter client-side
       if (readIds.isNotEmpty) {
-        // For now, let's fetch more and filter client-side since Supabase syntax is tricky
+        // Fetch more and filter client-side since Supabase syntax is tricky
+        // Increase fetch size to account for filtering and offset
+        final fetchLimit = (limit * 4) + offset;
         final response = await query
             .order('published', ascending: false)
-            .limit(limit * 3); // Fetch more to account for filtering
+            .limit(fetchLimit);
             
         final allArticles = response.map<NewsArticle>((json) => NewsArticle.fromSupabase(json)).toList();
         
         // Filter out read articles client-side
         final unreadArticles = allArticles.where((article) => 
           !readIds.contains(article.id)
-        ).take(limit).toList();
+        ).toList();
+        
+        // Apply offset and limit after filtering
+        final paginatedArticles = unreadArticles.skip(offset).take(limit).toList();
         
         // Sort by quality score after filtering (highest quality first)
-        unreadArticles.sort((a, b) {
+        paginatedArticles.sort((a, b) {
           final scoreA = a.score ?? 0.0;
           final scoreB = b.score ?? 0.0;
           return scoreB.compareTo(scoreA); // Descending order (highest first)
         });
         
-        return unreadArticles;
+        return paginatedArticles;
       } else {
         final response = await query
             .order('published', ascending: false)
-            .limit(limit);
+            .range(offset, offset + limit - 1); // Use Supabase range for pagination
             
         final articles = response.map<NewsArticle>((json) => NewsArticle.fromSupabase(json)).toList();
         
