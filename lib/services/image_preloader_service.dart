@@ -11,7 +11,7 @@ class ImagePreloaderService {
   static Future<void> preloadNextArticleImages(
     List<NewsArticle> articles,
     int currentIndex, {
-    int preloadCount = 3,
+    int preloadCount = 15, // CRITICAL FIX: Increased from 3 to 15
   }) async {
     if (articles.isEmpty || currentIndex >= articles.length) return;
 
@@ -108,8 +108,8 @@ class ImagePreloaderService {
       print('🖼️ VIEWING IMAGE: ${articles[viewedIndex].imageUrl.substring(0, 50)}...');
     }
     
-    // Preload next 3 images when user views an article
-    await preloadNextArticleImages(articles, viewedIndex, preloadCount: 3);
+    // Preload next 15 images when user views an article (CRITICAL FIX)
+    await preloadNextArticleImages(articles, viewedIndex, preloadCount: 15);
     
     // Also preload previous image if user might swipe back
     if (viewedIndex > 0) {

@@ -13,6 +13,9 @@ import '../services/dynamic_category_discovery_service.dart';
 import '../widgets/news_feed_page_builder.dart';
 import '../services/image_preloader_service.dart';
 import '../services/optimized_image_service.dart';
+import '../services/predictive_preloader_service.dart';
+import '../services/parallel_color_service.dart';
+import '../services/instant_preloader_service.dart';
 import '../services/error_message_service.dart';
 import 'settings_screen.dart';
 
@@ -57,6 +60,8 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
     _initializeCategories();
     // Initialize optimized image cache
     OptimizedImageService.initializeCache();
+    // Initialize parallel color extraction
+    ParallelColorService.initializeParallelColorExtraction();
     // Load "All" category immediately and simply
     _loadAllCategorySimple();
     
@@ -145,8 +150,11 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
       
       if (validArticles.isNotEmpty) {
         _preloadColors();
-        // Use optimized image preloading for faster loading
-        OptimizedImageService.preloadImagesAggressively(validArticles, 0, preloadCount: 5);
+        // CRITICAL FIX: INSTANT preloading - start immediately, don't wait
+        print('🚀 INSTANT PRELOAD: Starting aggressive preloading of first 25 images');
+        
+        // Start preloading first 25 images immediately in background
+        OptimizedImageService.preloadImagesAggressively(validArticles, 0, preloadCount: 25);
       }
     } catch (e) {
       setState(() {
@@ -880,8 +888,14 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
           }
         }
         
-        // Preload colors in background
+        // CRITICAL FIX: Start INSTANT preloading immediately
         if (unreadArticles.isNotEmpty) {
+          print('🚀 INSTANT PRELOAD: Starting instant preloading for ${unreadArticles.length} articles');
+          
+          // Start instant preloading immediately - this should make images load instantly
+          InstantPreloaderService.startInstantPreloading(unreadArticles);
+          
+          // Preload colors in background
           _preloadColors();
         }
         

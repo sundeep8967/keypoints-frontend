@@ -105,8 +105,8 @@ class _DynamicColorNewsCardState extends State<DynamicColorNewsCard> {
                       // Optimized settings for faster loading
                       fadeInDuration: const Duration(milliseconds: 150),
                       fadeOutDuration: const Duration(milliseconds: 100),
-                      memCacheWidth: 400,
-                      memCacheHeight: 250,
+                      memCacheWidth: 1600, // CRITICAL FIX: 4x larger memory cache
+                      memCacheHeight: 1200, // CRITICAL FIX: 4x larger memory cache
                       placeholder: (context, url) => Container(
                         color: CupertinoColors.systemGrey6.resolveFrom(context),
                         child: const Center(

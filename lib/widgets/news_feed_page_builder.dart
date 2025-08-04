@@ -2,6 +2,8 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import '../models/news_article.dart';
 import '../services/color_extraction_service.dart';
+import '../services/parallel_color_service.dart';
+import '../services/predictive_preloader_service.dart';
 import '../services/read_articles_service.dart';
 import '../services/category_preference_service.dart';
 import '../services/image_preloader_service.dart';
@@ -22,7 +24,7 @@ Future<void> _preloadColorsForUpcomingArticles(
   for (int i = startIndex; i < endIndex; i++) {
     if (i < articles.length && !colorCache.containsKey(articles[i].imageUrl)) {
       try {
-        final palette = await ColorExtractionService.extractColorsFromImage(articles[i].imageUrl);
+        final palette = await ParallelColorService.extractColorsParallel(articles[i].imageUrl);
         colorCache[articles[i].imageUrl] = palette;
         final titlePreview = articles[i].title.length > 50 ? articles[i].title.substring(0, 50) : articles[i].title;
         print('✅ PRELOADED COLOR: Article $i - $titlePreview...');
@@ -63,14 +65,14 @@ class NewsFeedPageBuilder {
 
     return PageView.builder(
       scrollDirection: Axis.vertical,
-      physics: const PageScrollPhysics(),
-      itemCount: null, // Allow infinite scrolling
+      physics: const BouncingScrollPhysics(), // CRITICAL FIX: Allow smooth rapid scrolling
+      itemCount: articlesToShow.length + 1, // CRITICAL FIX: Proper item count for correct scrolling
       pageSnapping: true,
       onPageChanged: (index) async {
         print('PAGE CHANGED: Moving to article $index in $category');
         
         // Load more articles when approaching the end (3 articles before the end)
-        if (index >= articlesToShow.length - 3 && loadMoreArticles != null) {
+        if (index >= articlesToShow.length - 3 && loadMoreArticles != null && index < articlesToShow.length) {
           print('🔄 LOADING MORE: Approaching end at index $index, loading more articles for $category');
           loadMoreArticles(category);
         }
@@ -80,24 +82,33 @@ class NewsFeedPageBuilder {
           final previousArticle = articlesToShow[index - 1];
           await ReadArticlesService.markAsRead(previousArticle.id);
           
-          // Smart read tracking: Remove this article from all category caches
-          CategoryPreferenceService.removeReadArticleFromCaches(previousArticle.id, categoryArticles);
+          // CRITICAL FIX: Don't remove from cache immediately - this causes index mismatch
+          // Just mark as read, let the cache refresh handle removal
+          // CategoryPreferenceService.removeReadArticleFromCaches(previousArticle.id, categoryArticles);
           
           // Track article read for preference learning
           CategoryPreferenceService.trackArticleRead(previousArticle, selectedCategory);
           
-          print('Marked article "${previousArticle.title}" as read and removed from all categories');
+          print('✅ MARKED AS READ: "${previousArticle.title}" (ID: ${previousArticle.id}) - keeping in cache for smooth scrolling');
         }
         
         if (category == selectedCategory) {
           onCurrentIndexChanged(index);
         }
         
-        // Preload images and colors for next articles when user views current article
+        // CRITICAL FIX: AGGRESSIVE preloading - preload way ahead
         if (index < articlesToShow.length) {
-          // Use optimized image service for better performance
-          OptimizedImageService.onArticleViewed(articlesToShow, index);
-          // Also preload colors for upcoming articles
+          // Update scroll metrics for velocity tracking
+          PredictivePreloaderService.updateScrollMetrics(index.toDouble());
+          
+          // INSTANT PRELOAD: Preload next 25 images immediately when user scrolls
+          print('🚀 SCROLL PRELOAD: User at index $index, preloading next 25 images');
+          OptimizedImageService.preloadImagesAggressively(articlesToShow, index, preloadCount: 25);
+          
+          // Use predictive preloading strategy
+          PredictivePreloaderService.predictivePreload(articlesToShow, index);
+          
+          // Also preload colors for upcoming articles (legacy fallback)
           _preloadColorsForUpcomingArticles(articlesToShow, index, colorCache);
         }
       },
@@ -132,27 +143,26 @@ class NewsFeedPageBuilder {
   ) {
     final cachedPalette = colorCache[article.imageUrl];
     
+    final titlePreview = article.title.length > 50 ? article.title.substring(0, 50) : article.title;
+    
     if (cachedPalette != null) {
-      final titlePreview = article.title.length > 50 ? article.title.substring(0, 50) : article.title;
-      print('🎯 USING CACHED COLOR: Article $index - $titlePreview...');
+      print('🎯 USING CACHED COLOR: Article $index (ID: ${article.id}) - $titlePreview...');
       return NewsFeedWidgets.buildCardWithPalette(context, article, index, cachedPalette);
     }
     
-    final titlePreview = article.title.length > 50 ? article.title.substring(0, 50) : article.title;
-    print('⏳ LOADING COLOR: Article $index - $titlePreview...');
-    return FutureBuilder<ColorPalette>(
-      future: ColorExtractionService.extractColorsFromImage(article.imageUrl),
-      builder: (context, snapshot) {
-        final palette = snapshot.data ?? ColorPalette.defaultPalette();
-        
-        if (snapshot.data != null) {
-          colorCache[article.imageUrl] = snapshot.data!;
-          print('✅ CACHED NEW COLOR: Article $index');
-        }
-        
-        return NewsFeedWidgets.buildCardWithPalette(context, article, index, palette);
-      },
-    );
+    print('⏳ LOADING COLOR: Article $index (ID: ${article.id}) - $titlePreview...');
+    // CRITICAL FIX: Use non-blocking color extraction
+    final palette = ParallelColorService.getCachedColorOrDefault(article.imageUrl);
+    
+    // Start background extraction if not cached
+    if (!ParallelColorService.isColorCached(article.imageUrl)) {
+      ParallelColorService.extractColorsParallel(article.imageUrl).then((extractedPalette) {
+        colorCache[article.imageUrl] = extractedPalette;
+        // Note: UI will update automatically when setState is called elsewhere
+      });
+    }
+    
+    return NewsFeedWidgets.buildCardWithPalette(context, article, index, palette);
   }
 
   static Widget buildCategoryPageView(

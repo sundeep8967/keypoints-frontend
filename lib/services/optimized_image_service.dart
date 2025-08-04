@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import '../models/news_article.dart';
+import 'aggressive_cache_manager.dart';
 
 class OptimizedImageService {
   static final Map<String, bool> _preloadedImages = {};
@@ -60,7 +61,7 @@ class OptimizedImageService {
         ),
       ),
       // Use optimized cache manager
-      cacheManager: DefaultCacheManager(),
+      cacheManager: AggressiveCacheManager(),
     );
   }
 
@@ -68,7 +69,7 @@ class OptimizedImageService {
   static Future<void> preloadImagesAggressively(
     List<NewsArticle> articles,
     int currentIndex, {
-    int preloadCount = 5,
+    int preloadCount = 15, // CRITICAL FIX: Increased from 5 to 15
   }) async {
     if (articles.isEmpty || currentIndex >= articles.length) return;
 
@@ -174,8 +175,8 @@ class OptimizedImageService {
     List<NewsArticle> articles,
     int viewedIndex,
   ) async {
-    // Aggressively preload next 5 images
-    await preloadImagesAggressively(articles, viewedIndex, preloadCount: 5);
+    // Aggressively preload next 15 images (CRITICAL FIX)
+    await preloadImagesAggressively(articles, viewedIndex, preloadCount: 15);
     
     // Also preload previous image for smooth back navigation
     if (viewedIndex > 0) {
@@ -222,6 +223,11 @@ class OptimizedImageService {
     _preloadingInProgress.clear();
     _imageProviderCache.clear();
     // Cache cleared
+  }
+
+  /// Preload single image with highest priority (for instant loading)
+  static Future<void> preloadSingleImageWithPriority(String imageUrl) async {
+    return _preloadSingleImageFast(imageUrl, priority: true);
   }
 
   /// Get cache statistics
