@@ -34,9 +34,9 @@ class DynamicTextService {
     );
   }
   
-  /// Creates a flexible widget that adapts to available space
+  /// Creates a flexible widget that shows description content adapted to available space
   static Widget buildAdaptiveContent({
-    required String? keypoints,
+    String? keypoints, // CHANGED: Made optional since we're not using it anymore
     required String description,
     required TextStyle baseStyle,
     int minLines = 3,
@@ -51,20 +51,14 @@ class DynamicTextService {
           final maxPossibleLines = (availableHeight / estimatedLineHeight).floor();
           final intelligentMaxLines = maxPossibleLines.clamp(minLines, maxLines);
           
-          if (keypoints?.isNotEmpty == true) {
-            return TextFormattingService.formatKeyPoints(
-              keypoints!,
-              baseStyle,
-              maxLines: intelligentMaxLines,
-            );
-          } else {
-            return Text(
-              description,
-              style: baseStyle,
-              maxLines: intelligentMaxLines,
-              overflow: TextOverflow.ellipsis,
-            );
-          }
+          // CHANGED: Always show description instead of keypoints with justify alignment
+          return Text(
+            description,
+            style: baseStyle,
+            textAlign: TextAlign.justify, // ADDED: Justify alignment for professional newspaper look
+            maxLines: intelligentMaxLines,
+            overflow: TextOverflow.ellipsis,
+          );
         },
       ),
     );

@@ -8,6 +8,7 @@ import com.chaquo.python.android.AndroidPlatform;
 import com.chaquo.python.PyObject;
 import java.util.List;
 import java.util.ArrayList;
+import io.flutter.plugins.googlemobileads.GoogleMobileAdsPlugin;
 
 public class MainActivity extends FlutterActivity {
     private static final String CHANNEL = "color_extraction";
@@ -15,6 +16,13 @@ public class MainActivity extends FlutterActivity {
     @Override
     public void configureFlutterEngine(FlutterEngine flutterEngine) {
         super.configureFlutterEngine(flutterEngine);
+        
+        // Register the native ad factory for Google Mobile Ads
+        GoogleMobileAdsPlugin.registerNativeAdFactory(
+            flutterEngine, 
+            "newsArticleNativeAd", 
+            new NewsArticleNativeAdFactory(getLayoutInflater())
+        );
         
         // Initialize Python
         if (!Python.isStarted()) {
@@ -55,5 +63,13 @@ public class MainActivity extends FlutterActivity {
                         result.error("PYTHON_ERROR", "Error executing Python code: " + e.getMessage(), null);
                     }
                 });
+    }
+    
+    @Override
+    public void cleanUpFlutterEngine(FlutterEngine flutterEngine) {
+        super.cleanUpFlutterEngine(flutterEngine);
+        
+        // Unregister the native ad factory
+        GoogleMobileAdsPlugin.unregisterNativeAdFactory(flutterEngine, "newsArticleNativeAd");
     }
 }

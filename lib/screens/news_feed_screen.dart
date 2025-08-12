@@ -17,6 +17,7 @@ import '../services/predictive_preloader_service.dart';
 import '../services/parallel_color_service.dart';
 import '../services/instant_preloader_service.dart';
 import '../services/error_message_service.dart';
+import '../services/scroll_state_service.dart';
 import 'settings_screen.dart';
 
 class NewsFeedScreen extends StatefulWidget {
@@ -49,6 +50,9 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
   late AnimationController _animationController;
   late PageController _categoryPageController;
   late ScrollController _categoryScrollController;
+  
+  // PageControllers for each category to enable bidirectional scrolling
+  final Map<String, PageController> _articlePageControllers = {};
   
   // Store category pill positions for accurate scrolling
   final List<GlobalKey> _categoryKeys = [];
@@ -93,6 +97,13 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
     _animationController.dispose();
     _categoryPageController.dispose();
     _categoryScrollController.dispose();
+    
+    // Dispose all article PageControllers
+    for (final controller in _articlePageControllers.values) {
+      controller.dispose();
+    }
+    _articlePageControllers.clear();
+    
     super.dispose();
   }
 
@@ -246,6 +257,14 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
         setState(() {
           _selectedCategory = newCategory;
           
+          // Reset article PageController for new category to start from beginning
+          if (_articlePageControllers.containsKey(newCategory)) {
+            final controller = _articlePageControllers[newCategory]!;
+            if (controller.hasClients) {
+              controller.animateToPage(0, duration: Duration(milliseconds: 300), curve: Curves.easeInOut);
+            }
+          }
+          
           // Special handling for "All" category - check cache first
           if (newCategory == 'All') {
             if (_categoryArticles['All']?.isNotEmpty == true) {
@@ -288,6 +307,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
       _loadMoreArticlesForCategory,  // Use the new load more function for infinite scrolling
       _loadAllCategorySimple,  // Use simple load for "All" category
       _colorCache,
+      _articlePageControllers, // Pass PageControllers for bidirectional scrolling
     ),
         ),
       ],
@@ -470,6 +490,19 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
     // Prevent multiple simultaneous loads
     if (_categoryLoading[category] == true) {
       print('🔄 LOAD MORE: Already loading $category, skipping...');
+      return;
+    }
+    
+    // CRITICAL FIX: Don't load more articles while user is actively scrolling
+    // This prevents article list changes that cause "next article changes" issue
+    if (ScrollStateService.isActivelyScrolling) {
+      print('🔄 LOAD MORE: User actively scrolling, delaying load to prevent article changes');
+      // Retry after scrolling stops
+      Future.delayed(const Duration(milliseconds: 2000), () {
+        if (!ScrollStateService.isActivelyScrolling) {
+          _loadMoreArticlesForCategory(category);
+        }
+      });
       return;
     }
     

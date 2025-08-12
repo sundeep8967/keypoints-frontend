@@ -5,6 +5,7 @@ import 'screens/news_feed_screen.dart';
 import 'screens/language_selection_screen.dart';
 import 'services/supabase_service.dart';
 import 'services/local_storage_service.dart';
+import 'services/ad_integration_service.dart';
 import 'config/image_cache_config.dart';
 
 void main() async {
@@ -36,6 +37,19 @@ void main() async {
     print('Supabase initialized successfully');
   } catch (e) {
     print('Supabase initialization error: $e');
+  }
+
+  // Initialize AdMob for native ads
+  try {
+    await AdIntegrationService.initialize();
+    print('AdMob initialized successfully');
+    
+    // Preload ads for popular categories
+    AdIntegrationService.preloadAdsForCategories([
+      'All', 'Technology', 'Business', 'Sports', 'Entertainment'
+    ]);
+  } catch (e) {
+    print('AdMob initialization error: $e');
   }
 
   // Firebase removed - using Supabase only

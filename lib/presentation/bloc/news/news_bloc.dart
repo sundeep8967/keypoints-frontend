@@ -4,6 +4,8 @@ import '../../../domain/entities/news_article_entity.dart';
 import '../../../domain/usecases/get_news.dart';
 import '../../../domain/usecases/get_news_by_category.dart';
 import '../../../domain/usecases/mark_article_as_read.dart';
+import '../../../services/ad_integration_service.dart';
+import '../../../models/news_article.dart';
 
 part 'news_event.dart';
 part 'news_state.dart';
@@ -41,14 +43,38 @@ class NewsBloc extends Bloc<NewsEvent, NewsState> {
   /// Gets current index
   int get currentIndex => _currentIndex;
 
+  /// Convert NewsArticleEntity to NewsArticle for ad integration
+  List<NewsArticle> _convertEntitiesToModels(List<NewsArticleEntity> entities) {
+    return entities.map((entity) => NewsArticle(
+      id: entity.id,
+      title: entity.title,
+      description: entity.description,
+      imageUrl: entity.imageUrl,
+      timestamp: entity.timestamp,
+      category: entity.category,
+      keypoints: entity.keypoints,
+      sourceUrl: entity.sourceUrl,
+    )).toList();
+  }
+
   Future<void> _onLoadNews(LoadNewsEvent event, Emitter<NewsState> emit) async {
     emit(NewsLoading());
     
     final result = await getNews(GetNewsParams(limit: event.limit));
     
-    result.fold(
-      (failure) => emit(NewsError(failure.message)),
-      (articles) => emit(NewsLoaded(articles)),
+    await result.fold(
+      (failure) async => emit(NewsError(failure.message)),
+      (articles) async {
+        // Convert entities to models for ad integration
+        final articleModels = _convertEntitiesToModels(articles);
+        // Integrate ads into the news feed
+        final mixedFeed = await AdIntegrationService.integrateAdsIntoFeed(
+          articles: articleModels,
+          category: 'All',
+          maxAds: 3,
+        );
+        emit(NewsLoaded(articles, mixedFeed: mixedFeed));
+      },
     );
   }
 
@@ -59,9 +85,19 @@ class NewsBloc extends Bloc<NewsEvent, NewsState> {
       GetNewsByCategoryParams(category: event.category, limit: event.limit),
     );
     
-    result.fold(
-      (failure) => emit(NewsError(failure.message)),
-      (articles) => emit(NewsByCategoryLoaded(articles, event.category)),
+    await result.fold(
+      (failure) async => emit(NewsError(failure.message)),
+      (articles) async {
+        // Convert entities to models for ad integration
+        final articleModels = _convertEntitiesToModels(articles);
+        // Integrate ads into the category feed
+        final mixedFeed = await AdIntegrationService.integrateAdsIntoFeed(
+          articles: articleModels,
+          category: event.category,
+          maxAds: 3,
+        );
+        emit(NewsByCategoryLoaded(articles, event.category, mixedFeed: mixedFeed));
+      },
     );
   }
 
@@ -97,9 +133,20 @@ class NewsBloc extends Bloc<NewsEvent, NewsState> {
     // Don't show loading for refresh
     final result = await getNews(GetNewsParams(limit: event.limit));
     
-    result.fold(
-      (failure) => emit(NewsError(failure.message)),
-      (articles) => emit(NewsLoaded(articles)),
+    await result.fold(
+      (failure) async => emit(NewsError(failure.message)),
+      (articles) async {
+        // Clear ads cache and integrate fresh ads
+        AdIntegrationService.clearAllAds();
+        // Convert entities to models for ad integration
+        final articleModels = _convertEntitiesToModels(articles);
+        final mixedFeed = await AdIntegrationService.integrateAdsIntoFeed(
+          articles: articleModels,
+          category: 'All',
+          maxAds: 3,
+        );
+        emit(NewsLoaded(articles, mixedFeed: mixedFeed));
+      },
     );
   }
 

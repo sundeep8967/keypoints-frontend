@@ -59,6 +59,9 @@ dependencies:
   # URL launcher for opening articles
   url_launcher: ^6.3.2
   
+  # Google AdMob for native ads
+  google_mobile_ads: ^5.1.0
+  
   # Clean Architecture dependencies
   dartz: ^0.10.1
   equatable: ^2.0.5
@@ -92,6 +95,7 @@ flutter:
   assets:
     - assets/data/
     - assets/applogo.png
+    - assets/kpIcon.png
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
@@ -122,6 +126,6 @@ flutter:
 flutter_launcher_icons:
   android: "launcher_icon"
   ios: true
-  image_path: "assets/applogo.png"
+  image_path: "assets/kpIcon.png"
   min_sdk_android: 21
   remove_alpha_ios: true

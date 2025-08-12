@@ -13,21 +13,25 @@ class NewsLoading extends NewsState {}
 
 class NewsLoaded extends NewsState {
   final List<NewsArticleEntity> articles;
+  final List<dynamic> mixedFeed;
 
-  const NewsLoaded(this.articles);
+  const NewsLoaded(this.articles, {List<dynamic>? mixedFeed}) 
+      : mixedFeed = mixedFeed ?? articles;
 
   @override
-  List<Object> get props => [articles];
+  List<Object> get props => [articles, mixedFeed];
 }
 
 class NewsByCategoryLoaded extends NewsState {
   final List<NewsArticleEntity> articles;
   final String category;
+  final List<dynamic> mixedFeed;
 
-  const NewsByCategoryLoaded(this.articles, this.category);
+  const NewsByCategoryLoaded(this.articles, this.category, {List<dynamic>? mixedFeed})
+      : mixedFeed = mixedFeed ?? articles;
 
   @override
-  List<Object> get props => [articles, category];
+  List<Object> get props => [articles, category, mixedFeed];
 }
 
 class NewsError extends NewsState {

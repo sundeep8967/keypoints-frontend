@@ -5,6 +5,9 @@ import '../widgets/news_article_card.dart';
 import '../widgets/category_selector.dart';
 import '../widgets/loading_shimmer.dart';
 import '../../injection_container.dart';
+import '../../widgets/native_ad_card.dart';
+import '../../services/ad_integration_service.dart';
+import '../../services/color_extraction_service.dart';
 
 class NewsFeedPage extends StatefulWidget {
   const NewsFeedPage({super.key});
@@ -21,6 +24,12 @@ class _NewsFeedPageState extends State<NewsFeedPage> {
     'All', 'Technology', 'Business', 'Sports', 'Entertainment', 
     'Health', 'Science', 'World', 'Politics'
   ];
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -97,14 +106,14 @@ class _NewsFeedPageState extends State<NewsFeedPage> {
         if (state is NewsLoading) {
           return const LoadingShimmer();
         } else if (state is NewsLoaded || state is NewsByCategoryLoaded) {
-          final articles = state is NewsLoaded 
-              ? state.articles 
-              : (state as NewsByCategoryLoaded).articles;
+          final mixedFeed = state is NewsLoaded 
+              ? state.mixedFeed 
+              : (state as NewsByCategoryLoaded).mixedFeed;
           
-          if (articles.isEmpty) {
+          if (mixedFeed.isEmpty) {
             return const Center(
               child: Text(
-                'No articles found',
+                'No content found',
                 style: TextStyle(
                   color: CupertinoColors.white,
                   fontSize: 18,
@@ -116,16 +125,43 @@ class _NewsFeedPageState extends State<NewsFeedPage> {
           return PageView.builder(
             controller: _pageController,
             scrollDirection: Axis.vertical,
-            itemCount: articles.length,
+            itemCount: mixedFeed.length,
             itemBuilder: (context, index) {
-              return NewsArticleCard(
-                article: articles[index],
-                onRead: () {
-                  context.read<NewsBloc>().add(
-                    MarkArticleAsReadEvent(articleId: articles[index].id),
-                  );
-                },
-              );
+              final item = mixedFeed[index];
+              
+              // Check if this item is an ad or an article
+              if (AdIntegrationService.isAd(item)) {
+                return NativeAdCard(
+                  adModel: item,
+                  palette: const ColorPalette(
+                    primary: CupertinoColors.black,
+                    secondary: Color(0xFF1C1C1E),
+                    accent: Color(0xFF007AFF),
+                    background: CupertinoColors.black,
+                    surface: Color(0xFF1C1C1E),
+                    onPrimary: CupertinoColors.white,
+                    onSecondary: CupertinoColors.white,
+                    onAccent: CupertinoColors.white,
+                  ),
+                );
+              } else if (AdIntegrationService.isNewsArticle(item)) {
+                return NewsArticleCard(
+                  article: item,
+                  onRead: () {
+                    context.read<NewsBloc>().add(
+                      MarkArticleAsReadEvent(articleId: item.id),
+                    );
+                  },
+                );
+              } else {
+                // Fallback for unknown item types
+                return const Center(
+                  child: Text(
+                    'Unknown content type',
+                    style: TextStyle(color: CupertinoColors.white),
+                  ),
+                );
+              }
             },
           );
         } else if (state is NewsError) {

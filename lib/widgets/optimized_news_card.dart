@@ -119,14 +119,13 @@ class OptimizedNewsCard extends StatelessWidget {
                   Text(
                     article.title,
                     style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w800,
+                      fontSize: 18, // REDUCED from 22 to 18 for smaller title
+                      fontWeight: FontWeight.w700, // REDUCED from w800 to w700
                       color: palette.onPrimary,
-                      height: 1.3,
-                      letterSpacing: -0.3,
+                      height: 1.2, // REDUCED from 1.3 to 1.2 for tighter spacing
+                      letterSpacing: -0.2, // REDUCED from -0.3 to -0.2
                     ),
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
+                    // REMOVED maxLines and overflow to show full title without truncation
                   ),
                   const SizedBox(height: 12),
                   

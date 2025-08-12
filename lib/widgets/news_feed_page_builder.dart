@@ -8,7 +8,11 @@ import '../services/read_articles_service.dart';
 import '../services/category_preference_service.dart';
 import '../services/image_preloader_service.dart';
 import '../services/optimized_image_service.dart';
+import '../services/scroll_state_service.dart';
+import '../services/ad_integration_service.dart';
+import '../models/native_ad_model.dart';
 import '../widgets/news_feed_widgets.dart';
+import '../widgets/native_ad_card.dart';
 
 // Helper function to preload colors for upcoming articles
 Future<void> _preloadColorsForUpcomingArticles(
@@ -48,73 +52,177 @@ class NewsFeedPageBuilder {
     Function(int) onCurrentIndexChanged,
     Map<String, ColorPalette> colorCache,
     Function(String)? loadMoreArticles, // Add callback for loading more articles
+    PageController? pageController, // Add PageController parameter for bidirectional scrolling
+    Map<String, PageController> articlePageControllers, // Add PageControllers map for direction checking
   ) {
     final categoryArticlesList = categoryArticles[category] ?? [];
     final isLoading = categoryLoading[category] ?? false;
     
-    // Always use category-specific articles, not the main _articles list
-    final articlesToShow = categoryArticlesList;
+    // Create mixed feed with ads integrated
+    return FutureBuilder<List<dynamic>>(
+      future: _createMixedFeedWithAds(categoryArticlesList, category),
+      builder: (context, snapshot) {
+        final mixedFeed = snapshot.data ?? categoryArticlesList;
+        return _buildPageViewForMixedFeed(
+          context,
+          category,
+          mixedFeed,
+          isLoading,
+          selectedCategory,
+          currentIndex,
+          error,
+          onCurrentIndexChanged,
+          colorCache,
+          loadMoreArticles,
+          pageController,
+          articlePageControllers,
+        );
+      },
+    );
+  }
+
+  // Helper method to create mixed feed with ads
+  static Future<List<dynamic>> _createMixedFeedWithAds(
+    List<NewsArticle> articles, 
+    String category
+  ) async {
+    if (articles.isEmpty) return articles;
     
-    if (isLoading && articlesToShow.isEmpty) {
+    try {
+      return await AdIntegrationService.integrateAdsIntoFeed(
+        articles: articles,
+        category: category,
+        maxAds: 3, // Maximum 3 ads per category
+      );
+    } catch (e) {
+      print('❌ Error integrating ads: $e');
+      return articles; // Fallback to articles only
+    }
+  }
+
+  // Helper method to build PageView for mixed feed
+  static Widget _buildPageViewForMixedFeed(
+    BuildContext context,
+    String category,
+    List<dynamic> mixedFeed,
+    bool isLoading,
+    String selectedCategory,
+    int currentIndex,
+    String error,
+    Function(int) onCurrentIndexChanged,
+    Map<String, ColorPalette> colorCache,
+    Function(String)? loadMoreArticles,
+    PageController? pageController,
+    Map<String, PageController> articlePageControllers,
+  ) {
+    
+    if (isLoading && mixedFeed.isEmpty) {
       return NewsFeedWidgets.buildLoadingPage();
     }
 
-    if (articlesToShow.isEmpty) {
+    if (mixedFeed.isEmpty) {
       return NewsFeedWidgets.buildNoArticlesPage(context, error);
     }
 
-    return PageView.builder(
-      scrollDirection: Axis.vertical,
-      physics: const BouncingScrollPhysics(), // CRITICAL FIX: Allow smooth rapid scrolling
-      itemCount: articlesToShow.length + 1, // CRITICAL FIX: Proper item count for correct scrolling
-      pageSnapping: true,
-      onPageChanged: (index) async {
-        print('PAGE CHANGED: Moving to article $index in $category');
-        
-        // Load more articles when approaching the end (3 articles before the end)
-        if (index >= articlesToShow.length - 3 && loadMoreArticles != null && index < articlesToShow.length) {
-          print('🔄 LOADING MORE: Approaching end at index $index, loading more articles for $category');
-          loadMoreArticles(category);
+    return NotificationListener<ScrollNotification>(
+      onNotification: (ScrollNotification notification) {
+        if (notification is ScrollStartNotification) {
+          ScrollStateService.startScrolling();
+        } else if (notification is ScrollEndNotification) {
+          ScrollStateService.stopScrolling();
         }
-        
-        // Mark previous article as read when moving to next article
-        if (index > 0 && index < articlesToShow.length && articlesToShow.isNotEmpty) {
-          final previousArticle = articlesToShow[index - 1];
-          await ReadArticlesService.markAsRead(previousArticle.id);
-          
-          // CRITICAL FIX: Don't remove from cache immediately - this causes index mismatch
-          // Just mark as read, let the cache refresh handle removal
-          // CategoryPreferenceService.removeReadArticleFromCaches(previousArticle.id, categoryArticles);
-          
-          // Track article read for preference learning
-          CategoryPreferenceService.trackArticleRead(previousArticle, selectedCategory);
-          
-          print('✅ MARKED AS READ: "${previousArticle.title}" (ID: ${previousArticle.id}) - keeping in cache for smooth scrolling');
-        }
-        
-        if (category == selectedCategory) {
-          onCurrentIndexChanged(index);
-        }
-        
-        // CRITICAL FIX: AGGRESSIVE preloading - preload way ahead
-        if (index < articlesToShow.length) {
-          // Update scroll metrics for velocity tracking
-          PredictivePreloaderService.updateScrollMetrics(index.toDouble());
-          
-          // INSTANT PRELOAD: Preload next 25 images immediately when user scrolls
-          print('🚀 SCROLL PRELOAD: User at index $index, preloading next 25 images');
-          OptimizedImageService.preloadImagesAggressively(articlesToShow, index, preloadCount: 25);
-          
-          // Use predictive preloading strategy
-          PredictivePreloaderService.predictivePreload(articlesToShow, index);
-          
-          // Also preload colors for upcoming articles (legacy fallback)
-          _preloadColorsForUpcomingArticles(articlesToShow, index, colorCache);
-        }
+        return false;
       },
-      itemBuilder: (context, index) {
-        // If we've scrolled beyond available articles, show loading or end message
-        if (index >= articlesToShow.length) {
+      child: PageView.builder(
+        controller: pageController, // CRITICAL FIX: Use PageController for bidirectional scrolling
+        scrollDirection: Axis.vertical,
+        physics: const BouncingScrollPhysics(), // CRITICAL FIX: Allow smooth rapid scrolling
+        itemCount: mixedFeed.length + 1, // CRITICAL FIX: Proper item count for mixed feed
+        pageSnapping: true,
+        onPageChanged: (index) async {
+          final itemType = index < mixedFeed.length ? AdIntegrationService.getItemType(mixedFeed[index]) : 'END';
+          print('PAGE CHANGED: Moving to $itemType $index in $category (scrolling: ${ScrollStateService.isActivelyScrolling})');
+          
+          // Load more articles when approaching the end (3 items before the end)
+          // Only if not actively scrolling to prevent list modifications
+          if (index >= mixedFeed.length - 3 && loadMoreArticles != null && index < mixedFeed.length && !ScrollStateService.isActivelyScrolling) {
+            print('🔄 LOADING MORE: Approaching end at index $index, loading more articles for $category');
+            loadMoreArticles(category);
+          }
+          
+          // CRITICAL FIX: Only mark articles as read (not ads) when moving forward and user stops scrolling
+          // This prevents article list changes during active scrolling and allows backward navigation
+          Future.delayed(const Duration(milliseconds: 1500), () async {
+            // Only mark as read if:
+            // 1. User has stopped scrolling
+            // 2. Moving forward (index > previous index)
+            // 3. Valid item range
+            // 4. Previous item was an article (not an ad)
+            if (!ScrollStateService.isActivelyScrolling && index > 0 && index < mixedFeed.length && mixedFeed.isNotEmpty) {
+              // Get the PageController to check scroll direction
+              final pageController = articlePageControllers[category];
+              if (pageController != null && pageController.hasClients) {
+                // Only mark as read if we're moving forward, not backward
+                final currentPage = pageController.page ?? 0;
+                if (currentPage >= index) { // Moving forward or staying
+                  final previousItem = mixedFeed[index - 1];
+                  
+                  // Only mark as read if previous item was an article (not an ad)
+                  if (AdIntegrationService.isNewsArticle(previousItem)) {
+                    final previousArticle = previousItem as NewsArticle;
+                    await ReadArticlesService.markAsRead(previousArticle.id);
+                    
+                    // CRITICAL FIX: Never remove from cache during scrolling session
+                    // This prevents the "next article changes" issue completely
+                    
+                    // Track article read for preference learning (only when scrolling stops)
+                    CategoryPreferenceService.trackArticleRead(previousArticle, selectedCategory);
+                    
+                    print('✅ SAFE MARK AS READ (FORWARD): "${previousArticle.title}" (ID: ${previousArticle.id}) - user stopped scrolling forward');
+                  } else if (AdIntegrationService.isAd(previousItem)) {
+                    print('📱 PREVIOUS ITEM WAS AD: Not marking as read');
+                  }
+                } else {
+                  print('⬆️ BACKWARD SCROLL: Not marking item as read - user scrolled back to see previous item');
+                }
+              }
+            } else if (ScrollStateService.isActivelyScrolling) {
+              print('⏸️ SKIP MARK AS READ: User still scrolling, preventing cache modifications');
+            }
+          });
+          
+          if (category == selectedCategory) {
+            onCurrentIndexChanged(index);
+          }
+          
+          // CRITICAL FIX: AGGRESSIVE preloading - preload way ahead (only for articles, not ads)
+          if (index < mixedFeed.length) {
+            // Update scroll metrics for velocity tracking
+            PredictivePreloaderService.updateScrollMetrics(index.toDouble());
+            
+            // Only preload if current item is an article (not an ad)
+            final currentItem = mixedFeed[index];
+            if (AdIntegrationService.isNewsArticle(currentItem)) {
+              // INSTANT PRELOAD: Preload next article images immediately when user scrolls
+              print('🚀 SCROLL PRELOAD: User at article index $index, preloading next images');
+              
+              // Extract only articles from mixed feed for preloading
+              final articlesOnly = mixedFeed.whereType<NewsArticle>().toList();
+              final articleIndex = articlesOnly.indexOf(currentItem as NewsArticle);
+              
+              if (articleIndex >= 0) {
+                OptimizedImageService.preloadImagesAggressively(articlesOnly, articleIndex, preloadCount: 25);
+                PredictivePreloaderService.predictivePreload(articlesOnly, articleIndex);
+                _preloadColorsForUpcomingArticles(articlesOnly, articleIndex, colorCache);
+              }
+            } else {
+              print('📱 SCROLL PRELOAD: Current item is ad, skipping image preloading');
+            }
+          }
+        },
+        itemBuilder: (context, index) {
+        // If we've scrolled beyond available items, show loading or end message
+        if (index >= mixedFeed.length) {
           // If we're loading more articles, show loading indicator
           if (isLoading) {
             return NewsFeedWidgets.buildLoadingPage();
@@ -125,13 +233,70 @@ class NewsFeedPageBuilder {
           });
         }
         
-        final article = articlesToShow[index];
-        return Container(
-          width: double.infinity,
-          height: double.infinity,
-          child: buildFullScreenCard(context, article, index, colorCache),
-        );
-      },
+        final item = mixedFeed[index];
+        
+        // Handle different item types
+        if (AdIntegrationService.isAd(item)) {
+          // Render native ad card
+          final adModel = item as NativeAdModel;
+          final adPalette = _generateAdColorPalette(); // Generate colors for ad
+          return Container(
+            width: double.infinity,
+            height: double.infinity,
+            child: NativeAdCard(
+              adModel: adModel,
+              palette: adPalette,
+            ),
+          );
+        } else if (AdIntegrationService.isNewsArticle(item)) {
+          // Render news article card
+          final article = item as NewsArticle;
+          return Container(
+            width: double.infinity,
+            height: double.infinity,
+            child: buildFullScreenCard(context, article, index, colorCache),
+          );
+        } else {
+          // Fallback for unknown item types
+          return Container(
+            width: double.infinity,
+            height: double.infinity,
+            color: Colors.red,
+            child: Center(
+              child: Text(
+                'Unknown item type',
+                style: TextStyle(color: Colors.white, fontSize: 18),
+              ),
+            ),
+          );
+        }
+        },
+      ),
+    );
+  }
+
+  // Helper method to generate color palette for ads
+  static ColorPalette _generateAdColorPalette() {
+    // Generate a consistent color palette for ads
+    final adColors = [
+      const Color(0xFF1E3A8A), // Blue
+      const Color(0xFF7C3AED), // Purple
+      const Color(0xFF059669), // Green
+      const Color(0xFFDC2626), // Red
+      const Color(0xFFEA580C), // Orange
+    ];
+    
+    final selectedColor = adColors[DateTime.now().millisecondsSinceEpoch % adColors.length];
+    
+    return ColorPalette(
+      primary: selectedColor,
+      secondary: selectedColor.withValues(alpha: 0.8),
+      accent: selectedColor.withValues(alpha: 0.6),
+      background: selectedColor.withValues(alpha: 0.1),
+      surface: selectedColor.withValues(alpha: 0.05),
+      onPrimary: Colors.white,
+      onSecondary: Colors.white,
+      onAccent: Colors.white,
     );
   }
 
@@ -179,6 +344,7 @@ class NewsFeedPageBuilder {
     Function(String) loadArticlesByCategoryForCache,
     Function() loadNewsArticles,
     Map<String, ColorPalette> colorCache,
+    Map<String, PageController> articlePageControllers, // Add PageControllers for each category
   ) {
     return PageView.builder(
       scrollDirection: Axis.horizontal,
@@ -215,6 +381,12 @@ class NewsFeedPageBuilder {
       },
       itemBuilder: (context, categoryIndex) {
         final category = categories[categoryIndex];
+        
+        // Get or create PageController for this category
+        if (!articlePageControllers.containsKey(category)) {
+          articlePageControllers[category] = PageController(initialPage: 0);
+        }
+        
         return buildCategoryContent(
           context,
           category,
@@ -226,6 +398,8 @@ class NewsFeedPageBuilder {
           onCurrentIndexChanged,
           colorCache,
           loadArticlesByCategoryForCache, // Pass the load more articles callback
+          articlePageControllers[category], // Pass the PageController for bidirectional scrolling
+          articlePageControllers, // Pass the PageControllers map for direction checking
         );
       },
     );

@@ -142,14 +142,13 @@ class _DynamicColorNewsCardState extends State<DynamicColorNewsCard> {
                     Text(
                       widget.article.title,
                       style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w700,
+                        fontSize: 18, // REDUCED from 22 to 18 for smaller title
+                        fontWeight: FontWeight.w600, // REDUCED from w700 to w600
                         color: CupertinoColors.label.resolveFrom(context),
-                        height: 1.3,
-                        letterSpacing: -0.5,
+                        height: 1.2, // REDUCED from 1.3 to 1.2 for tighter spacing
+                        letterSpacing: -0.2, // REDUCED from -0.5 to -0.2
                       ),
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
+                      // REMOVED maxLines and overflow to show full title without truncation
                     ),
                     
                     const SizedBox(height: 12),
