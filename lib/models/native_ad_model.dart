@@ -7,7 +7,7 @@ class NativeAdModel {
   final String imageUrl;
   final String advertiser;
   final String callToAction;
-  final NativeAd nativeAd;
+  final NativeAd? nativeAd; // Make nullable for mock ads
   final bool isLoaded;
 
   const NativeAdModel({
@@ -17,7 +17,7 @@ class NativeAdModel {
     required this.imageUrl,
     required this.advertiser,
     required this.callToAction,
-    required this.nativeAd,
+    this.nativeAd, // Make optional for mock ads
     this.isLoaded = false,
   });
 

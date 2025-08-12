@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:async';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import '../models/native_ad_model.dart';
+import 'reward_points_service.dart';
 
 class AdMobService {
   static bool _isInitialized = false;
@@ -94,9 +95,13 @@ class AdMobService {
           },
           onAdClicked: (ad) {
             print('👆 Native ad clicked: $adId');
+            // Award points for ad click
+            RewardPointsService.instance.addPointsForAdClick(adId);
           },
           onAdImpression: (ad) {
             print('👁️ Native ad impression: $adId');
+            // Award points for ad impression
+            RewardPointsService.instance.addPointsForAdImpression(adId);
           },
         ),
         request: const AdRequest(),
@@ -263,24 +268,37 @@ class AdMobService {
   static NativeAdModel? createMockAd() {
     print('🎭 Creating mock ad for testing purposes');
     
-    // This creates a placeholder ad model without a real NativeAd
-    // Useful for testing UI layout when ads are not available
-    return null; // For now, return null to maintain existing behavior
-    
-    // Uncomment below to enable mock ads for testing:
-    /*
+    // ENABLED: Create placeholder ads when real ads fail
     final mockId = 'mock_ad_${++_adCounter}_${DateTime.now().millisecondsSinceEpoch}';
+    
+    final mockTitles = [
+      'Discover Amazing Products',
+      'Special Offer Just For You',
+      'Trending Now - Don\'t Miss Out',
+      'Limited Time Deal',
+      'Recommended For You',
+    ];
+    
+    final mockDescriptions = [
+      'Find the best deals and products tailored to your interests.',
+      'Exclusive offers available for a limited time only.',
+      'Join thousands of satisfied customers today.',
+      'Quality products at unbeatable prices.',
+      'Experience the difference with our premium selection.',
+    ];
+    
+    final randomIndex = DateTime.now().millisecondsSinceEpoch % mockTitles.length;
+    
     return NativeAdModel(
       id: mockId,
-      title: 'Test Advertisement',
-      description: 'This is a test ad that appears when real ads fail to load. In production, this would be replaced with actual ad content.',
-      imageUrl: 'https://via.placeholder.com/400x200/FF6B6B/FFFFFF?text=Test+Ad',
-      advertiser: 'Test Advertiser',
+      title: mockTitles[randomIndex],
+      description: mockDescriptions[randomIndex],
+      imageUrl: 'https://via.placeholder.com/400x200/4285F4/FFFFFF?text=Sponsored+Content',
+      advertiser: 'Sponsored',
       callToAction: 'Learn More',
-      nativeAd: null, // No real ad object
-      isLoaded: false, // Mark as not loaded to prevent AdWidget usage
+      nativeAd: null, // No real ad object for mock ads
+      isLoaded: false, // Mark as not loaded to show custom UI instead of AdWidget
     );
-    */
   }
 
   /// Get troubleshooting information for ad loading issues

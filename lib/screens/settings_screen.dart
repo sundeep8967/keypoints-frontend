@@ -1,6 +1,8 @@
 import 'package:flutter/cupertino.dart';
 import '../services/local_storage_service.dart';
 import '../services/read_articles_service.dart';
+import '../services/reward_points_service.dart';
+import '../widgets/points_display_widget.dart';
 import 'contact_us_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -73,6 +75,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   CupertinoIcons.tag,
                   () => _showCategorySelector(),
                 ),
+              ],
+            ),
+            const SizedBox(height: 30),
+            _buildSection(
+              'Reward Points',
+              [
+                _buildPointsSection(),
               ],
             ),
             const SizedBox(height: 30),
@@ -440,6 +449,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildPointsSection() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      child: const PointsDisplayWidget(showDetailed: true),
     );
   }
 }

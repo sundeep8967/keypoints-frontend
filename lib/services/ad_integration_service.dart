@@ -2,6 +2,7 @@ import '../models/news_article.dart';
 import '../models/native_ad_model.dart';
 import 'admob_service.dart';
 import 'ad_debug_service.dart';
+import 'advanced_ad_preloader_service.dart';
 
 /// Service to seamlessly integrate native ads into news feed
 class AdIntegrationService {
@@ -14,8 +15,12 @@ class AdIntegrationService {
     if (_isInitialized) return;
     
     await AdMobService.initialize();
+    
+    // Initialize advanced preloader for background ad loading
+    await AdvancedAdPreloaderService.initialize();
+    
     _isInitialized = true;
-    print('✅ Ad Integration Service initialized');
+    print('✅ Ad Integration Service initialized with advanced preloader');
   }
 
   /// Mix ads into a list of news articles
@@ -24,7 +29,10 @@ class AdIntegrationService {
     required String category,
     int maxAds = 3,
   }) async {
+    print('🔍 AD INTEGRATION DEBUG: Starting for $category with ${articles.length} articles');
+    
     if (!_isInitialized) {
+      print('🔍 AD INTEGRATION DEBUG: Not initialized, initializing now...');
       await initialize();
     }
 
@@ -32,13 +40,18 @@ class AdIntegrationService {
     final adPositions = AdMobService.getAdPositions(articles.length);
     final adsNeeded = adPositions.length.clamp(0, maxAds);
     
+    print('🔍 AD INTEGRATION DEBUG: Ad positions: $adPositions');
+    print('🔍 AD INTEGRATION DEBUG: Ads needed: $adsNeeded');
+    
     if (adsNeeded == 0) {
       print('📰 No ads needed for ${articles.length} articles');
       return articles;
     }
 
     // Get or create ads for this category
+    print('🔍 AD INTEGRATION DEBUG: Getting ads for category $category...');
     final ads = await _getAdsForCategory(category, adsNeeded);
+    print('🔍 AD INTEGRATION DEBUG: Got ${ads.length} ads for $category');
     
     // Create mixed feed
     final mixedFeed = <dynamic>[];
@@ -52,35 +65,75 @@ class AdIntegrationService {
       if (adPositions.contains(i) && adIndex < ads.length) {
         mixedFeed.add(ads[adIndex]);
         adIndex++;
-        print('📱 Inserted ad at position ${mixedFeed.length - 1}');
+        print('📱 ✅ INSERTED AD at position ${mixedFeed.length - 1} (after article $i)');
       }
     }
     
-    print('📰 Mixed feed created: ${articles.length} articles + ${adIndex} ads = ${mixedFeed.length} items');
+    print('📰 ✅ MIXED FEED CREATED: ${articles.length} articles + ${adIndex} ads = ${mixedFeed.length} items');
+    print('🔍 AD INTEGRATION DEBUG: Final feed breakdown:');
+    for (int i = 0; i < mixedFeed.length && i < 10; i++) {
+      final itemType = isAd(mixedFeed[i]) ? 'AD' : 'ARTICLE';
+      print('  Position $i: $itemType');
+    }
+    
     return mixedFeed;
   }
 
-  /// Get ads for a specific category (with caching)
+  /// Get ads for a specific category (with advanced preloading)
   static Future<List<NativeAdModel>> _getAdsForCategory(String category, int count) async {
-    // Check if we have cached ads for this category
+    print('🔍 _getAdsForCategory: Requested $count ads for $category');
+    
+    // First, try to get ads from the preloaded pool (FASTEST)
+    final preloadedAds = AdvancedAdPreloaderService.getPreloadedAds(count, category: category);
+    if (preloadedAds.isNotEmpty) {
+      print('🚀 ✅ Using PRELOADED ads for $category (${preloadedAds.length} from pool)');
+      
+      // Trigger predictive preloading for future requests
+      AdvancedAdPreloaderService.predictivePreload();
+      
+      return preloadedAds;
+    }
+    
+    // Fallback: Check if we have cached ads for this category
     if (_categoryAds.containsKey(category) && _categoryAds[category]!.length >= count) {
-      print('📱 Using cached ads for $category');
+      print('📱 ✅ Using cached ads for $category (${_categoryAds[category]!.length} available)');
       return _categoryAds[category]!.take(count).toList();
     }
 
-    // Create new ads
-    print('📱 Creating $count new ads for $category');
-    final newAds = await AdMobService.createMultipleAds(count);
+    // Last resort: Create new ads immediately (SLOWEST)
+    print('📱 🔄 Pool empty! Creating $count new ads for $category...');
+    final newAds = await AdvancedAdPreloaderService.emergencyAdRequest(count);
+    print('📱 📊 Emergency request returned ${newAds.length} ads');
     
     // Debug logging if no ads were loaded
     if (newAds.isEmpty) {
-      print('⚠️ No ads loaded for category: $category');
-      print('🔍 Running ad debug analysis...');
+      print('⚠️ ❌ NO ADS LOADED for category: $category');
+      print('🔍 This is why you\'re not seeing ads! Running debug analysis...');
       AdDebugService.printDebugInfo();
+      
+      // Show pool statistics for debugging
+      final poolStats = AdvancedAdPreloaderService.getPoolStats();
+      print('📊 POOL STATS: $poolStats');
+      
+      // Try to create a single test ad for debugging
+      print('🔍 Attempting to create a single test ad...');
+      final testAd = await AdMobService.createNativeAd();
+      if (testAd != null) {
+        print('✅ Test ad created successfully! Issue might be with batch creation.');
+        return [testAd]; // Return the test ad
+      } else {
+        print('❌ Test ad also failed. Check network, emulator, or AdMob configuration.');
+      }
+    } else {
+      print('✅ Successfully loaded ${newAds.length} emergency ads for $category');
+      for (int i = 0; i < newAds.length; i++) {
+        print('  Ad ${i + 1}: ${newAds[i].isLoaded ? "LOADED" : "NOT LOADED"} - ${newAds[i].title}');
+      }
     }
     
-    // Cache the ads
+    // Cache the ads for future use
     _categoryAds[category] = newAds;
+    print('📱 💾 Cached ${newAds.length} ads for $category');
     
     return newAds;
   }
@@ -107,7 +160,7 @@ class AdIntegrationService {
     if (_categoryAds.containsKey(category)) {
       // Dispose of the ads
       for (final ad in _categoryAds[category]!) {
-        ad.nativeAd.dispose();
+        ad.nativeAd?.dispose(); // Handle nullable nativeAd
       }
       _categoryAds.remove(category);
       print('🗑️ Cleared ads cache for $category');
@@ -121,6 +174,14 @@ class AdIntegrationService {
     }
     AdMobService.disposeAllAds();
     print('🗑️ Cleared all ads cache');
+  }
+
+  /// Dispose all services and cleanup
+  static void dispose() {
+    clearAllAds();
+    AdvancedAdPreloaderService.dispose();
+    _isInitialized = false;
+    print('🗑️ Ad Integration Service disposed');
   }
 
   /// Preload ads for popular categories (following Google's best practices)
@@ -142,15 +203,34 @@ class AdIntegrationService {
     print('✅ Finished preloading ads');
   }
 
-  /// Get ad statistics
+  /// Track user reading behavior to optimize ad preloading
+  static void trackUserReading({
+    required int articlesRead,
+    required double averageTimePerArticle,
+    required String currentCategory,
+  }) {
+    print('📊 TRACKING: User read $articlesRead articles, avg ${averageTimePerArticle}s each');
+    
+    // Update preloader with user behavior
+    AdvancedAdPreloaderService.adjustPoolSize(
+      newReadingSpeed: averageTimePerArticle,
+    );
+    
+    // Trigger predictive preloading
+    AdvancedAdPreloaderService.predictivePreload();
+  }
+
+  /// Get comprehensive ad statistics including preloader stats
   static Map<String, dynamic> getAdStats() {
     final totalAds = _categoryAds.values.fold<int>(0, (sum, ads) => sum + ads.length);
+    final poolStats = AdvancedAdPreloaderService.getPoolStats();
     
     return {
       'totalAds': totalAds,
       'categoriesWithAds': _categoryAds.keys.length,
       'adsByCategory': _categoryAds.map((key, value) => MapEntry(key, value.length)),
       'isInitialized': _isInitialized,
+      'preloaderStats': poolStats,
     };
   }
 }

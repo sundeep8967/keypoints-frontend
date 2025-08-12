@@ -18,6 +18,7 @@ import '../services/parallel_color_service.dart';
 import '../services/instant_preloader_service.dart';
 import '../services/error_message_service.dart';
 import '../services/scroll_state_service.dart';
+import '../widgets/points_display_widget.dart';
 import 'settings_screen.dart';
 
 class NewsFeedScreen extends StatefulWidget {

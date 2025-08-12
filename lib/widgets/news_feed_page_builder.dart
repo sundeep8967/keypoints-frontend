@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import '../models/news_article.dart';
 import '../services/color_extraction_service.dart';
 import '../services/parallel_color_service.dart';
@@ -12,7 +13,6 @@ import '../services/scroll_state_service.dart';
 import '../services/ad_integration_service.dart';
 import '../models/native_ad_model.dart';
 import '../widgets/news_feed_widgets.dart';
-import '../widgets/native_ad_card.dart';
 
 // Helper function to preload colors for upcoming articles
 Future<void> _preloadColorsForUpcomingArticles(
@@ -178,6 +178,13 @@ class NewsFeedPageBuilder {
                     // Track article read for preference learning (only when scrolling stops)
                     CategoryPreferenceService.trackArticleRead(previousArticle, selectedCategory);
                     
+                    // 🚀 NEW: Track user reading behavior for ad preloading optimization
+                    AdIntegrationService.trackUserReading(
+                      articlesRead: index,
+                      averageTimePerArticle: 45.0, // TODO: Calculate actual reading time
+                      currentCategory: category,
+                    );
+                    
                     print('✅ SAFE MARK AS READ (FORWARD): "${previousArticle.title}" (ID: ${previousArticle.id}) - user stopped scrolling forward');
                   } else if (AdIntegrationService.isAd(previousItem)) {
                     print('📱 PREVIOUS ITEM WAS AD: Not marking as read');
@@ -237,17 +244,139 @@ class NewsFeedPageBuilder {
         
         // Handle different item types
         if (AdIntegrationService.isAd(item)) {
-          // Render native ad card
+          // Render native ad card with dynamic colors like articles
           final adModel = item as NativeAdModel;
           final adPalette = _generateAdColorPalette(); // Generate colors for ad
-          return Container(
-            width: double.infinity,
-            height: double.infinity,
-            child: NativeAdCard(
-              adModel: adModel,
-              palette: adPalette,
-            ),
-          );
+          
+          if (adModel.isLoaded && adModel.nativeAd != null) {
+            // Real native ad - use AdWidget
+            return Container(
+              width: double.infinity,
+              height: double.infinity,
+              child: Column(
+                children: [
+                  // Top spacing to avoid header overlap
+                  SizedBox(height: MediaQuery.of(context).padding.top + 70),
+                  
+                  // Pure ad content - no container styling
+                  Expanded(
+                    child: AdWidget(ad: adModel.nativeAd!), // Safe to use ! here since we checked above
+                  ),
+                  
+                  // Bottom spacing
+                  SizedBox(height: MediaQuery.of(context).padding.bottom + 20),
+                ],
+              ),
+            );
+          } else {
+            // Mock ad or loading state - show custom UI that looks like news article
+            return Container(
+              width: double.infinity,
+              height: double.infinity,
+              color: CupertinoColors.black,
+              child: Column(
+                children: [
+                  SizedBox(height: MediaQuery.of(context).padding.top + 70),
+                  Expanded(
+                    child: Container(
+                      margin: EdgeInsets.symmetric(horizontal: 20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Ad image placeholder
+                          Container(
+                            width: double.infinity,
+                            height: 200,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [adPalette.primary, adPalette.secondary],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    CupertinoIcons.star_fill,
+                                    color: Colors.white,
+                                    size: 40,
+                                  ),
+                                  SizedBox(height: 8),
+                                  Text(
+                                    'Sponsored',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          
+                          SizedBox(height: 20),
+                          
+                          // Ad title
+                          Text(
+                            adModel.title,
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              height: 1.2,
+                            ),
+                          ),
+                          
+                          SizedBox(height: 16),
+                          
+                          // Ad description
+                          Text(
+                            adModel.description,
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.8),
+                              fontSize: 16,
+                              height: 1.4,
+                            ),
+                          ),
+                          
+                          Spacer(),
+                          
+                          // Call to action button
+                          Container(
+                            width: double.infinity,
+                            height: 50,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [adPalette.primary, adPalette.accent],
+                              ),
+                              borderRadius: BorderRadius.circular(25),
+                            ),
+                            child: Center(
+                              child: Text(
+                                adModel.callToAction,
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                          
+                          SizedBox(height: 20),
+                        ],
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: MediaQuery.of(context).padding.bottom + 20),
+                ],
+              ),
+            );
+          }
         } else if (AdIntegrationService.isNewsArticle(item)) {
           // Render news article card
           final article = item as NewsArticle;
