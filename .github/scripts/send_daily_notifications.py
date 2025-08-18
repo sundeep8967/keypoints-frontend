@@ -114,7 +114,6 @@ def create_notification_message(news_item):
                 channel_id='news_channel',
                 priority='normal',
                 default_sound=True,
-                default_vibrate=True,
                 image=image_url
             )
         ),
