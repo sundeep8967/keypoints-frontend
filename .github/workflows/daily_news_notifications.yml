@@ -2,8 +2,12 @@ name: Daily News Notifications
 
 on:
   schedule:
-    # Run daily at 9:00 AM UTC (adjust timezone as needed)
-    - cron: '0 9 * * *'
+    # 1:00 PM IST (7:30 AM UTC)
+    - cron: '30 7 * * *'
+    # 6:00 PM IST (12:30 PM UTC)
+    - cron: '30 12 * * *'
+    # 9:30 PM IST (4:00 PM UTC)
+    - cron: '0 16 * * *'
   workflow_dispatch: # Allow manual trigger
 
 jobs:
@@ -30,3 +34,36 @@ jobs:
         FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
       run: |
         python .github/scripts/send_daily_notifications.py
+        
+    - name: Cleanup old FCM tokens
+      env:
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+      run: |
+        python -c "
+        import os
+        from supabase import create_client, Client
+        from datetime import datetime, timedelta
+        
+        # Initialize Supabase client
+        supabase_url = os.getenv('SUPABASE_URL')
+        supabase_key = os.getenv('SUPABASE_SERVICE_KEY')
+        supabase: Client = create_client(supabase_url, supabase_key)
+        
+        # Calculate cutoff date (30 days ago)
+        cutoff_date = datetime.now() - timedelta(days=30)
+        
+        try:
+            # Delete inactive FCM tokens older than 30 days
+            response = supabase.table('user_data').delete().lt('updated_at', cutoff_date.isoformat()).eq('active', False).execute()
+            print(f'Cleaned up {len(response.data)} inactive FCM tokens older than 30 days')
+            
+            # Also clean up tokens that haven't been updated in 60 days regardless of status
+            very_old_cutoff = datetime.now() - timedelta(days=60)
+            response2 = supabase.table('user_data').delete().lt('updated_at', very_old_cutoff.isoformat()).execute()
+            print(f'Cleaned up {len(response2.data)} very old FCM tokens (60+ days)')
+            
+        except Exception as e:
+            print(f'Error during FCM cleanup: {e}')
+            # Don't exit with error for cleanup failures, just log them
+        "
