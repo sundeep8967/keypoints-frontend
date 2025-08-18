@@ -112,7 +112,7 @@ def create_notification_message(news_item):
         'android': messaging.AndroidConfig(
             notification=messaging.AndroidNotification(
                 channel_id='news_channel',
-                priority=messaging.Priority.HIGH,
+                priority='normal',
                 default_sound=True,
                 default_vibrate=True,
                 image=image_url
