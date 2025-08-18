@@ -50,10 +50,11 @@ def get_active_fcm_tokens(supabase):
 def get_latest_news(supabase):
     """Get latest news from news_article table"""
     try:
-        # Try to get from news table first (check your actual table name)
-        response = supabase.table('news').select('*').limit(5).execute()
+        # Use the actual table name from your app
+        response = supabase.table('news_articles').select('*').limit(5).execute()
         
         if response.data:
+            print(f"✅ Found {len(response.data)} articles in table")
             return response.data
         
         # Fallback: If no news table, create sample news
@@ -108,32 +109,31 @@ def create_notification_message(news_item):
             'image_url': image_url,
             'timestamp': str(int(datetime.now().timestamp()))
         },
-        'android': {
-            'notification': {
-                'channel_id': 'news_channel',
-                'priority': 'high',
-                'default_sound': True,
-                'default_vibrate': True,
-                'image': image_url,  # Android big picture style
-                'style': 'big_picture'
-            }
-        },
-        'apns': {
-            'payload': {
-                'aps': {
-                    'alert': {
-                        'title': title,
-                        'body': ''  # Empty body for iOS too
-                    },
-                    'sound': 'default',
-                    'badge': 1,
-                    'mutable-content': 1  # Required for rich notifications with images
-                }
-            },
-            'fcm_options': {
-                'image': image_url  # iOS rich notification image
-            }
-        }
+        'android': messaging.AndroidConfig(
+            notification=messaging.AndroidNotification(
+                channel_id='news_channel',
+                priority=messaging.Priority.HIGH,
+                default_sound=True,
+                default_vibrate=True,
+                image=image_url
+            )
+        ),
+        'apns': messaging.APNSConfig(
+            payload=messaging.APNSPayload(
+                aps=messaging.Aps(
+                    alert=messaging.ApsAlert(
+                        title=title,
+                        body=''
+                    ),
+                    sound='default',
+                    badge=1,
+                    mutable_content=True
+                )
+            ),
+            fcm_options=messaging.APNSFCMOptions(
+                image=image_url
+            )
+        )
     }
     
     return message_data
@@ -152,7 +152,14 @@ def send_notifications_batch(tokens, message_data, batch_size=500):
             # Create multicast message
             multicast_message = messaging.MulticastMessage(
                 tokens=batch_tokens,
-                **message_data
+                notification=messaging.Notification(
+                    title=message_data['notification']['title'],
+                    body=message_data['notification']['body'],
+                    image=message_data['notification']['image']
+                ),
+                data=message_data['data'],
+                android=message_data['android'],
+                apns=message_data['apns']
             )
             
             # Send batch (use send_each_for_multicast for newer Firebase versions)
