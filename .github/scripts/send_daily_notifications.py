@@ -50,14 +50,14 @@ def get_active_fcm_tokens(supabase):
 def get_latest_news(supabase):
     """Get latest news from news_article table"""
     try:
-        # Try to get from news_article table first
-        response = supabase.table('news_article').select('*').limit(5).execute()
+        # Try to get from news table first (check your actual table name)
+        response = supabase.table('news').select('*').limit(5).execute()
         
         if response.data:
             return response.data
         
-        # Fallback: If no news_article table, create sample news
-        print("No news_article table found, using sample news")
+        # Fallback: If no news table, create sample news
+        print("No news table found, using sample news")
         return [
             {
                 'title': 'Daily News Update',
@@ -155,8 +155,8 @@ def send_notifications_batch(tokens, message_data, batch_size=500):
                 **message_data
             )
             
-            # Send batch
-            response = messaging.send_multicast(multicast_message)
+            # Send batch (use send_each_for_multicast for newer Firebase versions)
+            response = messaging.send_each_for_multicast(multicast_message)
             
             # Count results
             total_sent += response.success_count
