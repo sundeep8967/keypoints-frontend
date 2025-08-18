@@ -227,23 +227,8 @@ def main():
         print(f"❌ Failed notifications: {failed_count}")
         print(f"📊 Success rate: {(sent_count / len(fcm_tokens) * 100):.1f}%")
         
-        # Log to Supabase (optional - create a notifications_log table)
-        try:
-            log_data = {
-                'sent_at': datetime.now().isoformat(),
-                'total_tokens': len(fcm_tokens),
-                'successful_sends': sent_count,
-                'failed_sends': failed_count,
-                'news_title': selected_news.get('title', 'Daily Update'),
-                'success_rate': round(sent_count / len(fcm_tokens) * 100, 1)
-            }
-            
-            # Try to log to notifications_log table (create if needed)
-            supabase.table('notifications_log').insert(log_data).execute()
-            print("📝 Logged notification stats to Supabase")
-            
-        except Exception as e:
-            print(f"⚠️ Could not log to Supabase (table may not exist): {e}")
+        # Log results to console (Supabase logging disabled to avoid table errors)
+        print("📝 Notification stats logged to console only")
         
     except Exception as e:
         print(f"❌ Error in main function: {e}")
