@@ -1,11 +1,13 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'screens/news_feed_screen.dart';
 import 'screens/language_selection_screen.dart';
 import 'services/supabase_service.dart';
 import 'services/local_storage_service.dart';
 import 'services/ad_integration_service.dart';
+import 'services/fcm_service.dart';
 import 'config/image_cache_config.dart';
 
 void main() async {
@@ -31,6 +33,14 @@ void main() async {
   // Initialize image cache for better performance
   ImageCacheConfig.initialize();
   
+  // Initialize Firebase (required for FCM)
+  try {
+    await Firebase.initializeApp();
+    print('Firebase initialized successfully');
+  } catch (e) {
+    print('Firebase initialization error: $e');
+  }
+  
   // Initialize Supabase
   try {
     await SupabaseService.initialize();
@@ -52,7 +62,7 @@ void main() async {
     print('AdMob initialization error: $e');
   }
 
-  // Firebase removed - using Supabase only
+  // Firebase initialized for FCM - Supabase used for data storage
   
   runApp(const NewsApp());
 }
@@ -90,6 +100,15 @@ class _AppInitializerState extends State<AppInitializer> {
   void initState() {
     super.initState();
     _checkFirstTimeSetup();
+    
+    // Initialize FCM in background after core functionality
+    _initializeFCMWhenReady();
+  }
+
+  /// Initialize FCM after core app functionality is ready (background task)
+  Future<void> _initializeFCMWhenReady() async {
+    // Wait for core app to be ready, then initialize FCM
+    FCMService.initializeWhenReady();
   }
 
   Future<void> _checkFirstTimeSetup() async {

@@ -1,36 +1,27 @@
 {
   "project_info": {
-    "project_number": "YOUR_PROJECT_NUMBER",
-    "project_id": "YOUR_PROJECT_ID",
-    "storage_bucket": "YOUR_PROJECT_ID.appspot.com"
+    "project_number": "467251672026",
+    "firebase_url": "https://keypointsnews-b09a0-default-rtdb.firebaseio.com",
+    "project_id": "keypointsnews-b09a0",
+    "storage_bucket": "keypointsnews-b09a0.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "YOUR_ANDROID_APP_ID",
+        "mobilesdk_app_id": "1:467251672026:android:39591b49dcde72d14b86e3",
         "android_client_info": {
           "package_name": "com.sundeep.keypoints"
         }
       },
-      "oauth_client": [
-        {
-          "client_id": "YOUR_CLIENT_ID",
-          "client_type": 3
-        }
-      ],
+      "oauth_client": [],
       "api_key": [
         {
-          "current_key": "YOUR_API_KEY"
+          "current_key": "AIzaSyAhHv5_lwSTPHcZQBtXJ8aAx8kCgbwCqN8"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": [
-            {
-              "client_id": "YOUR_CLIENT_ID",
-              "client_type": 3
-            }
-          ]
+          "other_platform_oauth_client": []
         }
       }
     }

@@ -38,6 +38,7 @@ dependencies:
   # Firebase dependencies
   firebase_core: ^2.24.2
   cloud_firestore: ^4.13.6
+  firebase_messaging: ^14.7.10
   
   # Supabase dependencies
   supabase_flutter: ^2.5.6
@@ -126,6 +127,6 @@ flutter:
 flutter_launcher_icons:
   android: "launcher_icon"
   ios: true
-  image_path: "assets/kpIcon.png"
+  image_path: "assets/kpIcon1.png"
   min_sdk_android: 21
   remove_alpha_ios: true
