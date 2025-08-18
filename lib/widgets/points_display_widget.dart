@@ -468,8 +468,45 @@ class _PointsDisplayWidgetState extends State<PointsDisplayWidget> {
               const Text('Claim Submitted'),
             ],
           ),
-          content: const Text(
-            'Your reward claim has been submitted successfully. You will receive your voucher via email within 24-48 hours.',
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Your reward claim has been submitted successfully!',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: CupertinoColors.systemBlue.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: CupertinoColors.systemBlue.withOpacity(0.3),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      CupertinoIcons.mail,
+                      color: CupertinoColors.systemBlue,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'You will receive your reward through email by 1 week.',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: CupertinoColors.systemBlue,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
           actions: [
             CupertinoDialogAction(
