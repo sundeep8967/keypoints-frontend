@@ -42,6 +42,11 @@ def get_active_fcm_tokens(supabase):
         response = supabase.table('user_data').select('fcm_token').eq('active', True).execute()
         tokens = [row['fcm_token'] for row in response.data if row['fcm_token']]
         print(f"Found {len(tokens)} active FCM tokens")
+        
+        # Print complete FCM tokens for debugging
+        for i, token in enumerate(tokens, 1):
+            print(f"FCM Token {i}: {token}")
+        
         return tokens
     except Exception as e:
         print(f"Error fetching FCM tokens: {e}")
@@ -112,7 +117,7 @@ def create_notification_message(news_item):
         'android': messaging.AndroidConfig(
             notification=messaging.AndroidNotification(
                 channel_id='news_channel',
-                priority='normal',
+                priority='default',
                 default_sound=True,
                 image=image_url
             )

@@ -51,7 +51,7 @@ class FCMService {
       
       if (token != null && token != _currentToken) {
         _currentToken = token;
-        print('FCM Token obtained: ${token.substring(0, 20)}...');
+        print('FCM Token obtained: $token');
         
         // Store FCM token in Supabase (without email for now)
         await _storeFCMTokenOnly(token);
@@ -85,7 +85,7 @@ class FCMService {
   static void _setupTokenRefreshListener() {
     try {
       _messaging!.onTokenRefresh.listen((newToken) {
-        print('FCM Token refreshed: ${newToken.substring(0, 20)}...');
+        print('FCM Token refreshed: $newToken');
         
         // Mark old token as inactive if different
         if (_currentToken != null && _currentToken != newToken) {
