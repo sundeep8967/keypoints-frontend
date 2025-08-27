@@ -52,36 +52,55 @@ def get_active_fcm_tokens(supabase):
         print(f"Error fetching FCM tokens: {e}")
         return []
 
-def get_latest_news(supabase):
-    """Get latest news from news_article table"""
+def get_unique_daily_article(supabase):
+    """Get unique article based on notification sequence for the day"""
+    
+    # Get current hour to determine which notification this is FOR THE DAY
+    current_hour = datetime.now().hour
+    
+    # Determine notification sequence number for the day
+    if 6 <= current_hour < 12:      # 1st notification of the day (7:30 AM UTC)
+        limit_count = 1
+        notification_number = "1st"
+        
+    elif 12 <= current_hour < 17:   # 2nd notification of the day (12:30 PM UTC)
+        limit_count = 2  
+        notification_number = "2nd"
+        
+    else:                           # 3rd notification of the day (4:00 PM UTC)
+        limit_count = 3
+        notification_number = "3rd"
+    
     try:
-        # Use the actual table name from your app
-        response = supabase.table('news_articles').select('*').limit(5).execute()
+        # Fetch articles with limit based on notification sequence
+        response = supabase.table('news_articles')\
+            .select('*')\
+            .order('id', desc=True)\
+            .limit(limit_count)\
+            .execute()
         
         if response.data:
-            print(f"✅ Found {len(response.data)} articles in table")
-            return response.data
-        
-        # Fallback: If no news table, create sample news
-        print("No news table found, using sample news")
-        return [
-            {
+            # Take the LAST article from the result (which is the target article)
+            article = response.data[-1]  
+            print(f"📰 {notification_number} notification of the day: Selected article ID {article.get('id')} - {article.get('title', 'No title')}")
+            return article
+        else:
+            # Fallback: If no articles found, create sample news
+            print("No news articles found, using sample news")
+            return {
                 'title': 'Daily News Update',
                 'description': 'Stay updated with the latest news and trends. Open the app to read more!',
                 'url': 'https://your-app-link.com'
             }
-        ]
-        
+            
     except Exception as e:
-        print(f"Error fetching news: {e}")
+        print(f"Error fetching article: {e}")
         # Return fallback news
-        return [
-            {
-                'title': 'Daily News Update',
-                'description': 'Stay updated with the latest news and trends. Open the app to read more!',
-                'url': 'https://your-app-link.com'
-            }
-        ]
+        return {
+            'title': 'Daily News Update',
+            'description': 'Stay updated with the latest news and trends. Open the app to read more!',
+            'url': 'https://your-app-link.com'
+        }
 
 def create_notification_message(news_item):
     """Create FCM notification message with image and title only"""
@@ -204,16 +223,12 @@ def main():
             print("❌ No active FCM tokens found")
             return
         
-        # Get latest news
-        news_articles = get_latest_news(supabase)
+        # Get unique daily article based on notification sequence
+        selected_news = get_unique_daily_article(supabase)
         
-        if not news_articles:
-            print("❌ No news articles found")
+        if not selected_news:
+            print("❌ No news article found")
             return
-        
-        # Pick a random news article for today
-        selected_news = random.choice(news_articles)
-        print(f"📰 Selected news: {selected_news.get('title', 'Daily Update')}")
         
         # Create notification message
         message_data = create_notification_message(selected_news)
