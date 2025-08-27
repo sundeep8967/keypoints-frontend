@@ -26,7 +26,7 @@ class OptimizedNewsCard extends StatelessWidget {
       color: palette.primary,
       child: Column(
         children: [
-          SizedBox(height: MediaQuery.of(context).padding.top + 70),
+          SizedBox(height: MediaQuery.of(context).padding.top + 54), // padding.top + 50 (header) + 4 (gap to match top gap)
           // Optimized image section
           Container(
             height: MediaQuery.of(context).size.height * 0.3,

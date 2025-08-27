@@ -152,7 +152,7 @@ class NewsFeedWidgets {
       color: palette.primary,
       child: Column(
         children: [
-          SizedBox(height: MediaQuery.of(context).padding.top + 70),
+          SizedBox(height: MediaQuery.of(context).padding.top + 54), // padding.top + 50 (header) + 4 (gap to match top gap)
           Container(
             height: MediaQuery.of(context).size.height * 0.3,
             width: double.infinity,
