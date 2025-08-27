@@ -3,6 +3,7 @@ import '../services/supabase_service.dart';
 import '../services/read_articles_service.dart';
 import '../services/news_feed_helper.dart';
 
+import '../utils/app_logger.dart';
 class NewsLoadingService {
   static Future<List<NewsArticle>> loadNewsArticles() async {
     try {
@@ -19,22 +20,22 @@ class NewsLoadingService {
           // Filter out articles with no content and mark them as read
           final validArticles = await NewsFeedHelper.filterValidArticles(unreadArticles);
           
-          print('SUCCESS: Loaded ${allArticles.length} total articles, ${unreadArticles.length} unread, ${validArticles.length} valid from Supabase');
-          print('INFO: ${readIds.length} articles already read, ${unreadArticles.length - validArticles.length} auto-marked as read (no content)');
+          AppLogger.log('SUCCESS: Loaded ${allArticles.length} total articles, ${unreadArticles.length} unread, ${validArticles.length} valid from Supabase');
+          AppLogger.log('INFO: ${readIds.length} articles already read, ${unreadArticles.length - validArticles.length} auto-marked as read (no content)');
           
           return validArticles;
         } else {
-          print('WARNING: No articles found in Supabase');
+          AppLogger.log('WARNING: No articles found in Supabase');
         }
       } catch (e) {
-        print('ERROR: Supabase failed: $e');
+        AppLogger.error(': Supabase failed: $e');
       }
 
       // No fallback - show error if no Supabase articles
-      print('ERROR: No articles found in Supabase and no fallback used');
+      AppLogger.error(': No articles found in Supabase and no fallback used');
       throw Exception('NO_ARTICLES_IN_DATABASE');
     } catch (e) {
-      print('ERROR: Failed to load articles: $e');
+      AppLogger.error(': Failed to load articles: $e');
       return [];
     }
   }
@@ -52,11 +53,11 @@ class NewsLoadingService {
             !readIds.contains(article.id)
           ).toList();
           
-          print('SUCCESS: Loaded ${allCategoryArticles.length} total $category articles, ${unreadCategoryArticles.length} unread from Supabase');
+          AppLogger.log('SUCCESS: Loaded ${allCategoryArticles.length} total $category articles, ${unreadCategoryArticles.length} unread from Supabase');
           return unreadCategoryArticles;
         }
       } catch (e) {
-        print('ERROR: Supabase category filter failed: $e');
+        AppLogger.error(': Supabase category filter failed: $e');
       }
 
       // PRIORITY 2: Try filtering all Supabase articles locally
@@ -72,18 +73,18 @@ class NewsLoadingService {
           ).toList();
           
           if (unreadFilteredArticles.isNotEmpty) {
-            print('SUCCESS: Filtered ${unreadFilteredArticles.length} unread $category articles from ${filteredArticles.length} total');
+            AppLogger.log('SUCCESS: Filtered ${unreadFilteredArticles.length} unread $category articles from ${filteredArticles.length} total');
             return unreadFilteredArticles;
           }
         }
       } catch (e) {
-        print('ERROR: Failed to filter Supabase articles: $e');
+        AppLogger.error(': Failed to filter Supabase articles: $e');
       }
 
-      print('ERROR: Supabase completely unavailable for $category');
+      AppLogger.error(': Supabase completely unavailable for $category');
       return [];
     } catch (e) {
-      print('ERROR: Failed to load articles for $category: $e');
+      AppLogger.error(': Failed to load articles for $category: $e');
       return [];
     }
   }
@@ -95,51 +96,51 @@ class NewsLoadingService {
       // Map UI category names to database category names
       String dbCategory = _mapCategoryName(category);
       
-      print('=== LOADING CATEGORY: $category ===');
-      print('UI Category: "$category" -> DB Category: "$dbCategory"');
-      print('Read articles count: ${readIds.length}');
+      AppLogger.log('=== LOADING CATEGORY: $category ===');
+      AppLogger.log('UI Category: "$category" -> DB Category: "$dbCategory"');
+      AppLogger.log('Read articles count: ${readIds.length}');
       
       // Use the new method that directly fetches unread articles - get more to ensure enough unread
       final unreadCategoryArticles = await SupabaseService.getUnreadNewsByCategory(dbCategory, readIds, limit: 200);
-      print('Found ${unreadCategoryArticles.length} unread articles for "$dbCategory"');
+      AppLogger.log('Found ${unreadCategoryArticles.length} unread articles for "$dbCategory"');
       
       // Debug: Also try the old method to compare
       final allCategoryArticles = await SupabaseService.getNewsByCategory(dbCategory, limit: 100);
-      print('DEBUG: Total articles in "$dbCategory" category: ${allCategoryArticles.length}');
+      AppLogger.debug(': Total articles in "$dbCategory" category: ${allCategoryArticles.length}');
       
       if (allCategoryArticles.isNotEmpty) {
         final readCount = allCategoryArticles.where((article) => readIds.contains(article.id)).length;
-        print('DEBUG: $dbCategory breakdown - Total: ${allCategoryArticles.length}, Read: $readCount, Should be unread: ${allCategoryArticles.length - readCount}');
+        AppLogger.debug(': $dbCategory breakdown - Total: ${allCategoryArticles.length}, Read: $readCount, Should be unread: ${allCategoryArticles.length - readCount}');
         
         // Show first few article titles for debugging
-        print('DEBUG: First 3 articles in $dbCategory:');
+        AppLogger.debug(': First 3 articles in $dbCategory:');
         for (int i = 0; i < allCategoryArticles.length && i < 3; i++) {
           final article = allCategoryArticles[i];
           final isRead = readIds.contains(article.id);
-          print('  ${i+1}. "${article.title}" (ID: ${article.id}) - ${isRead ? "READ" : "UNREAD"}');
+          AppLogger.log('  ${i+1}. "${article.title}" (ID: ${article.id}) - ${isRead ? "READ" : "UNREAD"}');
         }
       }
       
       // Filter out articles with no content and mark them as read
       final validCategoryArticles = await NewsFeedHelper.filterValidArticles(unreadCategoryArticles);
-      print('Filtered to ${validCategoryArticles.length} valid articles for $dbCategory');
+      AppLogger.log('Filtered to ${validCategoryArticles.length} valid articles for $dbCategory');
       
       if (validCategoryArticles.isNotEmpty) {
-        print('Pre-loaded $category: ${validCategoryArticles.length} valid articles available');
+        AppLogger.log('Pre-loaded $category: ${validCategoryArticles.length} valid articles available');
       } else {
-        print('No unread $category articles found - checking if category exists...');
+        AppLogger.log('No unread $category articles found - checking if category exists...');
         // Check if category exists at all by getting a small sample
         final sampleCategoryArticles = await SupabaseService.getNewsByCategory(dbCategory, limit: 5);
         if (sampleCategoryArticles.isNotEmpty) {
-          print('$category exists in database but all articles have been read');
+          AppLogger.log('$category exists in database but all articles have been read');
         } else {
-          print('No $category articles found in database at all');
+          AppLogger.log('No $category articles found in database at all');
         }
       }
       
       return validCategoryArticles;
     } catch (e) {
-      print('Error pre-loading $category: $e');
+      AppLogger.log('Error pre-loading $category: $e');
       return [];
     }
   }
@@ -173,48 +174,48 @@ class NewsLoadingService {
     try {
       final allArticles = await SupabaseService.getNews(limit: 200);
       final uniqueCategories = allArticles.map((article) => article.category).toSet().toList();
-      print('=== DATABASE CATEGORIES FOUND ===');
+      AppLogger.log('=== DATABASE CATEGORIES FOUND ===');
       for (String cat in uniqueCategories) {
         final count = allArticles.where((a) => a.category == cat).length;
-        print('Category: "$cat" - $count articles');
+        AppLogger.log('Category: "$cat" - $count articles');
       }
-      print('=== END DATABASE CATEGORIES ===');
+      AppLogger.log('=== END DATABASE CATEGORIES ===');
     } catch (e) {
-      print('Error debugging categories: $e');
+      AppLogger.log('Error debugging categories: $e');
     }
   }
 
   static Future<void> showAllSupabaseArticles() async {
     try {
-      print('=== FETCHING ALL ARTICLES FROM SUPABASE ===');
+      AppLogger.log('=== FETCHING ALL ARTICLES FROM SUPABASE ===');
       
       // Get all articles (increase limit to see more)
       final allArticles = await SupabaseService.getNews(limit: 200);
       
-      print('TOTAL ARTICLES FOUND: ${allArticles.length}');
-      print('');
+      AppLogger.log('TOTAL ARTICLES FOUND: ${allArticles.length}');
+      AppLogger.log('');
       
       for (int i = 0; i < allArticles.length; i++) {
         final article = allArticles[i];
         
-        print('--- ARTICLE ${i + 1} ---');
-        print('ID: ${article.id}');
-        print('Title: ${article.title}');
-        print('Category: ${article.category}');
-        print('Published: ${article.timestamp}');
+        AppLogger.log('--- ARTICLE ${i + 1} ---');
+        AppLogger.log('ID: ${article.id}');
+        AppLogger.log('Title: ${article.title}');
+        AppLogger.log('Category: ${article.category}');
+        AppLogger.log('Published: ${article.timestamp}');
         
         // Check keypoints
         if (article.keypoints != null && article.keypoints!.isNotEmpty) {
-          print('Keypoints: ${article.keypoints!.substring(0, article.keypoints!.length > 100 ? 100 : article.keypoints!.length)}...');
+          AppLogger.log('Keypoints: ${article.keypoints!.substring(0, article.keypoints!.length > 100 ? 100 : article.keypoints!.length)}...');
         } else {
-          print('Keypoints: [NONE]');
+          AppLogger.log('Keypoints: [NONE]');
         }
         
         // Check description
         if (article.description.isNotEmpty) {
-          print('Description: ${article.description.substring(0, article.description.length > 100 ? 100 : article.description.length)}...');
+          AppLogger.log('Description: ${article.description.substring(0, article.description.length > 100 ? 100 : article.description.length)}...');
         } else {
-          print('Description: [EMPTY]');
+          AppLogger.log('Description: [EMPTY]');
         }
         
         // Content validation
@@ -222,9 +223,9 @@ class NewsLoadingService {
         final hasDescription = article.description.trim().isNotEmpty;
         final isValid = hasKeypoints || hasDescription;
         
-        print('Content Status: ${isValid ? "VALID" : "INVALID (would be auto-marked as read)"}');
-        print('Image URL: ${article.imageUrl}');
-        print('');
+        AppLogger.log('Content Status: ${isValid ? "VALID" : "INVALID (would be auto-marked as read)"}');
+        AppLogger.log('Image URL: ${article.imageUrl}');
+        AppLogger.log('');
       }
       
       // Summary
@@ -233,20 +234,20 @@ class NewsLoadingService {
         a.description.trim().isNotEmpty
       ).length;
       
-      print('=== SUMMARY ===');
-      print('Total Articles: ${allArticles.length}');
-      print('Valid Articles: $validCount');
-      print('Invalid Articles: ${allArticles.length - validCount}');
-      print('=== END ===');
+      AppLogger.log('=== SUMMARY ===');
+      AppLogger.log('Total Articles: ${allArticles.length}');
+      AppLogger.log('Valid Articles: $validCount');
+      AppLogger.log('Invalid Articles: ${allArticles.length - validCount}');
+      AppLogger.log('=== END ===');
       
     } catch (e) {
-      print('ERROR fetching articles: $e');
+      AppLogger.error(' fetching articles: $e');
     }
   }
 
   static Future<void> showSupabaseCategories() async {
     try {
-      print('=== CATEGORIES IN SUPABASE DATABASE ===');
+      AppLogger.log('=== CATEGORIES IN SUPABASE DATABASE ===');
       
       final allArticles = await SupabaseService.getNews(limit: 500);
       final categoryMap = <String, int>{};
@@ -260,18 +261,18 @@ class NewsLoadingService {
       final sortedCategories = categoryMap.entries.toList()
         ..sort((a, b) => b.value.compareTo(a.value));
       
-      print('AVAILABLE CATEGORIES (sorted by article count):');
+      AppLogger.log('AVAILABLE CATEGORIES (sorted by article count):');
       for (var entry in sortedCategories) {
-        print('  "${entry.key}" -> ${entry.value} articles');
+        AppLogger.log('  "${entry.key}" -> ${entry.value} articles');
       }
       
-      print('');
-      print('CATEGORY LIST: ${sortedCategories.map((e) => e.key).join(", ")}');
-      print('TOTAL CATEGORIES: ${sortedCategories.length}');
-      print('=== END CATEGORIES ===');
+      AppLogger.log('');
+      AppLogger.log('CATEGORY LIST: ${sortedCategories.map((e) => e.key).join(", ")}');
+      AppLogger.log('TOTAL CATEGORIES: ${sortedCategories.length}');
+      AppLogger.log('=== END CATEGORIES ===');
       
     } catch (e) {
-      print('ERROR fetching categories: $e');
+      AppLogger.error(' fetching categories: $e');
     }
   }
 }

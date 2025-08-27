@@ -1,9 +1,11 @@
 import 'package:flutter/cupertino.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../models/news_article.dart';
 import '../read_articles_service.dart';
 import '../color_extraction_service.dart';
 import '../news_ui_service.dart';
 
+import '../../utils/app_logger.dart';
 /// Consolidated service that merges:
 /// - article_management_service.dart
 /// - read_articles_service.dart  
@@ -16,9 +18,9 @@ class ArticleService {
   static Future<void> markAsRead(String articleId) async {
     try {
       await ReadArticlesService.markAsRead(articleId);
-      print('ArticleService: Marked article $articleId as read');
+      AppLogger.log('ArticleService: Marked article $articleId as read');
     } catch (e) {
-      print('ArticleService.markAsRead error: $e');
+      AppLogger.log('ArticleService.markAsRead error: $e');
       rethrow;
     }
   }
@@ -28,7 +30,7 @@ class ArticleService {
     try {
       return await ReadArticlesService.isRead(articleId);
     } catch (e) {
-      print('ArticleService.isArticleRead error: $e');
+      AppLogger.log('ArticleService.isArticleRead error: $e');
       return false;
     }
   }
@@ -39,7 +41,7 @@ class ArticleService {
       final readIds = await ReadArticlesService.getReadArticleIds();
       return readIds.toSet();
     } catch (e) {
-      print('ArticleService.getReadArticleIds error: $e');
+      AppLogger.log('ArticleService.getReadArticleIds error: $e');
       return <String>{};
     }
   }
@@ -49,7 +51,7 @@ class ArticleService {
     try {
       return await ReadArticlesService.getReadCount();
     } catch (e) {
-      print('ArticleService.getReadArticleCount error: $e');
+      AppLogger.log('ArticleService.getReadArticleCount error: $e');
       return 0;
     }
   }
@@ -58,9 +60,9 @@ class ArticleService {
   static Future<void> clearAllReadArticles() async {
     try {
       await ReadArticlesService.clearAllRead();
-      print('ArticleService: Cleared all read articles');
+      AppLogger.log('ArticleService: Cleared all read articles');
     } catch (e) {
-      print('ArticleService.clearAllReadArticles error: $e');
+      AppLogger.log('ArticleService.clearAllReadArticles error: $e');
       rethrow;
     }
   }
@@ -81,7 +83,7 @@ class ArticleService {
       
       return palette;
     } catch (e) {
-      print('ArticleService.getArticleColorPalette error for $imageUrl: $e');
+      AppLogger.log('ArticleService.getArticleColorPalette error for $imageUrl: $e');
       
       // Return default palette on error
       final defaultPalette = ColorPalette.defaultPalette();
@@ -109,7 +111,7 @@ class ArticleService {
         
         // Preload in background
         getArticleColorPalette(article.imageUrl).catchError((e) {
-          print('Background color preload failed for article $i: $e');
+          AppLogger.log('Background color preload failed for article $i: $e');
           return ColorPalette.defaultPalette();
         });
         
@@ -117,7 +119,7 @@ class ArticleService {
         await Future.delayed(const Duration(milliseconds: 100));
       }
     } catch (e) {
-      print('ArticleService.preloadColorPalettes error: $e');
+      AppLogger.log('ArticleService.preloadColorPalettes error: $e');
     }
   }
 
@@ -149,7 +151,7 @@ class ArticleService {
           validArticles.add(article);
         } else {
           invalidArticleIds.add(article.id);
-          print('Invalid article filtered: ${article.title} (${article.id})');
+          AppLogger.log('Invalid article filtered: ${article.title} (${article.id})');
         }
       }
 
@@ -158,28 +160,41 @@ class ArticleService {
         for (final id in invalidArticleIds) {
           await markAsRead(id);
         }
-        print('Marked ${invalidArticleIds.length} invalid articles as read');
+        AppLogger.log('Marked ${invalidArticleIds.length} invalid articles as read');
       }
 
       return validArticles;
     } catch (e) {
-      print('ArticleService.filterValidArticles error: $e');
+      AppLogger.log('ArticleService.filterValidArticles error: $e');
       return articles; // Return original list on error
     }
   }
 
-  /// Share an article
+  /// Share an article with full functionality
   static Future<void> shareArticle(NewsArticle article) async {
     try {
-      // TODO: Implement actual sharing functionality
-      // For now, just log the action
-      print('ArticleService: Sharing article: ${article.title}');
+      AppLogger.log('ArticleService: Sharing article: ${article.title}');
       
-      // You could integrate with share_plus package here
-      // await Share.share('${article.title}\n\n${article.description}');
+      // Create comprehensive share text
+      final shareText = '''
+📰 ${article.title}
+
+${article.description}
+
+📱 Read more on KeyPoints News App
+${article.sourceUrl != null && article.sourceUrl!.isNotEmpty ? '\n🔗 Source: ${article.sourceUrl}' : ''}
+''';
+      
+      // Share with subject for better email/messaging integration
+      await Share.share(
+        shareText,
+        subject: '📰 ${article.title} - KeyPoints News',
+      );
+      
+      AppLogger.success('Article shared successfully: ${article.title}');
       
     } catch (e) {
-      print('ArticleService.shareArticle error: $e');
+      AppLogger.error('ArticleService.shareArticle error: $e');
       rethrow;
     }
   }
@@ -201,7 +216,7 @@ class ArticleService {
         'colorsCached': _colorCache.length,
       };
     } catch (e) {
-      print('ArticleService.getArticleStats error: $e');
+      AppLogger.log('ArticleService.getArticleStats error: $e');
       return {
         'totalRead': 0,
         'readToday': 0,
@@ -219,9 +234,9 @@ class ArticleService {
       // Remove color from cache
       _colorCache.remove(article.imageUrl);
       
-      print('ArticleService: Removed article ${article.id}');
+      AppLogger.log('ArticleService: Removed article ${article.id}');
     } catch (e) {
-      print('ArticleService.removeArticle error: $e');
+      AppLogger.log('ArticleService.removeArticle error: $e');
       rethrow;
     }
   }
@@ -232,9 +247,9 @@ class ArticleService {
       for (final id in articleIds) {
         await markAsRead(id);
       }
-      print('ArticleService: Marked ${articleIds.length} articles as read');
+      AppLogger.log('ArticleService: Marked ${articleIds.length} articles as read');
     } catch (e) {
-      print('ArticleService.markMultipleAsRead error: $e');
+      AppLogger.log('ArticleService.markMultipleAsRead error: $e');
       rethrow;
     }
   }

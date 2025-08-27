@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../models/news_article.dart';
 
+import '../utils/app_logger.dart';
 class ImagePreloaderService {
   static final Map<String, bool> _preloadedImages = {};
   static final Map<String, bool> _preloadingInProgress = {};
@@ -19,17 +20,17 @@ class ImagePreloaderService {
     final startIndex = currentIndex + 1;
     final endIndex = (startIndex + preloadCount).clamp(0, articles.length);
 
-    print('🔄 PRELOADING: Current article index: $currentIndex');
+    AppLogger.info(' PRELOADING: Current article index: $currentIndex');
     if (currentIndex < articles.length) {
-      print('📖 CURRENT ARTICLE: "${articles[currentIndex].title}"');
-      print('🖼️ CURRENT IMAGE: ${articles[currentIndex].imageUrl.substring(0, 50)}...');
+      AppLogger.log('📖 CURRENT ARTICLE: "${articles[currentIndex].title}"');
+      AppLogger.log('🖼️ CURRENT IMAGE: ${articles[currentIndex].imageUrl.substring(0, 50)}...');
     }
     
-    print('🚀 PRELOADING NEXT $preloadCount ARTICLES (indices $startIndex to ${endIndex - 1}):');
+    AppLogger.info(' PRELOADING NEXT $preloadCount ARTICLES (indices $startIndex to ${endIndex - 1}):');
     for (int i = startIndex; i < endIndex; i++) {
       if (i < articles.length) {
-        print('  📄 Article $i: "${articles[i].title}"');
-        print('  🖼️ Image $i: ${articles[i].imageUrl.substring(0, 50)}...');
+        AppLogger.log('  📄 Article $i: "${articles[i].title}"');
+        AppLogger.log('  🖼️ Image $i: ${articles[i].imageUrl.substring(0, 50)}...');
       }
     }
 
@@ -88,9 +89,9 @@ class ImagePreloaderService {
       await completer.future;
       
       _preloadedImages[imageUrl] = true;
-      print('✅ Successfully preloaded image: ${imageUrl.substring(0, 50)}...');
+      AppLogger.success(' Successfully preloaded image: ${imageUrl.substring(0, 50)}...');
     } catch (e) {
-      print('Failed to preload image $imageUrl: $e');
+      AppLogger.log('Failed to preload image $imageUrl: $e');
       _preloadedImages[imageUrl] = false;
     } finally {
       _preloadingInProgress[imageUrl] = false;
@@ -102,10 +103,10 @@ class ImagePreloaderService {
     List<NewsArticle> articles,
     int viewedIndex,
   ) async {
-    print('\n🎯 USER VIEWED ARTICLE AT INDEX: $viewedIndex');
+    AppLogger.log('\n🎯 USER VIEWED ARTICLE AT INDEX: $viewedIndex');
     if (viewedIndex < articles.length) {
-      print('👀 VIEWING: "${articles[viewedIndex].title}"');
-      print('🖼️ VIEWING IMAGE: ${articles[viewedIndex].imageUrl.substring(0, 50)}...');
+      AppLogger.log('👀 VIEWING: "${articles[viewedIndex].title}"');
+      AppLogger.log('🖼️ VIEWING IMAGE: ${articles[viewedIndex].imageUrl.substring(0, 50)}...');
     }
     
     // Preload next 15 images when user views an article (CRITICAL FIX)
@@ -115,11 +116,11 @@ class ImagePreloaderService {
     if (viewedIndex > 0) {
       final prevImageUrl = articles[viewedIndex - 1].imageUrl;
       if (_preloadedImages[prevImageUrl] != true && _preloadingInProgress[prevImageUrl] != true) {
-        print('⬅️ Also preloading previous image for article ${viewedIndex - 1}');
+        AppLogger.log('⬅️ Also preloading previous image for article ${viewedIndex - 1}');
         _preloadSingleImage(prevImageUrl);
       }
     }
-    print('─────────────────────────────────────────────────────\n');
+    AppLogger.log('─────────────────────────────────────────────────────\n');
   }
 
   /// Check if an image is already preloaded
@@ -131,7 +132,7 @@ class ImagePreloaderService {
   static void clearPreloadCache() {
     _preloadedImages.clear();
     _preloadingInProgress.clear();
-    print('Cleared image preload cache');
+    AppLogger.log('Cleared image preload cache');
   }
 
   /// Get preload statistics for debugging
@@ -155,7 +156,7 @@ class ImagePreloaderService {
   }) async {
     if (categoryArticles.isEmpty) return;
 
-    print('Preloading first $maxImages images for category');
+    AppLogger.log('Preloading first $maxImages images for category');
 
     final preloadFutures = <Future<void>>[];
     final imagesToPreload = categoryArticles.take(maxImages);
@@ -169,7 +170,7 @@ class ImagePreloaderService {
     }
 
     await Future.wait(preloadFutures);
-    print('Completed category image preloading');
+    AppLogger.log('Completed category image preloading');
   }
 }
 

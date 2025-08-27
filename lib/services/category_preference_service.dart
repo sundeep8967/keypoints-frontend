@@ -2,6 +2,7 @@ import '../models/news_article.dart';
 import '../services/local_storage_service.dart';
 import '../services/news_feed_helper.dart';
 
+import '../utils/app_logger.dart';
 class CategoryPreferenceService {
   // Smart category preference tracking
   static final Map<String, int> _categoryViewTime = {}; // Time spent in each category
@@ -20,7 +21,7 @@ class CategoryPreferenceService {
     _categoryVisitCount[toCategory] = (_categoryVisitCount[toCategory] ?? 0) + 1;
     _categoryStartTime = DateTime.now();
     
-    print('User preference: Spent ${_categoryViewTime[fromCategory] ?? 0}s in $fromCategory, visiting $toCategory (${_categoryVisitCount[toCategory]} times)');
+    AppLogger.log('User preference: Spent ${_categoryViewTime[fromCategory] ?? 0}s in $fromCategory, visiting $toCategory (${_categoryVisitCount[toCategory]} times)');
     
     // Update category preferences periodically
     updateCategoryPreferences();
@@ -33,7 +34,7 @@ class CategoryPreferenceService {
     _categoryArticlesRead[articleCategory] = (_categoryArticlesRead[articleCategory] ?? 0) + 1;
     _categoryArticlesRead[selectedCategory] = (_categoryArticlesRead[selectedCategory] ?? 0) + 1;
     
-    print('User preference: Read article in $articleCategory (${_categoryArticlesRead[articleCategory]} total)');
+    AppLogger.log('User preference: Read article in $articleCategory (${_categoryArticlesRead[articleCategory]} total)');
   }
 
   static void updateCategoryPreferences() {
@@ -62,12 +63,12 @@ class CategoryPreferenceService {
     final sortedPreferences = preferenceScores.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
     
-    print('=== USER CATEGORY PREFERENCES ===');
+    AppLogger.log('=== USER CATEGORY PREFERENCES ===');
     for (int i = 0; i < sortedPreferences.length && i < 5; i++) {
       final entry = sortedPreferences[i];
-      print('${i + 1}. ${entry.key}: ${entry.value.toStringAsFixed(1)} points');
+      AppLogger.log('${i + 1}. ${entry.key}: ${entry.value.toStringAsFixed(1)} points');
     }
-    print('=== END PREFERENCES ===');
+    AppLogger.log('=== END PREFERENCES ===');
     
     // Store preferences for future use
     saveUserPreferences(sortedPreferences);
@@ -78,9 +79,9 @@ class CategoryPreferenceService {
     final topCategories = preferences.take(5).map((e) => e.key).toList();
     try {
       await LocalStorageService.setCategoryPreferences(topCategories);
-      print('Saved user preferences: ${topCategories.join(", ")}');
+      AppLogger.log('Saved user preferences: ${topCategories.join(", ")}');
     } catch (e) {
-      print('Error saving preferences: $e');
+      AppLogger.log('Error saving preferences: $e');
     }
     
     // Reorder category list based on preferences for better UX
@@ -89,7 +90,7 @@ class CategoryPreferenceService {
 
   static void reorderCategoriesByPreference(List<String> preferredCategories) {
     // This could reorder the horizontal category pills to show preferred ones first
-    print('Top preferred categories: ${preferredCategories.join(", ")}');
+    AppLogger.log('Top preferred categories: ${preferredCategories.join(", ")}');
     
     // Future enhancement: Dynamically reorder the category pills
     // to show user's favorite categories first
@@ -100,11 +101,9 @@ class CategoryPreferenceService {
   }
 
   static void removeReadArticleFromCaches(String articleId, Map<String, List<NewsArticle>> categoryArticles) {
-    for (String category in categoryArticles.keys) {
-      final categoryList = categoryArticles[category];
-      if (categoryList != null) {
-        categoryList.removeWhere((article) => article.id == articleId);
-      }
-    }
+    // DON'T remove articles from active session cache
+    // This prevents the "articles changing while viewing" issue
+    // Articles will be filtered out on next app launch or manual refresh
+    AppLogger.log('📖 CategoryPreferenceService: Article marked as read (kept in session): $articleId');
   }
 }

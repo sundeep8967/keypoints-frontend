@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/news_feed_helper.dart';
 
+import '../utils/app_logger.dart';
 class CategoryScrollService {
   static void scrollToSelectedCategoryAccurate(
     BuildContext context,
@@ -58,7 +59,7 @@ class CategoryScrollService {
         // Ensure we stay within bounds
         targetScroll = targetScroll.clamp(0.0, maxScroll);
         
-        print('Category "${categories[categoryIndex]}" ($categoryIndex): pos=$itemPosition, width=$currentItemWidth, visible=$visibleStart-$visibleEnd, scroll=$currentScroll->$targetScroll');
+        AppLogger.log('Category "${categories[categoryIndex]}" ($categoryIndex): pos=$itemPosition, width=$currentItemWidth, visible=$visibleStart-$visibleEnd, scroll=$currentScroll->$targetScroll');
         
         // Only animate if we need to scroll significantly
         if ((targetScroll - currentScroll).abs() > 10) {
@@ -69,7 +70,7 @@ class CategoryScrollService {
           );
         }
       } catch (e) {
-        print('Scroll error: $e');
+        AppLogger.log('Scroll error: $e');
       }
     });
   }
@@ -82,7 +83,7 @@ class CategoryScrollService {
     // Add delay to ensure the scroll controller is ready
     Future.delayed(const Duration(milliseconds: 150), () {
       if (!categoryScrollController.hasClients) {
-        print('ScrollController not ready yet');
+        AppLogger.log('ScrollController not ready yet');
         return;
       }
       
@@ -119,7 +120,7 @@ class CategoryScrollService {
         // Ensure we don't scroll beyond bounds
         targetScroll = targetScroll.clamp(0.0, maxScroll);
         
-        print('Category $categoryIndex: start=$itemStartPosition, end=$itemEndPosition, visible=$visibleStart-$visibleEnd, scrollTo=$targetScroll');
+        AppLogger.log('Category $categoryIndex: start=$itemStartPosition, end=$itemEndPosition, visible=$visibleStart-$visibleEnd, scrollTo=$targetScroll');
         
         // Only scroll if we need to
         if ((targetScroll - currentPosition).abs() > 5) {
@@ -130,7 +131,7 @@ class CategoryScrollService {
           );
         }
       } catch (e) {
-        print('Error scrolling to category: $e');
+        AppLogger.log('Error scrolling to category: $e');
       }
     });
   }

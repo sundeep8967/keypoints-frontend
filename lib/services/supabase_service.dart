@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/news_article.dart';
 import '../config/app_config.dart';
 
+import '../utils/app_logger.dart';
 /// Service class for handling all Supabase database operations.
 /// 
 /// This service provides methods for fetching, adding, updating, and deleting
@@ -29,22 +30,22 @@ class SupabaseService {
           url: AppConfig.supabaseUrl,
           anonKey: AppConfig.supabaseAnonKey,
         );
-        print('✅ Supabase initialized with environment credentials');
+        AppLogger.success(' Supabase initialized with environment credentials');
       } else if (AppConfig.isUsingDevCredentials) {
         // Fallback to development credentials (local development only)
         await Supabase.initialize(
           url: AppConfig.devSupabaseUrl,
           anonKey: AppConfig.devSupabaseAnonKey,
         );
-        print('⚠️ Supabase initialized with development credentials');
-        print('🔒 WARNING: Configure environment variables for production');
+        AppLogger.warning(' Supabase initialized with development credentials');
+        AppLogger.log('🔒 WARNING: Configure environment variables for production');
       } else {
         throw Exception(
           'Supabase credentials not configured. Please set SUPABASE_URL and SUPABASE_ANON_KEY environment variables.'
         );
       }
     } catch (e) {
-      print('❌ Supabase initialization failed: $e');
+      AppLogger.error(' Supabase initialization failed: $e');
       rethrow;
     }
   }
@@ -81,15 +82,8 @@ class SupabaseService {
       
       // Print source for each article
       for (final article in articles) {
-        print('source--> ${article.source}');
+        AppLogger.log('source--> ${article.source}');
       }
-      
-      // Sort by quality score after fetching (highest quality first)
-      articles.sort((a, b) {
-        final scoreA = a.score ?? 0.0;
-        final scoreB = b.score ?? 0.0;
-        return scoreB.compareTo(scoreA); // Descending order (highest first)
-      });
       
       return articles;
     } on PostgrestException catch (e) {
@@ -110,14 +104,6 @@ class SupabaseService {
         .limit(limit)
         .map((data) {
           final articles = data.map<NewsArticle>((json) => NewsArticle.fromSupabase(json)).toList();
-          
-          // Sort by quality score after fetching (highest quality first)
-          articles.sort((a, b) {
-            final scoreA = a.score ?? 0.0;
-            final scoreB = b.score ?? 0.0;
-            return scoreB.compareTo(scoreA); // Descending order (highest first)
-          });
-          
           return articles;
         });
   }
@@ -128,7 +114,7 @@ class SupabaseService {
       await client.from('news_articles').insert(article.toSupabaseMap());
       return true;
     } catch (e) {
-      print('Error adding news to Supabase: $e');
+      AppLogger.log('Error adding news to Supabase: $e');
       return false;
     }
   }
@@ -142,7 +128,7 @@ class SupabaseService {
           .eq('id', article.id);
       return true;
     } catch (e) {
-      print('Error updating news in Supabase: $e');
+      AppLogger.log('Error updating news in Supabase: $e');
       return false;
     }
   }
@@ -153,7 +139,7 @@ class SupabaseService {
       await client.from('news_articles').delete().eq('id', articleId);
       return true;
     } catch (e) {
-      print('Error deleting news from Supabase: $e');
+      AppLogger.log('Error deleting news from Supabase: $e');
       return false;
     }
   }
@@ -189,14 +175,6 @@ class SupabaseService {
           .limit(limit);
 
       final articles = response.map<NewsArticle>((json) => NewsArticle.fromSupabase(json)).toList();
-      
-      // Sort by quality score after fetching (highest quality first)
-      articles.sort((a, b) {
-        final scoreA = a.score ?? 0.0;
-        final scoreB = b.score ?? 0.0;
-        return scoreB.compareTo(scoreA); // Descending order (highest first)
-      });
-      
       return articles;
     } on PostgrestException catch (e) {
       throw Exception('Database error while fetching $category articles: ${e.message}');
@@ -245,14 +223,6 @@ class SupabaseService {
         
         // Apply offset and limit after filtering
         final paginatedArticles = unreadArticles.skip(offset).take(limit).toList();
-        
-        // Sort by quality score after filtering (highest quality first)
-        paginatedArticles.sort((a, b) {
-          final scoreA = a.score ?? 0.0;
-          final scoreB = b.score ?? 0.0;
-          return scoreB.compareTo(scoreA); // Descending order (highest first)
-        });
-        
         return paginatedArticles;
       } else {
         final response = await query
@@ -260,14 +230,6 @@ class SupabaseService {
             .range(offset, offset + limit - 1); // Use Supabase range for pagination
             
         final articles = response.map<NewsArticle>((json) => NewsArticle.fromSupabase(json)).toList();
-        
-        // Sort by quality score after fetching (highest quality first)
-        articles.sort((a, b) {
-          final scoreA = a.score ?? 0.0;
-          final scoreB = b.score ?? 0.0;
-          return scoreB.compareTo(scoreA); // Descending order (highest first)
-        });
-        
         return articles;
       }
     } on PostgrestException catch (e) {
@@ -292,17 +254,9 @@ class SupabaseService {
           .limit(limit);
 
       final articles = response.map<NewsArticle>((json) => NewsArticle.fromSupabase(json)).toList();
-      
-      // Sort by quality score after fetching (highest quality first)
-      articles.sort((a, b) {
-        final scoreA = a.score ?? 0.0;
-        final scoreB = b.score ?? 0.0;
-        return scoreB.compareTo(scoreA); // Descending order (highest first)
-      });
-      
       return articles;
     } catch (e) {
-      print('Error searching news in Supabase: $e');
+      AppLogger.log('Error searching news in Supabase: $e');
       return [];
     }
   }

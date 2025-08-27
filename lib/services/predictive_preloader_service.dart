@@ -3,6 +3,7 @@ import '../models/news_article.dart';
 import 'optimized_image_service.dart';
 import 'parallel_color_service.dart';
 
+import '../utils/app_logger.dart';
 /// CRITICAL FIX: Predictive preloading based on scroll velocity
 /// Preloads more content when user scrolls fast
 class PredictivePreloaderService {
@@ -51,7 +52,7 @@ class PredictivePreloaderService {
   ) async {
     final preloadCount = getDynamicPreloadCount();
     
-    print('🚀 PREDICTIVE PRELOAD: Velocity=${_scrollVelocity.toStringAsFixed(3)}, Count=$preloadCount');
+    AppLogger.info(' PREDICTIVE PRELOAD: Velocity=${_scrollVelocity.toStringAsFixed(3)}, Count=$preloadCount');
     
     // Preload images aggressively
     await OptimizedImageService.preloadImagesAggressively(
@@ -72,7 +73,7 @@ class PredictivePreloaderService {
   static Future<void> warmCategoryCache(List<NewsArticle> articles) async {
     if (articles.isEmpty) return;
     
-    print('🔥 CACHE WARMING: Preloading ${articles.length.clamp(0, 20)} articles');
+    AppLogger.log('🔥 CACHE WARMING: Preloading ${articles.length.clamp(0, 20)} articles');
     
     // Preload first 20 images immediately
     final imagesToWarm = articles.take(20).toList();

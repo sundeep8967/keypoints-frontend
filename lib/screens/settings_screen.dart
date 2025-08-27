@@ -1,10 +1,11 @@
+import 'dart:async';
 import 'package:flutter/cupertino.dart';
 import '../services/local_storage_service.dart';
 import '../services/read_articles_service.dart';
-import '../services/reward_points_service.dart';
 import '../widgets/points_display_widget.dart';
 import 'contact_us_screen.dart';
 
+import '../utils/app_logger.dart';
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
@@ -12,30 +13,83 @@ class SettingsScreen extends StatefulWidget {
   State<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen> {
+class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObserver {
   String? _selectedLanguage;
   List<String> _selectedCategories = [];
   int _readArticlesCount = 0;
+  late StreamSubscription<int> _readCountSubscription;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _loadSettings();
+    
+    // Listen to read count changes for real-time updates
+    _readCountSubscription = ReadArticlesService.readCountStream.listen((count) {
+      AppLogger.debug(' SETTINGS: Stream received new count: $count');
+      if (mounted) {
+        setState(() {
+          _readArticlesCount = count;
+        });
+        AppLogger.debug(' SETTINGS: UI updated with new count: $count');
+      } else {
+        AppLogger.debug(' SETTINGS: Widget not mounted, skipping UI update');
+      }
+    });
+    
+    // Emit current count to initialize the stream
+    ReadArticlesService.emitCurrentCount();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _readCountSubscription.cancel();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Refresh settings when app becomes active (user returns to app)
+    if (state == AppLifecycleState.resumed) {
+      _loadSettings();
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Refresh settings every time this screen becomes visible
     _loadSettings();
   }
 
   Future<void> _loadSettings() async {
-    final language = await LocalStorageService.getLanguagePreference();
-    final categories = await LocalStorageService.getCategoryPreferences();
-    final readCount = await ReadArticlesService.getReadCount();
-    
-    print('DEBUG SETTINGS: Loaded categories from storage: $categories');
-    print('DEBUG SETTINGS: Categories count: ${categories.length}');
-    
-    setState(() {
-      _selectedLanguage = language ?? 'English';
-      _selectedCategories = categories;
-      _readArticlesCount = readCount;
-    });
+    try {
+      final language = await LocalStorageService.getLanguagePreference();
+      final categories = await LocalStorageService.getCategoryPreferences();
+      final readCount = await ReadArticlesService.getReadCount();
+      
+      AppLogger.debug(' SETTINGS: Loaded categories from storage: $categories');
+      AppLogger.debug(' SETTINGS: Categories count: ${categories.length}');
+      AppLogger.debug(' SETTINGS: Read articles count: $readCount');
+      
+      if (mounted) {
+        setState(() {
+          _selectedLanguage = language ?? 'English';
+          _selectedCategories = categories;
+          _readArticlesCount = readCount;
+        });
+      }
+    } catch (e) {
+      AppLogger.error(' SETTINGS: Error loading settings: $e');
+    }
+  }
+
+  /// Manual refresh method for pull-to-refresh or button tap
+  Future<void> _refreshSettings() async {
+    AppLogger.info(' SETTINGS: Manual refresh triggered');
+    await _loadSettings();
   }
 
   @override
@@ -55,82 +109,91 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
       ),
       child: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(20),
-          children: [
-            _buildSection(
-              'Preferences',
-              [
-                _buildSettingItem(
-                  'Language',
-                  _selectedLanguage ?? 'English',
-                  CupertinoIcons.globe,
-                  () => _showLanguageSelector(),
-                ),
-                _buildSettingItem(
-                  'Categories',
-                  _selectedCategories.isEmpty 
-                    ? 'All categories' 
-                    : '${_selectedCategories.length} selected',
-                  CupertinoIcons.tag,
-                  () => _showCategorySelector(),
-                ),
-              ],
+        child: CustomScrollView(
+          slivers: [
+            CupertinoSliverRefreshControl(
+              onRefresh: _refreshSettings,
             ),
-            const SizedBox(height: 30),
-            _buildSection(
-              'Reward Points',
-              [
-                _buildPointsSection(),
-              ],
-            ),
-            const SizedBox(height: 30),
-            _buildSection(
-              'Statistics',
-              [
-                _buildInfoItem(
-                  'Articles Read',
-                  '$_readArticlesCount',
-                  CupertinoIcons.book,
-                ),
-                _buildInfoItem(
-                  'App Version',
-                  '1.0.0',
-                  CupertinoIcons.info,
-                ),
-              ],
-            ),
-            const SizedBox(height: 30),
-            _buildSection(
-              'About',
-              [
-                _buildSettingItem(
-                  'Contact Us',
-                  '',
-                  CupertinoIcons.mail,
-                  () => _navigateToContactUs(),
-                ),
-              ],
-            ),
-            const SizedBox(height: 30),
-            _buildSection(
-              'Actions',
-              [
-                _buildActionItem(
-                  'Clear Read History',
-                  'Reset all read articles',
-                  CupertinoIcons.clear,
-                  () => _clearReadHistory(),
-                  isDestructive: true,
-                ),
-                _buildActionItem(
-                  'Reset App',
-                  'Clear all data and restart setup',
-                  CupertinoIcons.refresh,
-                  () => _resetApp(),
-                  isDestructive: true,
-                ),
-              ],
+            SliverPadding(
+              padding: const EdgeInsets.all(20),
+              sliver: SliverList(
+                delegate: SliverChildListDelegate([
+                  _buildSection(
+                    'Preferences',
+                    [
+                      _buildSettingItem(
+                        'Language',
+                        _selectedLanguage ?? 'English',
+                        CupertinoIcons.globe,
+                        () => _showLanguageSelector(),
+                      ),
+                      _buildSettingItem(
+                        'Categories',
+                        _selectedCategories.isEmpty 
+                          ? 'All categories' 
+                          : '${_selectedCategories.length} selected',
+                        CupertinoIcons.tag,
+                        () => _showCategorySelector(),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 30),
+                  _buildSection(
+                    'Reward Points',
+                    [
+                      _buildPointsSection(),
+                    ],
+                  ),
+                  const SizedBox(height: 30),
+                  _buildSection(
+                    'Statistics',
+                    [
+                      _buildInfoItemWithRefresh(
+                        'Articles Read',
+                        '$_readArticlesCount',
+                        CupertinoIcons.book,
+                        () => _refreshSettings(),
+                      ),
+                      _buildInfoItem(
+                        'App Version',
+                        '1.0.0',
+                        CupertinoIcons.info,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 30),
+                  _buildSection(
+                    'About',
+                    [
+                      _buildSettingItem(
+                        'Contact Us',
+                        '',
+                        CupertinoIcons.mail,
+                        () => _navigateToContactUs(),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 30),
+                  _buildSection(
+                    'Actions',
+                    [
+                      _buildActionItem(
+                        'Clear Read History',
+                        'Reset all read articles',
+                        CupertinoIcons.clear,
+                        () => _clearReadHistory(),
+                      ),
+                      _buildActionItem(
+                        'Reset App',
+                        'Clear all data and restart setup',
+                        CupertinoIcons.refresh,
+                        () => _resetApp(),
+                        isDestructive: true,
+                      ),
+                    ],
+                  ),
+                ]),
+              ),
             ),
           ],
         ),
@@ -204,6 +267,39 @@ class _SettingsScreenState extends State<SettingsScreen> {
           color: CupertinoColors.systemGrey,
           fontSize: 16,
         ),
+      ),
+    );
+  }
+
+  Widget _buildInfoItemWithRefresh(String title, String value, IconData icon, VoidCallback onRefresh) {
+    return CupertinoListTile(
+      leading: Icon(icon, color: CupertinoColors.systemGrey),
+      title: Text(
+        title,
+        style: const TextStyle(color: CupertinoColors.white),
+      ),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            value,
+            style: const TextStyle(
+              color: CupertinoColors.systemGrey,
+              fontSize: 16,
+            ),
+          ),
+          const SizedBox(width: 8),
+          CupertinoButton(
+            padding: EdgeInsets.zero,
+            minSize: 0,
+            onPressed: onRefresh,
+            child: const Icon(
+              CupertinoIcons.refresh,
+              color: CupertinoColors.systemBlue,
+              size: 16,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -363,8 +459,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         builder: (context) => _CategorySelectionScreen(
           selectedCategories: _selectedCategories,
           onCategoriesChanged: (categories) {
-            print('DEBUG SETTINGS: Categories changed to: $categories');
-            print('DEBUG SETTINGS: New count: ${categories.length}');
+            AppLogger.debug(' SETTINGS: Categories changed to: $categories');
+            AppLogger.debug(' SETTINGS: New count: ${categories.length}');
             setState(() {
               _selectedCategories = categories;
             });
@@ -374,7 +470,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
     ).then((_) {
       // Refresh settings when returning from category selection
-      print('DEBUG SETTINGS: Returned from category selection, reloading...');
+      AppLogger.debug(' SETTINGS: Returned from category selection, reloading...');
       _loadSettings();
     });
   }
@@ -418,7 +514,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onPressed: () async {
               await ReadArticlesService.clearAllRead();
               await _loadSettings();
-              Navigator.pop(context);
+              if (mounted) Navigator.pop(context);
             },
           ),
         ],
@@ -443,7 +539,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onPressed: () async {
               await LocalStorageService.resetFirstTimeSetup();
               await ReadArticlesService.clearAllRead();
-              Navigator.pop(context);
+              if (mounted) Navigator.pop(context);
               // Would restart the app or navigate to language selection
             },
           ),

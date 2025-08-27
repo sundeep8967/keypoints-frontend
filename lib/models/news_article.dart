@@ -6,7 +6,6 @@ class NewsArticle {
   final DateTime timestamp;
   final String category;
   final String? keypoints; // Add keypoints field
-  final double? score; // Add score field
   final String? sourceUrl; // Add source URL field
   final String? source; // Add source field from Supabase table
 
@@ -18,7 +17,6 @@ class NewsArticle {
     required this.timestamp,
     this.category = 'General',
     this.keypoints,
-    this.score,
     this.sourceUrl,
     this.source,
   });
@@ -37,7 +35,6 @@ class NewsArticle {
           : DateTime.now(),
       category: data['category'] ?? 'General',
       keypoints: _parseKeyPoints(data['key_points']),
-      score: data['quality_score']?.toDouble(), // Get quality_score from database
       sourceUrl: data['link'] ?? data['source_url'] ?? data['original_url'], // Get source URL from database
       source: data['source'], // Get source field from database
     );
@@ -69,7 +66,6 @@ class NewsArticle {
       'published': timestamp.toIso8601String(),
       'category': category,
       'keypoints': keypoints,
-      'quality_score': score,
       'link': sourceUrl, // Store in 'link' field to match database
       'source': source, // Store source field
     };

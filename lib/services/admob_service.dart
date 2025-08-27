@@ -1,9 +1,11 @@
 import 'dart:io';
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import '../models/native_ad_model.dart';
 import 'reward_points_service.dart';
 
+import '../utils/app_logger.dart';
 class AdMobService {
   static bool _isInitialized = false;
   static final List<NativeAd> _loadedAds = [];
@@ -19,8 +21,9 @@ class AdMobService {
     // Use test ads during development
     const bool isProduction = bool.fromEnvironment('dart.vm.product');
     
-    if (!isProduction) {
-      return _testAdUnitId; // Always use test ads in debug mode
+    // For release builds, always use production ads
+    if (kDebugMode) {
+      return _testAdUnitId; // Use test ads only in debug mode
     }
     
     if (Platform.isAndroid) {
@@ -38,9 +41,9 @@ class AdMobService {
     try {
       await MobileAds.instance.initialize();
       _isInitialized = true;
-      print('✅ AdMob initialized successfully');
+      AppLogger.success(' AdMob initialized successfully');
     } catch (e) {
-      print('❌ AdMob initialization failed: $e');
+      AppLogger.error(' AdMob initialization failed: $e');
     }
   }
 
@@ -53,8 +56,8 @@ class AdMobService {
 
     try {
       final adId = 'native_ad_${++_adCounter}_${DateTime.now().millisecondsSinceEpoch}';
-      print('🔄 Attempting to create native ad: $adId');
-      print('📍 Using ad unit: $_nativeAdUnitId');
+      AppLogger.info(' Attempting to create native ad: $adId');
+      AppLogger.log('📍 Using ad unit: $_nativeAdUnitId');
       
       // Create a completer to handle async loading
       final completer = Completer<NativeAdModel?>();
@@ -66,7 +69,7 @@ class AdMobService {
         factoryId: 'newsArticleNativeAd', // Register the factory ID
         listener: NativeAdListener(
           onAdLoaded: (ad) {
-            print('✅ Native ad loaded successfully: $adId');
+            AppLogger.success(' Native ad loaded successfully: $adId');
             _loadedAds.add(ad as NativeAd);
             
             if (!isCompleted) {
@@ -86,7 +89,7 @@ class AdMobService {
             }
           },
           onAdFailedToLoad: (ad, error) {
-            print('❌ Native ad failed to load: $error');
+            AppLogger.error(' Native ad failed to load: $error');
             // Following Google's warning: don't retry from onAdFailedToLoad to avoid continuous failures
             if (!isCompleted) {
               isCompleted = true;
@@ -94,12 +97,12 @@ class AdMobService {
             }
           },
           onAdClicked: (ad) {
-            print('👆 Native ad clicked: $adId');
+            AppLogger.log('👆 Native ad clicked: $adId');
             // Award points for ad click
             RewardPointsService.instance.addPointsForAdClick(adId);
           },
           onAdImpression: (ad) {
-            print('👁️ Native ad impression: $adId');
+            AppLogger.log('👁️ Native ad impression: $adId');
             // Award points for ad impression
             RewardPointsService.instance.addPointsForAdImpression(adId);
           },
@@ -124,8 +127,8 @@ class AdMobService {
       final result = await completer.future.timeout(
         const Duration(seconds: 15), // Reduced timeout for faster fallback
         onTimeout: () {
-          print('⏰ Ad loading timed out for $adId');
-          print('💡 This is normal in test environments or with poor connectivity');
+          AppLogger.log('⏰ Ad loading timed out for $adId');
+          AppLogger.log('💡 This is normal in test environments or with poor connectivity');
           nativeAd.dispose(); // Clean up on timeout
           return null;
         },
@@ -133,7 +136,7 @@ class AdMobService {
       
       return result;
     } catch (e) {
-      print('❌ Error creating native ad: $e');
+      AppLogger.error(' Error creating native ad: $e');
       return null;
     }
   }
@@ -147,7 +150,7 @@ class AdMobService {
   /// Clear expired ads and reload cache
   static void clearExpiredAds() {
     if (_isCacheExpired()) {
-      print('🕐 Ad cache expired, clearing ads');
+      AppLogger.log('🕐 Ad cache expired, clearing ads');
       disposeAllAds();
       _lastCacheTime = DateTime.now();
     }
@@ -160,14 +163,14 @@ class AdMobService {
     }
     _loadedAds.clear();
     _lastCacheTime = null;
-    print('🗑️ Disposed all native ads');
+    AppLogger.log('🗑️ Disposed all native ads');
   }
 
   /// Dispose a specific ad (important for memory management)
   static void disposeAd(NativeAd ad) {
     ad.dispose();
     _loadedAds.remove(ad);
-    print('🗑️ Disposed native ad');
+    AppLogger.log('🗑️ Disposed native ad');
   }
 
   /// Check if ads should be shown (frequency control)
@@ -193,7 +196,7 @@ class AdMobService {
     final ads = <NativeAdModel>[];
     count = count.clamp(1, 5); // Google recommends max 5 ads per request
     
-    print('📱 Loading $count native ads...');
+    AppLogger.info(' Loading $count native ads...');
     
     // Load ads sequentially to avoid overwhelming the system
     // Following Google's guideline: "Don't call loadAd() until the first request finishes"
@@ -202,12 +205,12 @@ class AdMobService {
         final ad = await createNativeAd();
         if (ad != null) {
           ads.add(ad);
-          print('📱 Successfully loaded ad ${i + 1}/$count');
+          AppLogger.info(' Successfully loaded ad ${i + 1}/$count');
         } else {
-          print('❌ Failed to load ad ${i + 1}/$count');
+          AppLogger.error(' Failed to load ad ${i + 1}/$count');
           // Following Google's warning: limit ad load retries to avoid continuous failed requests
           if (i == 0) {
-            print('⚠️ First ad failed to load, stopping batch to avoid continuous failures');
+            AppLogger.warning(' First ad failed to load, stopping batch to avoid continuous failures');
             break;
           }
         }
@@ -217,7 +220,7 @@ class AdMobService {
           await Future.delayed(const Duration(milliseconds: 500));
         }
       } catch (e) {
-        print('❌ Error loading ad ${i + 1}/$count: $e');
+        AppLogger.error(' Error loading ad ${i + 1}/$count: $e');
         // Stop loading more ads if we encounter errors to prevent cascading failures
         break;
       }
@@ -228,13 +231,13 @@ class AdMobService {
       _lastCacheTime = DateTime.now();
     }
     
-    print('📱 Successfully created ${ads.length}/$count native ads');
+    AppLogger.info(' Successfully created ${ads.length}/$count native ads');
     return ads;
   }
 
   /// Preload ads for better performance (following Google's caching recommendations)
   static Future<void> preloadAds(int count) async {
-    print('📱 Preloading $count ads for better performance...');
+    AppLogger.info(' Preloading $count ads for better performance...');
     await createMultipleAds(count);
   }
 
@@ -259,14 +262,14 @@ class AdMobService {
       // The ad should still be in our loaded ads list
       return _loadedAds.contains(adModel.nativeAd);
     } catch (e) {
-      print('❌ Error validating ad: $e');
+      AppLogger.error(' Error validating ad: $e');
       return false;
     }
   }
 
   /// Create a mock ad for testing when real ads fail to load
   static NativeAdModel? createMockAd() {
-    print('🎭 Creating mock ad for testing purposes');
+    AppLogger.log('🎭 Creating mock ad for testing purposes');
     
     // ENABLED: Create placeholder ads when real ads fail
     final mockId = 'mock_ad_${++_adCounter}_${DateTime.now().millisecondsSinceEpoch}';

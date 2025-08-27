@@ -1,6 +1,7 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'reward_claims_service.dart';
 
+import '../utils/app_logger.dart';
 class FCMService {
   static FirebaseMessaging? _messaging;
   static String? _currentToken;
@@ -19,9 +20,9 @@ class FCMService {
       // Listen for token refresh
       _setupTokenRefreshListener();
       
-      print('FCM Service initialized successfully');
+      AppLogger.log('FCM Service initialized successfully');
     } catch (e) {
-      print('FCM Service initialization error: $e');
+      AppLogger.log('FCM Service initialization error: $e');
     }
   }
 
@@ -38,9 +39,9 @@ class FCMService {
         sound: true,
       );
 
-      print('FCM Permission status: ${settings.authorizationStatus}');
+      AppLogger.log('FCM Permission status: ${settings.authorizationStatus}');
     } catch (e) {
-      print('Error requesting FCM permission: $e');
+      AppLogger.log('Error requesting FCM permission: $e');
     }
   }
 
@@ -51,13 +52,13 @@ class FCMService {
       
       if (token != null && token != _currentToken) {
         _currentToken = token;
-        print('FCM Token obtained: $token');
+        AppLogger.log('FCM Token obtained: $token');
         
         // Store FCM token in Supabase (without email for now)
         await _storeFCMTokenOnly(token);
       }
     } catch (e) {
-      print('Error getting FCM token: $e');
+      AppLogger.log('Error getting FCM token: $e');
     }
   }
 
@@ -70,14 +71,14 @@ class FCMService {
       if (existingUser == null) {
         // Insert new record with temporary email
         await UserDataService.insertFCMTokenOnly(fcmToken);
-        print('FCM token stored in Supabase successfully');
+        AppLogger.log('FCM token stored in Supabase successfully');
       } else {
         // Update existing record as active
         await UserDataService.markFCMTokenActive(fcmToken);
-        print('FCM token marked as active in Supabase');
+        AppLogger.log('FCM token marked as active in Supabase');
       }
     } catch (e) {
-      print('Error storing FCM token in Supabase: $e');
+      AppLogger.log('Error storing FCM token in Supabase: $e');
     }
   }
 
@@ -85,7 +86,7 @@ class FCMService {
   static void _setupTokenRefreshListener() {
     try {
       _messaging!.onTokenRefresh.listen((newToken) {
-        print('FCM Token refreshed: $newToken');
+        AppLogger.log('FCM Token refreshed: $newToken');
         
         // Mark old token as inactive if different
         if (_currentToken != null && _currentToken != newToken) {
@@ -97,7 +98,7 @@ class FCMService {
         _storeFCMTokenOnly(newToken);
       });
     } catch (e) {
-      print('Error setting up FCM token refresh listener: $e');
+      AppLogger.log('Error setting up FCM token refresh listener: $e');
     }
   }
 
@@ -111,9 +112,9 @@ class FCMService {
     if (_currentToken != null) {
       try {
         await UserDataService.linkEmailToFCMToken(_currentToken!, email);
-        print('Email linked to FCM token successfully');
+        AppLogger.log('Email linked to FCM token successfully');
       } catch (e) {
-        print('Error linking email to FCM token: $e');
+        AppLogger.log('Error linking email to FCM token: $e');
       }
     }
   }
@@ -123,7 +124,7 @@ class FCMService {
     // Add a small delay to ensure core functionality is loaded first
     await Future.delayed(const Duration(seconds: 2));
     
-    print('Starting FCM initialization (background task)...');
+    AppLogger.log('Starting FCM initialization (background task)...');
     await initialize();
   }
 }

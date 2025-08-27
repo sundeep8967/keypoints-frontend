@@ -1,8 +1,9 @@
 import 'package:flutter/cupertino.dart';
 
+import '../utils/app_logger.dart';
 class NewsUIService {
   static void showToast(BuildContext context, String message, {VoidCallback? onDismiss}) {
-    print('TOAST: $message');
+    AppLogger.log('TOAST: $message');
     
     // Show a Cupertino-style alert dialog for better visibility
     if (context.mounted) {

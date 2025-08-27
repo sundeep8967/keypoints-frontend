@@ -2,6 +2,9 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../domain/entities/news_article_entity.dart';
+import '../../services/consolidated/article_service.dart';
+import '../../models/news_article.dart';
+import '../../utils/app_logger.dart';
 
 class NewsArticleCard extends StatelessWidget {
   final NewsArticleEntity article;
@@ -183,8 +186,22 @@ class NewsArticleCard extends StatelessWidget {
           padding: const EdgeInsets.all(12),
           color: CupertinoColors.white.withOpacity(0.2),
           borderRadius: BorderRadius.circular(25),
-          onPressed: () {
-            // TODO: Implement share functionality
+          onPressed: () async {
+            try {
+              // Convert NewsArticleEntity to NewsArticle for sharing
+              final newsArticle = NewsArticle(
+                id: article.id,
+                title: article.title,
+                description: article.description,
+                imageUrl: article.imageUrl,
+                timestamp: article.timestamp,
+                category: article.category,
+                sourceUrl: article.sourceUrl,
+              );
+              await ArticleService.shareArticle(newsArticle);
+            } catch (e) {
+              AppLogger.error('Share failed: $e');
+            }
           },
           child: const Icon(
             CupertinoIcons.share,

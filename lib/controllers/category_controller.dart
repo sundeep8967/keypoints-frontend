@@ -3,6 +3,7 @@ import 'package:flutter/cupertino.dart';
 import '../services/news_ui_service.dart';
 import '../services/category_scroll_service.dart';
 
+import '../utils/app_logger.dart';
 class CategoryController extends ChangeNotifier {
   String _selectedCategory = 'All';
   late PageController _pageController;
@@ -58,7 +59,7 @@ class CategoryController extends ChangeNotifier {
     // Notify parent about category change
     onCategoryChanged?.call(category);
     
-    print('CategoryController: Switched to $category');
+    AppLogger.log('CategoryController: Switched to $category');
   }
 
   /// Handle category tap with scroll animation
@@ -74,7 +75,7 @@ class CategoryController extends ChangeNotifier {
           CategoryScrollService.scrollToSelectedCategoryAccurate(
             context, _scrollController, index, categories);
         } catch (e) {
-          print('CategoryController: ScrollController error on tap: $e');
+          AppLogger.log('CategoryController: ScrollController error on tap: $e');
         }
       }
     });

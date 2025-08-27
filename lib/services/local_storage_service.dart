@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/news_article.dart';
 import 'read_articles_service.dart';
 
+import '../utils/app_logger.dart';
 class LocalStorageService {
   static const String _articlesKey = 'cached_news_articles';
   static const String _lastFetchKey = 'last_fetch_timestamp';
@@ -11,13 +12,21 @@ class LocalStorageService {
   static const String _languagePreferenceKey = 'language_preference';
   static const String _categoryPreferencesKey = 'category_preferences';
 
-  /// Save articles to local storage
+  /// Save articles to local storage (only saves unread articles to prevent duplicates)
   static Future<void> saveArticles(List<NewsArticle> articles) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       
-      // Convert articles to JSON
-      final articlesJson = articles.map((article) => {
+      // CRITICAL FIX: Filter out read articles before saving
+      final readIds = await ReadArticlesService.getReadArticleIds();
+      final unreadArticles = articles.where((article) => 
+        !readIds.contains(article.id)
+      ).toList();
+      
+      AppLogger.info('💾 SAVE FILTER: ${articles.length} total articles → ${unreadArticles.length} unread articles (filtered out ${articles.length - unreadArticles.length} read articles)');
+      
+      // Convert ONLY unread articles to JSON
+      final articlesJson = unreadArticles.map((article) => {
         'id': article.id,
         'title': article.title,
         'description': article.description,
@@ -31,13 +40,13 @@ class LocalStorageService {
       await prefs.setString(_lastFetchKey, DateTime.now().toIso8601String());
       
       // Save the latest article ID to track what we've seen
-      if (articles.isNotEmpty) {
-        await prefs.setString(_lastArticleIdKey, articles.first.id);
+      if (unreadArticles.isNotEmpty) {
+        await prefs.setString(_lastArticleIdKey, unreadArticles.first.id);
       }
       
-      print('✅ Saved ${articles.length} articles to local storage');
+      AppLogger.success('💾 Saved ${unreadArticles.length} UNREAD articles to local storage (no duplicates)');
     } catch (e) {
-      print('❌ Error saving articles to local storage: $e');
+      AppLogger.error('❌ Error saving articles to local storage: $e');
     }
   }
 
@@ -48,7 +57,7 @@ class LocalStorageService {
       final articlesString = prefs.getString(_articlesKey);
       
       if (articlesString == null) {
-        print('📱 No cached articles found');
+        AppLogger.info('📱 No cached articles found');
         return [];
       }
       
@@ -68,10 +77,22 @@ class LocalStorageService {
         !readIds.contains(article.id)
       ).toList();
       
-      print('📱 Loaded ${allArticles.length} cached articles, ${unreadArticles.length} unread');
+      AppLogger.info('📱 LOAD CACHE: ${allArticles.length} cached articles, ${readIds.length} read IDs, ${unreadArticles.length} unread articles');
+      
+      // Debug: Show first few articles and their read status
+      if (allArticles.isNotEmpty) {
+        AppLogger.info('📱 CACHE DEBUG: First 3 cached articles:');
+        for (int i = 0; i < allArticles.length && i < 3; i++) {
+          final article = allArticles[i];
+          final isRead = readIds.contains(article.id);
+          final titlePreview = article.title.length > 50 ? article.title.substring(0, 50) + '...' : article.title;
+          AppLogger.info('  ${i+1}. "${titlePreview}" (ID: ${article.id}) - ${isRead ? "READ" : "UNREAD"}');
+        }
+      }
+      
       return unreadArticles;
     } catch (e) {
-      print('❌ Error loading articles from local storage: $e');
+      AppLogger.error('❌ Error loading articles from local storage: $e');
       return [];
     }
   }
@@ -100,9 +121,9 @@ class LocalStorageService {
       // Save back to storage
       await saveArticles(limitedArticles);
       
-      print('📱 Added ${newArticles.length} new articles. Total cached: ${limitedArticles.length}');
+      AppLogger.info(' Added ${newArticles.length} new articles. Total cached: ${limitedArticles.length}');
     } catch (e) {
-      print('❌ Error adding new articles: $e');
+      AppLogger.error(' Error adding new articles: $e');
     }
   }
 
@@ -116,7 +137,7 @@ class LocalStorageService {
       
       return DateTime.tryParse(timestampString);
     } catch (e) {
-      print('❌ Error getting last fetch time: $e');
+      AppLogger.error(' Error getting last fetch time: $e');
       return null;
     }
   }
@@ -127,7 +148,7 @@ class LocalStorageService {
       final prefs = await SharedPreferences.getInstance();
       return prefs.getString(_lastArticleIdKey);
     } catch (e) {
-      print('❌ Error getting last article ID: $e');
+      AppLogger.error(' Error getting last article ID: $e');
       return null;
     }
   }
@@ -152,9 +173,9 @@ class LocalStorageService {
       await prefs.remove(_articlesKey);
       await prefs.remove(_lastFetchKey);
       await prefs.remove(_lastArticleIdKey);
-      print('🗑️ Cleared all cached articles');
+      AppLogger.log('🗑️ Cleared all cached articles');
     } catch (e) {
-      print('❌ Error clearing cache: $e');
+      AppLogger.error(' Error clearing cache: $e');
     }
   }
 
@@ -222,9 +243,9 @@ class LocalStorageService {
       // Also cleanup old read IDs
       await ReadArticlesService.cleanupOldReadIds();
       
-      print('🧹 Storage cleanup completed. Kept ${unreadArticles.length} unread articles');
+      AppLogger.log('🧹 Storage cleanup completed. Kept ${unreadArticles.length} unread articles');
     } catch (e) {
-      print('❌ Error during storage cleanup: $e');
+      AppLogger.error(' Error during storage cleanup: $e');
     }
   }
 
@@ -236,7 +257,7 @@ class LocalStorageService {
       final prefs = await SharedPreferences.getInstance();
       return prefs.getBool(_firstTimeSetupKey) ?? false;
     } catch (e) {
-      print('❌ Error checking first-time setup: $e');
+      AppLogger.error(' Error checking first-time setup: $e');
       return false;
     }
   }
@@ -246,9 +267,9 @@ class LocalStorageService {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(_firstTimeSetupKey, completed);
-      print('✅ First-time setup marked as ${completed ? 'completed' : 'not completed'}');
+      AppLogger.success(' First-time setup marked as ${completed ? 'completed' : 'not completed'}');
     } catch (e) {
-      print('❌ Error setting first-time setup: $e');
+      AppLogger.error(' Error setting first-time setup: $e');
     }
   }
 
@@ -257,9 +278,9 @@ class LocalStorageService {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_languagePreferenceKey, languageCode);
-      print('✅ Language preference saved: $languageCode');
+      AppLogger.success(' Language preference saved: $languageCode');
     } catch (e) {
-      print('❌ Error saving language preference: $e');
+      AppLogger.error(' Error saving language preference: $e');
     }
   }
 
@@ -269,7 +290,7 @@ class LocalStorageService {
       final prefs = await SharedPreferences.getInstance();
       return prefs.getString(_languagePreferenceKey);
     } catch (e) {
-      print('❌ Error getting language preference: $e');
+      AppLogger.error(' Error getting language preference: $e');
       return null;
     }
   }
@@ -279,9 +300,9 @@ class LocalStorageService {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setStringList(_categoryPreferencesKey, categories);
-      print('✅ Category preferences saved: ${categories.join(', ')}');
+      AppLogger.success(' Category preferences saved: ${categories.join(', ')}');
     } catch (e) {
-      print('❌ Error saving category preferences: $e');
+      AppLogger.error(' Error saving category preferences: $e');
     }
   }
 
@@ -291,7 +312,7 @@ class LocalStorageService {
       final prefs = await SharedPreferences.getInstance();
       return prefs.getStringList(_categoryPreferencesKey) ?? [];
     } catch (e) {
-      print('❌ Error getting category preferences: $e');
+      AppLogger.error(' Error getting category preferences: $e');
       return [];
     }
   }
@@ -303,9 +324,9 @@ class LocalStorageService {
       await prefs.remove(_firstTimeSetupKey);
       await prefs.remove(_languagePreferenceKey);
       await prefs.remove(_categoryPreferencesKey);
-      print('🔄 First-time setup reset');
+      AppLogger.info(' First-time setup reset');
     } catch (e) {
-      print('❌ Error resetting first-time setup: $e');
+      AppLogger.error(' Error resetting first-time setup: $e');
     }
   }
 }

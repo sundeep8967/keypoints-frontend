@@ -4,6 +4,7 @@ import 'admob_service.dart';
 import 'ad_debug_service.dart';
 import 'advanced_ad_preloader_service.dart';
 
+import '../utils/app_logger.dart';
 /// Service to seamlessly integrate native ads into news feed
 class AdIntegrationService {
   static const int _adFrequency = 5; // Show ad every 5th position
@@ -20,38 +21,39 @@ class AdIntegrationService {
     await AdvancedAdPreloaderService.initialize();
     
     _isInitialized = true;
-    print('✅ Ad Integration Service initialized with advanced preloader');
+    AppLogger.success(' Ad Integration Service initialized with advanced preloader');
   }
 
-  /// Mix ads into a list of news articles
+  /// Mix ads into a list of news articles with unlimited ad support
   static Future<List<dynamic>> integrateAdsIntoFeed({
     required List<NewsArticle> articles,
     required String category,
-    int maxAds = 3,
+    int maxAds = 999, // Default to unlimited
   }) async {
-    print('🔍 AD INTEGRATION DEBUG: Starting for $category with ${articles.length} articles');
+    AppLogger.debug(' AD INTEGRATION DEBUG: Starting for $category with ${articles.length} articles, maxAds: ${maxAds == 999 ? "UNLIMITED" : maxAds.toString()}');
     
     if (!_isInitialized) {
-      print('🔍 AD INTEGRATION DEBUG: Not initialized, initializing now...');
+      AppLogger.debug(' AD INTEGRATION DEBUG: Not initialized, initializing now...');
       await initialize();
     }
 
-    // Calculate how many ads we need
-    final adPositions = AdMobService.getAdPositions(articles.length);
+    // IMPROVED: Calculate how many ads we need based on article count
+    // Use a more generous ad frequency for longer feeds
+    final adPositions = _calculateOptimalAdPositions(articles.length);
     final adsNeeded = adPositions.length.clamp(0, maxAds);
     
-    print('🔍 AD INTEGRATION DEBUG: Ad positions: $adPositions');
-    print('🔍 AD INTEGRATION DEBUG: Ads needed: $adsNeeded');
+    AppLogger.debug(' AD INTEGRATION DEBUG: Ad positions: $adPositions');
+    AppLogger.debug(' AD INTEGRATION DEBUG: Ads needed: $adsNeeded');
     
     if (adsNeeded == 0) {
-      print('📰 No ads needed for ${articles.length} articles');
+      AppLogger.log('📰 No ads needed for ${articles.length} articles');
       return articles;
     }
 
     // Get or create ads for this category
-    print('🔍 AD INTEGRATION DEBUG: Getting ads for category $category...');
+    AppLogger.debug(' AD INTEGRATION DEBUG: Getting ads for category $category...');
     final ads = await _getAdsForCategory(category, adsNeeded);
-    print('🔍 AD INTEGRATION DEBUG: Got ${ads.length} ads for $category');
+    AppLogger.debug(' AD INTEGRATION DEBUG: Got ${ads.length} ads for $category');
     
     // Create mixed feed
     final mixedFeed = <dynamic>[];
@@ -65,75 +67,90 @@ class AdIntegrationService {
       if (adPositions.contains(i) && adIndex < ads.length) {
         mixedFeed.add(ads[adIndex]);
         adIndex++;
-        print('📱 ✅ INSERTED AD at position ${mixedFeed.length - 1} (after article $i)');
+        AppLogger.info(' ✅ INSERTED AD at position ${mixedFeed.length - 1} (after article $i)');
       }
     }
     
-    print('📰 ✅ MIXED FEED CREATED: ${articles.length} articles + ${adIndex} ads = ${mixedFeed.length} items');
-    print('🔍 AD INTEGRATION DEBUG: Final feed breakdown:');
+    AppLogger.log('📰 ✅ MIXED FEED CREATED: ${articles.length} articles + ${adIndex} ads = ${mixedFeed.length} items');
+    AppLogger.debug(' AD INTEGRATION DEBUG: Final feed breakdown:');
     for (int i = 0; i < mixedFeed.length && i < 10; i++) {
       final itemType = isAd(mixedFeed[i]) ? 'AD' : 'ARTICLE';
-      print('  Position $i: $itemType');
+      AppLogger.log('  Position $i: $itemType');
     }
     
     return mixedFeed;
   }
 
-  /// Get ads for a specific category (with advanced preloading)
+  /// Get ads for a specific category with unlimited support and smart batching
   static Future<List<NativeAdModel>> _getAdsForCategory(String category, int count) async {
-    print('🔍 _getAdsForCategory: Requested $count ads for $category');
+    AppLogger.debug(' _getAdsForCategory: Requested $count ads for $category');
+    
+    // For large requests, use smart batching to avoid overwhelming the system
+    if (count > 20) {
+      AppLogger.info(' 🔄 LARGE AD REQUEST: $count ads requested, using smart batching');
+      return await _getBatchedAds(category, count);
+    }
     
     // First, try to get ads from the preloaded pool (FASTEST)
     final preloadedAds = AdvancedAdPreloaderService.getPreloadedAds(count, category: category);
-    if (preloadedAds.isNotEmpty) {
-      print('🚀 ✅ Using PRELOADED ads for $category (${preloadedAds.length} from pool)');
+    if (preloadedAds.length >= count) {
+      AppLogger.info(' ✅ Using PRELOADED ads for $category (${preloadedAds.length} from pool)');
       
       // Trigger predictive preloading for future requests
       AdvancedAdPreloaderService.predictivePreload();
       
-      return preloadedAds;
+      return preloadedAds.take(count).toList();
+    }
+    
+    // Partial fulfillment: Use preloaded + create additional
+    if (preloadedAds.isNotEmpty) {
+      final remaining = count - preloadedAds.length;
+      AppLogger.info(' 🔄 PARTIAL PRELOAD: Using ${preloadedAds.length} preloaded, creating $remaining more');
+      
+      final additionalAds = await _createAdsBatch(remaining);
+      return [...preloadedAds, ...additionalAds];
     }
     
     // Fallback: Check if we have cached ads for this category
     if (_categoryAds.containsKey(category) && _categoryAds[category]!.length >= count) {
-      print('📱 ✅ Using cached ads for $category (${_categoryAds[category]!.length} available)');
+      AppLogger.info(' ✅ Using cached ads for $category (${_categoryAds[category]!.length} available)');
       return _categoryAds[category]!.take(count).toList();
     }
 
-    // Last resort: Create new ads immediately (SLOWEST)
-    print('📱 🔄 Pool empty! Creating $count new ads for $category...');
-    final newAds = await AdvancedAdPreloaderService.emergencyAdRequest(count);
-    print('📱 📊 Emergency request returned ${newAds.length} ads');
+    // Last resort: Create new ads immediately
+    AppLogger.info(' 🔄 Creating $count new ads for $category...');
+    final newAds = await _createAdsBatch(count);
+    AppLogger.info(' 📊 Created ${newAds.length} new ads');
     
     // Debug logging if no ads were loaded
     if (newAds.isEmpty) {
-      print('⚠️ ❌ NO ADS LOADED for category: $category');
-      print('🔍 This is why you\'re not seeing ads! Running debug analysis...');
+      AppLogger.warning(' ❌ NO ADS LOADED for category: $category');
+      AppLogger.debug(' This is why you\'re not seeing ads! Running debug analysis...');
       AdDebugService.printDebugInfo();
       
       // Show pool statistics for debugging
       final poolStats = AdvancedAdPreloaderService.getPoolStats();
-      print('📊 POOL STATS: $poolStats');
+      AppLogger.log('📊 POOL STATS: $poolStats');
       
       // Try to create a single test ad for debugging
-      print('🔍 Attempting to create a single test ad...');
+      AppLogger.debug(' Attempting to create a single test ad...');
       final testAd = await AdMobService.createNativeAd();
       if (testAd != null) {
-        print('✅ Test ad created successfully! Issue might be with batch creation.');
+        AppLogger.success(' Test ad created successfully! Issue might be with batch creation.');
         return [testAd]; // Return the test ad
       } else {
-        print('❌ Test ad also failed. Check network, emulator, or AdMob configuration.');
+        AppLogger.error(' Test ad also failed. Check network, emulator, or AdMob configuration.');
       }
     } else {
-      print('✅ Successfully loaded ${newAds.length} emergency ads for $category');
+      AppLogger.success(' Successfully loaded ${newAds.length} emergency ads for $category');
       for (int i = 0; i < newAds.length; i++) {
-        print('  Ad ${i + 1}: ${newAds[i].isLoaded ? "LOADED" : "NOT LOADED"} - ${newAds[i].title}');
+        AppLogger.log('  Ad ${i + 1}: ${newAds[i].isLoaded ? "LOADED" : "NOT LOADED"} - ${newAds[i].title}');
       }
     }
     
     // Cache the ads for future use
     _categoryAds[category] = newAds;
-    print('📱 💾 Cached ${newAds.length} ads for $category');
+    AppLogger.info(' 💾 Cached ${newAds.length} ads for $category');
     
     return newAds;
   }
@@ -163,7 +180,7 @@ class AdIntegrationService {
         ad.nativeAd?.dispose(); // Handle nullable nativeAd
       }
       _categoryAds.remove(category);
-      print('🗑️ Cleared ads cache for $category');
+      AppLogger.log('🗑️ Cleared ads cache for $category');
     }
   }
 
@@ -173,7 +190,7 @@ class AdIntegrationService {
       clearCategoryAds(category);
     }
     AdMobService.disposeAllAds();
-    print('🗑️ Cleared all ads cache');
+    AppLogger.log('🗑️ Cleared all ads cache');
   }
 
   /// Dispose all services and cleanup
@@ -181,12 +198,12 @@ class AdIntegrationService {
     clearAllAds();
     AdvancedAdPreloaderService.dispose();
     _isInitialized = false;
-    print('🗑️ Ad Integration Service disposed');
+    AppLogger.log('🗑️ Ad Integration Service disposed');
   }
 
   /// Preload ads for popular categories (following Google's best practices)
   static Future<void> preloadAdsForCategories(List<String> categories) async {
-    print('📱 Preloading ads for categories: ${categories.join(", ")}');
+    AppLogger.info(' Preloading ads for categories: ${categories.join(", ")}');
     
     // Clear expired ads first
     AdMobService.clearExpiredAds();
@@ -196,11 +213,11 @@ class AdIntegrationService {
         await _getAdsForCategory(category, 2); // Preload 2 ads per category
         await Future.delayed(const Duration(milliseconds: 1000)); // Delay between requests
       } catch (e) {
-        print('❌ Failed to preload ads for $category: $e');
+        AppLogger.error(' Failed to preload ads for $category: $e');
       }
     }
     
-    print('✅ Finished preloading ads');
+    AppLogger.success(' Finished preloading ads');
   }
 
   /// Track user reading behavior to optimize ad preloading
@@ -209,7 +226,7 @@ class AdIntegrationService {
     required double averageTimePerArticle,
     required String currentCategory,
   }) {
-    print('📊 TRACKING: User read $articlesRead articles, avg ${averageTimePerArticle}s each');
+    AppLogger.log('📊 TRACKING: User read $articlesRead articles, avg ${averageTimePerArticle}s each');
     
     // Update preloader with user behavior
     AdvancedAdPreloaderService.adjustPoolSize(
@@ -218,6 +235,90 @@ class AdIntegrationService {
     
     // Trigger predictive preloading
     AdvancedAdPreloaderService.predictivePreload();
+  }
+
+  /// Smart batching for large ad requests to avoid overwhelming the system
+  static Future<List<NativeAdModel>> _getBatchedAds(String category, int totalCount) async {
+    final allAds = <NativeAdModel>[];
+    const batchSize = 10; // Create ads in batches of 10
+    
+    AppLogger.info(' 📦 BATCHED LOADING: Creating $totalCount ads in batches of $batchSize');
+    
+    for (int i = 0; i < totalCount; i += batchSize) {
+      final remainingCount = (totalCount - i).clamp(0, batchSize);
+      
+      AppLogger.info(' 📦 Batch ${(i / batchSize).floor() + 1}: Creating $remainingCount ads');
+      
+      final batchAds = await _createAdsBatch(remainingCount);
+      allAds.addAll(batchAds);
+      
+      // Small delay between batches to avoid rate limiting
+      if (i + batchSize < totalCount) {
+        await Future.delayed(const Duration(milliseconds: 500));
+      }
+      
+      AppLogger.info(' 📦 Batch complete: ${batchAds.length} ads created, total: ${allAds.length}');
+    }
+    
+    AppLogger.success(' 📦 BATCHED LOADING COMPLETE: ${allAds.length}/$totalCount ads created');
+    return allAds;
+  }
+  
+  /// Create a batch of ads with error handling and fallbacks
+  static Future<List<NativeAdModel>> _createAdsBatch(int count) async {
+    final ads = <NativeAdModel>[];
+    
+    // Try emergency request first (uses advanced preloader)
+    try {
+      final emergencyAds = await AdvancedAdPreloaderService.emergencyAdRequest(count);
+      if (emergencyAds.isNotEmpty) {
+        return emergencyAds;
+      }
+    } catch (e) {
+      AppLogger.warning(' Emergency ad request failed: $e, falling back to direct creation');
+    }
+    
+    // Fallback: Create ads directly through AdMob service
+    try {
+      final directAds = await AdMobService.createMultipleAds(count);
+      ads.addAll(directAds);
+    } catch (e) {
+      AppLogger.error(' Direct ad creation failed: $e');
+    }
+    
+    // If still no ads, create mock ads to maintain user experience
+    if (ads.isEmpty && count > 0) {
+      AppLogger.info(' 🎭 Creating ${count} mock ads as fallback');
+      for (int i = 0; i < count; i++) {
+        final mockAd = AdMobService.createMockAd();
+        if (mockAd != null) {
+          ads.add(mockAd);
+        }
+      }
+    }
+    
+    return ads;
+  }
+
+  /// Calculate optimal ad positions for better distribution
+  static List<int> _calculateOptimalAdPositions(int articleCount) {
+    if (articleCount <= 3) return []; // No ads for very short feeds
+    
+    final positions = <int>[];
+    
+    // Start placing ads after the 3rd article, then every 4-6 articles
+    int nextAdPosition = 3; // First ad after 3rd article
+    
+    while (nextAdPosition < articleCount - 1) { // Don't place ad at the very end
+      positions.add(nextAdPosition);
+      
+      // Vary the spacing: 4-6 articles between ads for natural feel
+      final spacing = 4 + (positions.length % 3); // Alternates between 4, 5, 6
+      nextAdPosition += spacing;
+    }
+    
+    AppLogger.debug(' OPTIMAL AD POSITIONS: For $articleCount articles, placing ads at: $positions');
+    return positions;
   }
 
   /// Get comprehensive ad statistics including preloader stats

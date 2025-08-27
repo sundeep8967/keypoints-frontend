@@ -4,6 +4,7 @@ import '../local_storage_service.dart';
 import '../category_scroll_service.dart';
 import 'news_service.dart';
 
+import '../../utils/app_logger.dart';
 /// Consolidated service that merges:
 /// - category_loading_service.dart
 /// - category_management_service.dart
@@ -39,7 +40,7 @@ class CategoryService {
       final preferences = await LocalStorageService.getCategoryPreferences();
       return preferences.isNotEmpty ? preferences : _popularCategories;
     } catch (e) {
-      print('CategoryService.getUserPreferredCategories error: $e');
+      AppLogger.log('CategoryService.getUserPreferredCategories error: $e');
       return _popularCategories;
     }
   }
@@ -48,9 +49,9 @@ class CategoryService {
   static Future<void> saveUserPreferences(List<String> categories) async {
     try {
       await LocalStorageService.setCategoryPreferences(categories);
-      print('CategoryService: Saved ${categories.length} category preferences');
+      AppLogger.log('CategoryService: Saved ${categories.length} category preferences');
     } catch (e) {
-      print('CategoryService.saveUserPreferences error: $e');
+      AppLogger.log('CategoryService.saveUserPreferences error: $e');
       rethrow;
     }
   }
@@ -71,7 +72,7 @@ class CategoryService {
         if (lastLoaded != null && 
             DateTime.now().difference(lastLoaded).inMinutes < 10 &&
             cachedArticles.isNotEmpty) {
-          print('CategoryService: Using cached $category articles (${cachedArticles.length})');
+          AppLogger.log('CategoryService: Using cached $category articles (${cachedArticles.length})');
           return cachedArticles;
         }
       }
@@ -91,12 +92,12 @@ class CategoryService {
       _categoryLastLoaded[category] = DateTime.now();
       _categoryLoading[category] = false;
 
-      print('CategoryService: Loaded ${articles.length} articles for $category');
+      AppLogger.log('CategoryService: Loaded ${articles.length} articles for $category');
       return articles;
 
     } catch (e) {
       _categoryLoading[category] = false;
-      print('CategoryService.loadCategoryArticles error for $category: $e');
+      AppLogger.log('CategoryService.loadCategoryArticles error for $category: $e');
       rethrow;
     }
   }
@@ -112,7 +113,7 @@ class CategoryService {
           
           // Load in background without blocking
           loadCategoryArticles(category).catchError((e) {
-            print('Background preload failed for $category: $e');
+            AppLogger.log('Background preload failed for $category: $e');
             return <NewsArticle>[];
           });
           
@@ -121,7 +122,7 @@ class CategoryService {
         }
       }
     } catch (e) {
-      print('CategoryService.preloadPopularCategories error: $e');
+      AppLogger.log('CategoryService.preloadPopularCategories error: $e');
     }
   }
 
@@ -185,7 +186,7 @@ class CategoryService {
       CategoryScrollService.scrollToSelectedCategoryAccurate(
         context, scrollController, categoryIndex, categories);
     } catch (e) {
-      print('CategoryService.scrollToCategory error: $e');
+      AppLogger.log('CategoryService.scrollToCategory error: $e');
     }
   }
 

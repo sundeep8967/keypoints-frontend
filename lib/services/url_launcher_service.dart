@@ -1,18 +1,19 @@
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/cupertino.dart';
 
+import '../utils/app_logger.dart';
 /// Service for handling URL launching functionality
 class UrlLauncherService {
   /// Launch a URL directly in internal browser without confirmation
   static Future<bool> launchInternalBrowser(String url) async {
     try {
       final Uri uri = Uri.parse(url);
-      print('🚀 Opening URL in internal browser: $url');
+      AppLogger.info(' Opening URL in internal browser: $url');
       
       // Open directly in internal browser
       return await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
     } catch (e) {
-      print('Error opening URL in internal browser: $e');
+      AppLogger.log('Error opening URL in internal browser: $e');
       return false;
     }
   }
@@ -25,30 +26,30 @@ class UrlLauncherService {
 
     try {
       final Uri uri = Uri.parse(url);
-      print('🚀 Attempting to launch URL: $url');
+      AppLogger.info(' Attempting to launch URL: $url');
       
       // Try different launch modes for better Android compatibility
       try {
-        print('📱 Trying externalApplication mode...');
+        AppLogger.info(' Trying externalApplication mode...');
         return await launchUrl(uri, mode: LaunchMode.externalApplication);
       } catch (e1) {
-        print('❌ externalApplication failed: $e1');
+        AppLogger.error(' externalApplication failed: $e1');
         try {
-          print('📱 Trying platformDefault mode...');
+          AppLogger.info(' Trying platformDefault mode...');
           return await launchUrl(uri, mode: LaunchMode.platformDefault);
         } catch (e2) {
-          print('❌ platformDefault failed: $e2');
+          AppLogger.error(' platformDefault failed: $e2');
           try {
-            print('📱 Trying inAppBrowserView mode...');
+            AppLogger.info(' Trying inAppBrowserView mode...');
             return await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
           } catch (e3) {
-            print('❌ All launch modes failed');
+            AppLogger.error(' All launch modes failed');
             return false;
           }
         }
       }
     } catch (e) {
-      print('Error parsing or launching URL: $e');
+      AppLogger.log('Error parsing or launching URL: $e');
       return false;
     }
   }
@@ -59,15 +60,15 @@ class UrlLauncherService {
     String? url, 
     String articleTitle
   ) async {
-    print('🚀 showLaunchConfirmation called with URL: "$url"');
+    AppLogger.info(' showLaunchConfirmation called with URL: "$url"');
     
     if (url == null || url.isEmpty) {
-      print('❌ URL is null or empty');
+      AppLogger.error(' URL is null or empty');
       _showErrorDialog(context, 'No source URL available for this article.');
       return;
     }
     
-    print('✅ Showing confirmation dialog for URL: $url');
+    AppLogger.success(' Showing confirmation dialog for URL: $url');
 
     final bool? shouldLaunch = await showCupertinoDialog<bool>(
       context: context,

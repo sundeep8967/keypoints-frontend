@@ -1,6 +1,7 @@
 import '../models/news_article.dart';
 import '../services/news_loading_service.dart';
 
+import '../utils/app_logger.dart';
 class CategoryManagementService {
   static void preloadCategoryIfNeeded(
     String category,
@@ -50,12 +51,12 @@ class CategoryManagementService {
     Future.delayed(const Duration(milliseconds: 1000), () async {
       for (String category in popularCategories) {
         if (categoryArticles[category]?.isEmpty != false) {
-          print('Pre-loading popular category: $category');
+          AppLogger.log('Pre-loading popular category: $category');
           await loadArticlesByCategoryForCache(category);
           await Future.delayed(const Duration(milliseconds: 300)); // Small delay between loads
         }
       }
-      print('Popular categories pre-loaded successfully');
+      AppLogger.log('Popular categories pre-loaded successfully');
     });
   }
 

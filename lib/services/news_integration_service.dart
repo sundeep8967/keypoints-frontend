@@ -3,28 +3,29 @@ import 'supabase_service.dart';
 import 'local_storage_service.dart';
 import 'read_articles_service.dart';
 
+import '../utils/app_logger.dart';
 /// Integrated service that handles news loading with read article filtering
 class NewsIntegrationService {
   
   /// Load unread news articles with smart caching
   static Future<List<NewsArticle>> loadUnreadNews({int displayLimit = 20}) async {
     try {
-      print('🔄 Loading unread news articles...');
+      AppLogger.info(' Loading unread news articles...');
 
       // Step 1: Load cached UNREAD articles immediately
       final cachedUnreadArticles = await LocalStorageService.loadUnreadArticles();
-      print('📱 Found ${cachedUnreadArticles.length} cached unread articles');
+      AppLogger.info(' Found ${cachedUnreadArticles.length} cached unread articles');
 
       // Step 2: Check if we should fetch new articles
       final shouldFetch = await LocalStorageService.shouldFetchNewArticles();
       
       if (shouldFetch) {
-        print('🌐 Fetching new articles from Supabase...');
+        AppLogger.log('🌐 Fetching new articles from Supabase...');
         
         try {
           // Fetch 100 new articles from Supabase
           final newArticles = await SupabaseService.getNews(limit: 100);
-          print('📥 Fetched ${newArticles.length} new articles from Supabase');
+          AppLogger.log('📥 Fetched ${newArticles.length} new articles from Supabase');
           
           if (newArticles.isNotEmpty) {
             // Add new articles to cache
@@ -32,7 +33,7 @@ class NewsIntegrationService {
             
             // Reload UNREAD articles from cache
             final allUnreadArticles = await LocalStorageService.loadUnreadArticles();
-            print('✅ Total unread articles after update: ${allUnreadArticles.length}');
+            AppLogger.success(' Total unread articles after update: ${allUnreadArticles.length}');
             
             // Periodic cleanup
             await LocalStorageService.cleanupStorage();
@@ -40,7 +41,7 @@ class NewsIntegrationService {
             return allUnreadArticles.take(displayLimit).toList();
           }
         } catch (e) {
-          print('❌ Error fetching from Supabase: $e');
+          AppLogger.error(' Error fetching from Supabase: $e');
           // Continue with cached articles if fetch fails
         }
       }
@@ -49,7 +50,7 @@ class NewsIntegrationService {
       return cachedUnreadArticles.take(displayLimit).toList();
       
     } catch (e) {
-      print('❌ Error in loadUnreadNews: $e');
+      AppLogger.error(' Error in loadUnreadNews: $e');
       return [];
     }
   }
@@ -63,7 +64,7 @@ class NewsIntegrationService {
     try {
       // Mark as read
       await ReadArticlesService.markAsRead(articleId);
-      print('✅ Marked article $articleId as read');
+      AppLogger.success(' Marked article $articleId as read');
       
       // Remove from current list
       final updatedArticles = currentArticles.where((a) => a.id != articleId).toList();
@@ -77,7 +78,7 @@ class NewsIntegrationService {
       return updatedArticles;
       
     } catch (e) {
-      print('❌ Error in markAsReadAndGetNext: $e');
+      AppLogger.error(' Error in markAsReadAndGetNext: $e');
       return currentArticles;
     }
   }
@@ -110,7 +111,7 @@ class NewsIntegrationService {
   /// Force refresh - clear cache and fetch fresh articles
   static Future<List<NewsArticle>> forceRefresh({int displayLimit = 20}) async {
     try {
-      print('🔄 Force refreshing articles...');
+      AppLogger.info(' Force refreshing articles...');
       
       // Fetch fresh articles from Supabase
       final freshArticles = await SupabaseService.getNews(limit: 100);
@@ -126,7 +127,7 @@ class NewsIntegrationService {
       
       return [];
     } catch (e) {
-      print('❌ Error in forceRefresh: $e');
+      AppLogger.error(' Error in forceRefresh: $e');
       return [];
     }
   }

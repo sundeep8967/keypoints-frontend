@@ -1,6 +1,7 @@
 import '../models/news_article.dart';
 import '../services/read_articles_service.dart';
 
+import '../utils/app_logger.dart';
 class NewsFeedHelper {
   // Article validation functions
   static Future<List<NewsArticle>> filterValidArticles(List<NewsArticle> articles) async {
@@ -15,12 +16,12 @@ class NewsFeedHelper {
         // Mark invalid articles as read automatically
         await ReadArticlesService.markAsRead(article.id);
         
-        print('Auto-marked as read (no content): "${article.title}"');
+        AppLogger.log('Auto-marked as read (no content): "${article.title}"');
       }
     }
     
     if (invalidArticles.isNotEmpty) {
-      print('Filtered out ${invalidArticles.length} articles with no content');
+      AppLogger.log('Filtered out ${invalidArticles.length} articles with no content');
     }
     
     return validArticles;
@@ -29,19 +30,19 @@ class NewsFeedHelper {
   static bool hasValidContent(NewsArticle article) {
     // Check if article has title
     if (article.title.trim().isEmpty) {
-      print('Invalid article: no title');
+      AppLogger.log('Invalid article: no title');
       return false;
     }
     
     // Check if article has description/summary
     if (article.description.trim().isEmpty) {
-      print('Invalid article: no description - "${article.title}"');
+      AppLogger.log('Invalid article: no description - "${article.title}"');
       return false;
     }
     
     // Check if article has valid image URL (but don't be too strict)
     if (article.imageUrl.trim().isEmpty) {
-      print('Invalid article: no image URL - "${article.title}"');
+      AppLogger.log('Invalid article: no image URL - "${article.title}"');
       return false;
     }
     

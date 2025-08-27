@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import '../utils/app_logger.dart';
 class ScrollStateService {
   static bool _isActivelyScrolling = false;
   static Timer? _scrollEndTimer;
@@ -9,7 +10,7 @@ class ScrollStateService {
   static void startScrolling() {
     _isActivelyScrolling = true;
     _cancelScrollEndTimer();
-    print('📱 SCROLL STATE: User started scrolling - preventing cache modifications');
+    AppLogger.info(' SCROLL STATE: User started scrolling - preventing cache modifications');
   }
   
   /// Track when user stops scrolling (with debounce)
@@ -17,7 +18,7 @@ class ScrollStateService {
     _cancelScrollEndTimer();
     _scrollEndTimer = Timer(_scrollEndDelay, () {
       _isActivelyScrolling = false;
-      print('📱 SCROLL STATE: User stopped scrolling - cache modifications allowed');
+      AppLogger.info(' SCROLL STATE: User stopped scrolling - cache modifications allowed');
     });
   }
   
@@ -28,7 +29,7 @@ class ScrollStateService {
   static void forceStopScrolling() {
     _cancelScrollEndTimer();
     _isActivelyScrolling = false;
-    print('📱 SCROLL STATE: Force stopped scrolling state');
+    AppLogger.info(' SCROLL STATE: Force stopped scrolling state');
   }
   
   static void _cancelScrollEndTimer() {

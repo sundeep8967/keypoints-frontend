@@ -6,6 +6,7 @@ import '../services/consolidated/news_facade.dart';
 import '../services/color_extraction_service.dart';
 import '../services/error_message_service.dart';
 
+import '../utils/app_logger.dart';
 /// Controller for managing news feed state and operations.
 /// 
 /// This controller handles loading, caching, and state management for news articles
@@ -167,29 +168,19 @@ class NewsFeedController extends ChangeNotifier {
     }
   }
 
-  /// Mark article as read and move to next
+  /// Mark article as read (but keep in current session to prevent list changes)
   Future<void> markArticleAsRead(NewsArticle article) async {
     try {
       await NewsFacade().markArticleAsRead(article);
       
-      // Remove from current articles list
-      _articles.removeWhere((a) => a.id == article.id);
+      // DON'T remove from current articles list during active session
+      // This prevents the "articles changing while viewing" issue
+      // Articles will be filtered out on next app launch or manual refresh
       
-      // Also remove from category cache
-      for (final categoryList in _categoryArticles.values) {
-        categoryList.removeWhere((a) => a.id == article.id);
-      }
-      
-      // Adjust current index if needed
-      if (_currentIndex >= _articles.length && _articles.isNotEmpty) {
-        _currentIndex = _articles.length - 1;
-      }
-      
-      notifyListeners();
-      print('✅ CONTROLLER: Marked article as read: ${article.title}');
+      AppLogger.success('📖 CONTROLLER: Marked article as read (kept in session): ${article.title}');
       
     } catch (e) {
-      print('❌ CONTROLLER: Error marking article as read: $e');
+      AppLogger.error('❌ CONTROLLER: Error marking article as read: $e');
     }
   }
 
@@ -218,7 +209,7 @@ class NewsFeedController extends ChangeNotifier {
           final palette = await ColorExtractionService.extractColorsFromImage(article.imageUrl);
           _colorCache[article.imageUrl] = palette;
         } catch (e) {
-          print('Error preloading color for article $i: $e');
+          AppLogger.log('Error preloading color for article $i: $e');
         }
       }
     }

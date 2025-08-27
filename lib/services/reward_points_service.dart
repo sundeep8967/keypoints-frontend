@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../utils/app_logger.dart';
 class RewardPointsService {
   static const String _pointsKey = 'user_points';
   static const String _transactionsKey = 'points_transactions';
@@ -31,7 +32,7 @@ class RewardPointsService {
     final points = (userRevenue * POINTS_PER_DOLLAR).round();
     
     await _addPoints(points, 'native_ad_impression', adId);
-    print('💰 Earned $points points for ad impression: $adId');
+    AppLogger.log('💰 Earned $points points for ad impression: $adId');
   }
   
   /// Add points for ad click
@@ -40,7 +41,7 @@ class RewardPointsService {
     final points = (userRevenue * POINTS_PER_DOLLAR).round();
     
     await _addPoints(points, 'native_ad_click', adId);
-    print('💰 Earned $points points for ad click: $adId');
+    AppLogger.log('💰 Earned $points points for ad click: $adId');
   }
   
   /// Internal method to add points

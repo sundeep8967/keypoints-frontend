@@ -2,6 +2,7 @@ import '../models/news_article.dart';
 import '../services/supabase_service.dart';
 import '../services/read_articles_service.dart';
 
+import '../utils/app_logger.dart';
 class CategoryLoadingService {
   static Future<List<NewsArticle>> loadNewsArticlesForCategory(String category) async {
     try {
@@ -12,12 +13,12 @@ class CategoryLoadingService {
           !readIds.contains(article.id)
         ).toList();
         
-        print('Pre-loaded $category: ${unreadArticles.length} articles');
+        AppLogger.log('Pre-loaded $category: ${unreadArticles.length} articles');
         return unreadArticles;
       }
       return [];
     } catch (e) {
-      print('Error pre-loading $category: $e');
+      AppLogger.log('Error pre-loading $category: $e');
       return [];
     }
   }
@@ -52,11 +53,11 @@ class CategoryLoadingService {
             }
           }
           
-          print('SUCCESS: Loaded ${allCategoryArticles.length} total $category articles, ${unreadCategoryArticles.length} unread from Supabase');
+          AppLogger.log('SUCCESS: Loaded ${allCategoryArticles.length} total $category articles, ${unreadCategoryArticles.length} unread from Supabase');
           return unreadCategoryArticles;
         }
       } catch (e) {
-        print('ERROR: Supabase category filter failed: $e');
+        AppLogger.error(': Supabase category filter failed: $e');
       }
 
       // PRIORITY 2: Try filtering all Supabase articles locally
@@ -72,7 +73,7 @@ class CategoryLoadingService {
           ).toList();
           
           if (unreadFilteredArticles.isNotEmpty) {
-            print('SUCCESS: Filtered ${unreadFilteredArticles.length} unread $category articles from ${filteredArticles.length} total');
+            AppLogger.log('SUCCESS: Filtered ${unreadFilteredArticles.length} unread $category articles from ${filteredArticles.length} total');
             return unreadFilteredArticles;
           } else if (filteredArticles.isNotEmpty) {
             if (isRightSwipe) {
@@ -96,7 +97,7 @@ class CategoryLoadingService {
           }
         }
       } catch (e) {
-        print('ERROR: Failed to filter Supabase articles: $e');
+        AppLogger.error(': Failed to filter Supabase articles: $e');
       }
 
       // PRIORITY 3: If Supabase completely fails
@@ -142,11 +143,11 @@ class CategoryLoadingService {
             return [];
           }
           
-          print('SUCCESS: Loaded ${allCategoryArticles.length} total $category articles, ${unreadCategoryArticles.length} unread from Supabase');
+          AppLogger.log('SUCCESS: Loaded ${allCategoryArticles.length} total $category articles, ${unreadCategoryArticles.length} unread from Supabase');
           return unreadCategoryArticles;
         }
       } catch (e) {
-        print('ERROR: Supabase category filter failed: $e');
+        AppLogger.error(': Supabase category filter failed: $e');
       }
 
       // PRIORITY 2: Try filtering all Supabase articles locally
@@ -162,7 +163,7 @@ class CategoryLoadingService {
           ).toList();
           
           if (unreadFilteredArticles.isNotEmpty) {
-            print('SUCCESS: Filtered ${unreadFilteredArticles.length} unread $category articles from ${filteredArticles.length} total');
+            AppLogger.log('SUCCESS: Filtered ${unreadFilteredArticles.length} unread $category articles from ${filteredArticles.length} total');
             return unreadFilteredArticles;
           } else if (filteredArticles.isNotEmpty) {
             // Show toast and load all other unread articles
@@ -176,12 +177,12 @@ class CategoryLoadingService {
           }
         }
       } catch (e) {
-        print('ERROR: Failed to filter Supabase articles: $e');
+        AppLogger.error(': Failed to filter Supabase articles: $e');
       }
 
       // PRIORITY 3: If Supabase completely fails, show toast and prepare to switch back to All
       showToast('Unable to load $category articles. Switching back to All categories.');
-      print('ERROR: Supabase completely unavailable for $category');
+      AppLogger.error(': Supabase completely unavailable for $category');
       return [];
     } catch (e) {
       throw Exception('Failed to load articles for $category: $e');

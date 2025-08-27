@@ -60,6 +60,19 @@ android {
     buildTypes {
         release {
             signingConfig signingConfigs.release
+            
+            // Enable optimizations for production
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            
+            // Additional optimizations
+            zipAlignEnabled true
+            debuggable false
+        }
+        debug {
+            debuggable true
+            minifyEnabled false
         }
     }
 }

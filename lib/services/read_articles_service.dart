@@ -1,7 +1,14 @@
 import 'dart:convert';
+import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../utils/app_logger.dart';
 class ReadArticlesService {
+  // Stream controller for read count changes
+  static final StreamController<int> _readCountController = StreamController<int>.broadcast();
+  
+  /// Stream to listen for read count changes
+  static Stream<int> get readCountStream => _readCountController.stream;
   static const String _readArticlesKey = 'read_article_ids';
   static const String _lastCleanupKey = 'last_cleanup_timestamp';
   static const int _maxReadArticles = 1000; // Keep track of max 1000 read articles
@@ -12,6 +19,9 @@ class ReadArticlesService {
       final prefs = await SharedPreferences.getInstance();
       final readIds = await getReadArticleIds();
       
+      AppLogger.debug(' ReadArticlesService: Attempting to mark article $articleId as read');
+      AppLogger.debug(' ReadArticlesService: Current read count before: ${readIds.length}');
+      
       if (!readIds.contains(articleId)) {
         readIds.add(articleId);
         
@@ -21,10 +31,16 @@ class ReadArticlesService {
         }
         
         await prefs.setString(_readArticlesKey, jsonEncode(readIds));
-        print('Marked article $articleId as read. Total read: ${readIds.length}');
+        AppLogger.log('Marked article $articleId as read. Total read: ${readIds.length}');
+        
+        // Emit the new count to listeners
+        AppLogger.debug(' ReadArticlesService: Emitting new count to stream: ${readIds.length}');
+        _readCountController.add(readIds.length);
+      } else {
+        AppLogger.debug(' ReadArticlesService: Article $articleId already marked as read');
       }
     } catch (e) {
-      print('Error marking article as read: $e');
+      AppLogger.log('Error marking article as read: $e');
     }
   }
 
@@ -34,7 +50,7 @@ class ReadArticlesService {
       final readIds = await getReadArticleIds();
       return readIds.contains(articleId);
     } catch (e) {
-      print('Error checking if article is read: $e');
+      AppLogger.log('Error checking if article is read: $e');
       return false;
     }
   }
@@ -50,7 +66,7 @@ class ReadArticlesService {
       final List<dynamic> readIdsList = jsonDecode(readIdsString);
       return readIdsList.cast<String>();
     } catch (e) {
-      print('Error getting read article IDs: $e');
+      AppLogger.log('Error getting read article IDs: $e');
       return [];
     }
   }
@@ -61,14 +77,31 @@ class ReadArticlesService {
     return readIds.length;
   }
 
+  /// Get current count and emit it to stream (useful for initial load)
+  static Future<void> emitCurrentCount() async {
+    try {
+      final count = await getReadCount();
+      AppLogger.debug(' ReadArticlesService: About to emit current count: $count');
+      AppLogger.debug(' ReadArticlesService: Stream controller has listeners: ${_readCountController.hasListener}');
+      _readCountController.add(count);
+      AppLogger.debug(' ReadArticlesService: Successfully emitted current count: $count');
+    } catch (e) {
+      AppLogger.error(' ReadArticlesService: Error emitting current count: $e');
+    }
+  }
+
+
   /// Clear all read articles (for testing or reset)
   static Future<void> clearAllRead() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_readArticlesKey);
-      print('Cleared all read articles');
+      AppLogger.log('Cleared all read articles');
+      
+      // Emit count of 0 to listeners
+      _readCountController.add(0);
     } catch (e) {
-      print('Error clearing read articles: $e');
+      AppLogger.log('Error clearing read articles: $e');
     }
   }
 
@@ -94,12 +127,12 @@ class ReadArticlesService {
       if (readIds.length > 500) {
         final trimmedIds = readIds.sublist(readIds.length - 500);
         await prefs.setString(_readArticlesKey, jsonEncode(trimmedIds));
-        print('Cleaned up read articles: ${readIds.length} -> ${trimmedIds.length}');
+        AppLogger.log('Cleaned up read articles: ${readIds.length} -> ${trimmedIds.length}');
       }
       
       await prefs.setString(_lastCleanupKey, now.toIso8601String());
     } catch (e) {
-      print('Error during cleanup: $e');
+      AppLogger.log('Error during cleanup: $e');
     }
   }
 

@@ -2,6 +2,7 @@ import '../models/news_article.dart';
 import '../services/supabase_service.dart';
 import '../services/read_articles_service.dart';
 
+import '../utils/app_logger.dart';
 /// Service for dynamically discovering categories from the backend
 class DynamicCategoryDiscoveryService {
   
@@ -12,7 +13,7 @@ class DynamicCategoryDiscoveryService {
     required Function(String category) onCategoryEmpty,
     required Function() onDiscoveryComplete,
   }) async {
-    print('🔍 DISCOVERY: Starting parallel category discovery...');
+    AppLogger.debug(' DISCOVERY: Starting parallel category discovery...');
     
     // List of potential categories to check
     final potentialCategories = [
@@ -27,7 +28,7 @@ class DynamicCategoryDiscoveryService {
     // Create parallel futures for each category
     final futures = potentialCategories.map((category) async {
       try {
-        print('🔍 DISCOVERY: Checking $category...');
+        AppLogger.debug(' DISCOVERY: Checking $category...');
         
         // Check if category has articles
         final articles = await SupabaseService.getUnreadNewsByCategory(
@@ -37,16 +38,16 @@ class DynamicCategoryDiscoveryService {
         );
         
         if (articles.isNotEmpty) {
-          print('✅ DISCOVERY: Found $category with ${articles.length} articles');
+          AppLogger.success(' DISCOVERY: Found $category with ${articles.length} articles');
           onCategoryDiscovered(category, articles);
           return category;
         } else {
-          print('❌ DISCOVERY: $category is empty');
+          AppLogger.error(' DISCOVERY: $category is empty');
           onCategoryEmpty(category);
           return null;
         }
       } catch (e) {
-        print('❌ DISCOVERY: Error checking $category: $e');
+        AppLogger.error(' DISCOVERY: Error checking $category: $e');
         onCategoryEmpty(category);
         return null;
       }
@@ -56,7 +57,7 @@ class DynamicCategoryDiscoveryService {
     final results = await Future.wait(futures);
     final foundCategories = results.where((cat) => cat != null).cast<String>().toList();
     
-    print('🎯 DISCOVERY: Complete! Found ${foundCategories.length} categories: $foundCategories');
+    AppLogger.log('🎯 DISCOVERY: Complete! Found ${foundCategories.length} categories: $foundCategories');
     onDiscoveryComplete();
   }
   
@@ -66,7 +67,7 @@ class DynamicCategoryDiscoveryService {
     required Function(String category) onCategoryEmpty,
     required Function() onDiscoveryComplete,
   }) async {
-    print('🔍 DISCOVERY: Starting sequential category discovery...');
+    AppLogger.debug(' DISCOVERY: Starting sequential category discovery...');
     
     final potentialCategories = [
       'Technology', 'Business', 'Sports', 'Health', 'Science', 
@@ -80,7 +81,7 @@ class DynamicCategoryDiscoveryService {
     
     for (final category in potentialCategories) {
       try {
-        print('🔍 DISCOVERY: Checking $category...');
+        AppLogger.debug(' DISCOVERY: Checking $category...');
         
         final articles = await SupabaseService.getUnreadNewsByCategory(
           category, 
@@ -89,23 +90,23 @@ class DynamicCategoryDiscoveryService {
         );
         
         if (articles.isNotEmpty) {
-          print('✅ DISCOVERY: Found $category with ${articles.length} articles');
+          AppLogger.success(' DISCOVERY: Found $category with ${articles.length} articles');
           foundCategories.add(category);
           onCategoryDiscovered(category, articles);
           
           // Small delay to show progressive discovery
           await Future.delayed(const Duration(milliseconds: 100));
         } else {
-          print('❌ DISCOVERY: $category is empty');
+          AppLogger.error(' DISCOVERY: $category is empty');
           onCategoryEmpty(category);
         }
       } catch (e) {
-        print('❌ DISCOVERY: Error checking $category: $e');
+        AppLogger.error(' DISCOVERY: Error checking $category: $e');
         onCategoryEmpty(category);
       }
     }
     
-    print('🎯 DISCOVERY: Complete! Found ${foundCategories.length} categories: $foundCategories');
+    AppLogger.log('🎯 DISCOVERY: Complete! Found ${foundCategories.length} categories: $foundCategories');
     onDiscoveryComplete();
   }
   
@@ -141,7 +142,7 @@ class DynamicCategoryDiscoveryService {
       final articles = await SupabaseService.getNewsByCategory(category, limit: 1);
       return articles.isNotEmpty;
     } catch (e) {
-      print('Error checking category $category: $e');
+      AppLogger.log('Error checking category $category: $e');
       return false;
     }
   }

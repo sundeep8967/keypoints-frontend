@@ -4,6 +4,7 @@ import '../read_articles_service.dart';
 import '../news_feed_helper.dart';
 import '../local_storage_service.dart';
 
+import '../../utils/app_logger.dart';
 /// Consolidated service that merges:
 /// - news_loading_service.dart
 /// - news_feed_helper.dart  
@@ -21,34 +22,34 @@ class NewsService {
           return await _processAndFilterArticles(allArticles, limit);
         }
       } catch (e) {
-        print('Supabase loading failed: $e');
+        AppLogger.log('Supabase loading failed: $e');
       }
 
       // PRIORITY 2: Try local cache
       try {
         final cachedArticles = await LocalStorageService.loadUnreadArticles();
         if (cachedArticles.isNotEmpty) {
-          print('Loading from local cache: ${cachedArticles.length} articles');
+          AppLogger.log('Loading from local cache: ${cachedArticles.length} articles');
           return await _processAndFilterArticles(cachedArticles, limit);
         }
       } catch (e) {
-        print('Local cache loading failed: $e');
+        AppLogger.log('Local cache loading failed: $e');
       }
 
       // PRIORITY 3: Try bundled assets as last resort
       try {
         final bundledArticles = <NewsArticle>[];
         if (bundledArticles.isNotEmpty) {
-          print('Loading from bundled assets: ${bundledArticles.length} articles');
+          AppLogger.log('Loading from bundled assets: ${bundledArticles.length} articles');
           return await _processAndFilterArticles(bundledArticles, limit);
         }
       } catch (e) {
-        print('Bundled assets loading failed: $e');
+        AppLogger.log('Bundled assets loading failed: $e');
       }
 
       throw Exception('No news sources available');
     } catch (e) {
-      print('NewsService.loadNewsArticles error: $e');
+      AppLogger.log('NewsService.loadNewsArticles error: $e');
       rethrow;
     }
   }
@@ -68,7 +69,7 @@ class NewsService {
           return await _processAndFilterArticles(articles, limit);
         }
       } catch (e) {
-        print('Supabase category loading failed for $category: $e');
+        AppLogger.log('Supabase category loading failed for $category: $e');
       }
 
       // Fallback to cached articles filtered by category
@@ -82,12 +83,12 @@ class NewsService {
           return await _processAndFilterArticles(categoryArticles, limit);
         }
       } catch (e) {
-        print('Cache category filtering failed: $e');
+        AppLogger.log('Cache category filtering failed: $e');
       }
 
       return [];
     } catch (e) {
-      print('NewsService.loadNewsByCategory error for $category: $e');
+      AppLogger.log('NewsService.loadNewsByCategory error for $category: $e');
       rethrow;
     }
   }
@@ -106,7 +107,7 @@ class NewsService {
           final categoryArticles = await loadNewsByCategory(category, limit: articlesPerCategory);
           mixedArticles.addAll(categoryArticles);
         } catch (e) {
-          print('Failed to load $category for mix: $e');
+          AppLogger.log('Failed to load $category for mix: $e');
         }
       }
       
@@ -114,7 +115,7 @@ class NewsService {
       mixedArticles.shuffle();
       return mixedArticles.take(limit).toList();
     } catch (e) {
-      print('NewsService.loadRandomMixArticles error: $e');
+      AppLogger.log('NewsService.loadRandomMixArticles error: $e');
       rethrow;
     }
   }
@@ -133,7 +134,7 @@ class NewsService {
       
       throw Exception('No articles received from refresh');
     } catch (e) {
-      print('NewsService.refreshNews error: $e');
+      AppLogger.log('NewsService.refreshNews error: $e');
       rethrow;
     }
   }
@@ -143,7 +144,7 @@ class NewsService {
     try {
       return await LocalStorageService.shouldFetchNewArticles();
     } catch (e) {
-      print('NewsService.needsRefresh error: $e');
+      AppLogger.log('NewsService.needsRefresh error: $e');
       return true; // Default to needing refresh on error
     }
   }
@@ -160,7 +161,7 @@ class NewsService {
         'unread': cachedArticles.length - readCount,
       };
     } catch (e) {
-      print('NewsService.getArticleStats error: $e');
+      AppLogger.log('NewsService.getArticleStats error: $e');
       return {'total': 0, 'read': 0, 'unread': 0};
     }
   }
@@ -183,11 +184,11 @@ class NewsService {
       // Limit results
       final limitedArticles = validArticles.take(limit).toList();
       
-      print('Processed ${articles.length} → ${unreadArticles.length} unread → ${validArticles.length} valid → ${limitedArticles.length} final');
+      AppLogger.log('Processed ${articles.length} → ${unreadArticles.length} unread → ${validArticles.length} valid → ${limitedArticles.length} final');
       
       return limitedArticles;
     } catch (e) {
-      print('_processAndFilterArticles error: $e');
+      AppLogger.log('_processAndFilterArticles error: $e');
       return articles.take(limit).toList(); // Fallback to unprocessed articles
     }
   }

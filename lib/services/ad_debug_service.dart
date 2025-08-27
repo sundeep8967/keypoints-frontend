@@ -1,79 +1,80 @@
 import 'admob_service.dart';
 
+import '../utils/app_logger.dart';
 /// Debug service for troubleshooting native ad issues
 class AdDebugService {
   
   /// Print comprehensive ad debugging information
   static void printDebugInfo() {
-    print('\n🔍 ===== AD DEBUG INFORMATION =====');
+    AppLogger.debug(' INFORMATION =====');
     
     final info = AdMobService.getTroubleshootingInfo();
     
-    print('📱 AdMob Status:');
-    print('   - Initialized: ${info['isInitialized']}');
-    print('   - Ad Unit ID: ${info['adUnitId']}');
-    print('   - Using Test Ads: ${info['isTestAdUnit']}');
-    print('   - Loaded Ads Count: ${info['loadedAdsCount']}');
-    print('   - Ad Counter: ${info['adCounter']}');
-    print('   - Cache Expired: ${info['cacheExpired']}');
-    print('   - Last Cache Time: ${info['lastCacheTime'] ?? 'Never'}');
+    AppLogger.info(' AdMob Status:');
+    AppLogger.log('   - Initialized: ${info['isInitialized']}');
+    AppLogger.log('   - Ad Unit ID: ${info['adUnitId']}');
+    AppLogger.log('   - Using Test Ads: ${info['isTestAdUnit']}');
+    AppLogger.log('   - Loaded Ads Count: ${info['loadedAdsCount']}');
+    AppLogger.log('   - Ad Counter: ${info['adCounter']}');
+    AppLogger.log('   - Cache Expired: ${info['cacheExpired']}');
+    AppLogger.log('   - Last Cache Time: ${info['lastCacheTime'] ?? 'Never'}');
     
-    print('\n💡 Troubleshooting Tips:');
+    AppLogger.log('\n💡 Troubleshooting Tips:');
     final tips = info['troubleshootingTips'] as List<String>;
     for (int i = 0; i < tips.length; i++) {
-      print('   ${i + 1}. ${tips[i]}');
+      AppLogger.log('   ${i + 1}. ${tips[i]}');
     }
     
-    print('\n📊 Performance Stats:');
+    AppLogger.log('\n📊 Performance Stats:');
     final stats = AdMobService.getAdLoadingStats();
-    print('   - Total Loaded Ads: ${stats['totalLoadedAds']}');
-    print('   - Cache Status: ${stats['cacheExpired'] ? 'EXPIRED' : 'VALID'}');
+    AppLogger.log('   - Total Loaded Ads: ${stats['totalLoadedAds']}');
+    AppLogger.log('   - Cache Status: ${stats['cacheExpired'] ? 'EXPIRED' : 'VALID'}');
     
-    print('\n🎯 Current Issue Analysis:');
+    AppLogger.log('\n🎯 Current Issue Analysis:');
     if (info['isTestAdUnit'] == true) {
-      print('   ✅ Using test ad unit (should work in all environments)');
+      AppLogger.log('   ✅ Using test ad unit (should work in all environments)');
     } else {
-      print('   ⚠️  Using production ad unit (may not work in test environments)');
+      AppLogger.log('   ⚠️  Using production ad unit (may not work in test environments)');
     }
     
     if (info['loadedAdsCount'] == 0) {
-      print('   ❌ No ads currently loaded');
-      print('   💡 This could be due to:');
-      print('      - Network connectivity issues');
-      print('      - AdMob server unavailability');
-      print('      - Emulator limitations');
-      print('      - Ad inventory shortage');
+      AppLogger.log('   ❌ No ads currently loaded');
+      AppLogger.log('   💡 This could be due to:');
+      AppLogger.log('      - Network connectivity issues');
+      AppLogger.log('      - AdMob server unavailability');
+      AppLogger.log('      - Emulator limitations');
+      AppLogger.log('      - Ad inventory shortage');
     } else {
-      print('   ✅ ${info['loadedAdsCount']} ads successfully loaded');
+      AppLogger.log('   ✅ ${info['loadedAdsCount']} ads successfully loaded');
     }
     
-    print('================================\n');
+    AppLogger.log('================================\n');
   }
   
   /// Test ad loading with detailed logging
   static Future<void> testAdLoading() async {
-    print('🧪 Starting ad loading test...');
+    AppLogger.log('🧪 Starting ad loading test...');
     
     printDebugInfo();
     
-    print('🔄 Attempting to load a single test ad...');
+    AppLogger.info(' Attempting to load a single test ad...');
     final ad = await AdMobService.createNativeAd();
     
     if (ad != null) {
-      print('✅ Test ad loaded successfully!');
-      print('   - Ad ID: ${ad.id}');
-      print('   - Title: ${ad.title}');
-      print('   - Advertiser: ${ad.advertiser}');
+      AppLogger.success(' Test ad loaded successfully!');
+      AppLogger.log('   - Ad ID: ${ad.id}');
+      AppLogger.log('   - Title: ${ad.title}');
+      AppLogger.log('   - Advertiser: ${ad.advertiser}');
     } else {
-      print('❌ Test ad failed to load');
-      print('💡 Recommendations:');
-      print('   1. Check internet connection');
-      print('   2. Try running on a physical device instead of emulator');
-      print('   3. Verify AdMob configuration');
-      print('   4. Check if ads are available in your region');
+      AppLogger.error(' Test ad failed to load');
+      AppLogger.log('💡 Recommendations:');
+      AppLogger.log('   1. Check internet connection');
+      AppLogger.log('   2. Try running on a physical device instead of emulator');
+      AppLogger.log('   3. Verify AdMob configuration');
+      AppLogger.log('   4. Check if ads are available in your region');
     }
     
-    print('🧪 Ad loading test completed.\n');
+    AppLogger.log('🧪 Ad loading test completed.\n');
   }
   
   /// Check if the current environment supports ads

@@ -2,6 +2,8 @@ import 'package:flutter/cupertino.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 import '../models/news_article.dart';
+import '../services/consolidated/article_service.dart';
+import '../utils/app_logger.dart';
 
 class NewsDetailScreen extends StatelessWidget {
   final NewsArticle article;
@@ -27,8 +29,12 @@ class NewsDetailScreen extends StatelessWidget {
         ),
         trailing: CupertinoButton(
           padding: EdgeInsets.zero,
-          onPressed: () {
-            // Share functionality can be added here
+          onPressed: () async {
+            try {
+              await ArticleService.shareArticle(article);
+            } catch (e) {
+              AppLogger.error('Share failed: $e');
+            }
           },
           child: const Icon(
             CupertinoIcons.share,
@@ -116,8 +122,12 @@ class NewsDetailScreen extends StatelessWidget {
                         Expanded(
                           child: CupertinoButton.filled(
                             child: const Text('Share'),
-                            onPressed: () {
-                              // Share functionality
+                            onPressed: () async {
+                              try {
+                                await ArticleService.shareArticle(article);
+                              } catch (e) {
+                                AppLogger.error('Share failed: $e');
+                              }
                             },
                           ),
                         ),

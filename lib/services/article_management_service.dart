@@ -3,6 +3,7 @@ import '../services/read_articles_service.dart';
 import '../services/news_feed_helper.dart';
 import '../services/color_extraction_service.dart';
 
+import '../utils/app_logger.dart';
 class ArticleManagementService {
   static Future<void> preloadColors(
     List<NewsArticle> articles, 
@@ -15,7 +16,7 @@ class ArticleManagementService {
     final startIndex = currentIndex;
     final endIndex = (currentIndex + 5).clamp(0, articles.length); // Reduced from 10 to 5
     
-    print('Preloading colors for articles $startIndex to $endIndex');
+    AppLogger.log('Preloading colors for articles $startIndex to $endIndex');
     
     for (int i = startIndex; i < endIndex; i++) {
       if (i < articles.length && !colorCache.containsKey(articles[i].imageUrl)) {
@@ -38,7 +39,7 @@ class ArticleManagementService {
   ) async {
     // Only try to load more if we're actually at the end
     if (currentIndex >= articles.length - 2) {
-      print('INFO: Near end of articles, trying to load more...');
+      AppLogger.log('INFO: Near end of articles, trying to load more...');
       
       if (selectedCategory == 'All') {
         await loadNewsArticles();
@@ -52,14 +53,14 @@ class ArticleManagementService {
     Function setSelectedCategory,
     Function loadNewsArticles,
   ) async {
-    print('INFO: Loading all other unread articles...');
+    AppLogger.log('INFO: Loading all other unread articles...');
     
     try {
       // Reset to "All" category and load all unread articles
       setSelectedCategory('All');
       await loadNewsArticles();
     } catch (e) {
-      print('ERROR: Failed to load other unread articles: $e');
+      AppLogger.error(': Failed to load other unread articles: $e');
       throw Exception('Failed to load other articles: $e');
     }
   }
@@ -76,12 +77,12 @@ class ArticleManagementService {
         // Mark invalid articles as read automatically
         await ReadArticlesService.markAsRead(article.id);
         
-        print('Auto-marked as read (no content): "${article.title}"');
+        AppLogger.log('Auto-marked as read (no content): "${article.title}"');
       }
     }
     
     if (invalidArticles.isNotEmpty) {
-      print('Filtered out ${invalidArticles.length} articles with no content');
+      AppLogger.log('Filtered out ${invalidArticles.length} articles with no content');
     }
     
     return validArticles;
@@ -90,7 +91,7 @@ class ArticleManagementService {
   static bool hasValidContent(NewsArticle article) {
     // Check if article has valid image URL
     if (!hasValidImage(article.imageUrl)) {
-      print('Invalid image for article: "${article.title}" - URL: "${article.imageUrl}"');
+      AppLogger.log('Invalid image for article: "${article.title}" - URL: "${article.imageUrl}"');
       return false;
     }
     

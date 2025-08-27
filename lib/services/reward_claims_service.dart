@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:math';
 
+import '../utils/app_logger.dart';
 class UserDataService {
   static final _supabase = Supabase.instance.client;
 
@@ -64,10 +65,10 @@ class UserDataService {
         });
       }
 
-      print('User data updated successfully for $email');
+      AppLogger.log('User data updated successfully for $email');
       return true;
     } catch (e) {
-      print('Error updating user data: $e');
+      AppLogger.log('Error updating user data: $e');
       return false;
     }
   }
@@ -110,10 +111,10 @@ class UserDataService {
         });
       }
 
-      print('FCM token updated successfully for $email');
+      AppLogger.log('FCM token updated successfully for $email');
       return true;
     } catch (e) {
-      print('Error updating FCM token: $e');
+      AppLogger.log('Error updating FCM token: $e');
       return false;
     }
   }
@@ -130,7 +131,7 @@ class UserDataService {
 
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
-      print('Error fetching pending claims: $e');
+      AppLogger.log('Error fetching pending claims: $e');
       return [];
     }
   }
@@ -145,7 +146,7 @@ class UserDataService {
 
       return true;
     } catch (e) {
-      print('Error marking claim as processed: $e');
+      AppLogger.log('Error marking claim as processed: $e');
       return false;
     }
   }
@@ -161,7 +162,7 @@ class UserDataService {
 
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
-      print('Error fetching active users: $e');
+      AppLogger.log('Error fetching active users: $e');
       return [];
     }
   }
@@ -177,7 +178,7 @@ class UserDataService {
 
       return response;
     } catch (e) {
-      print('Error fetching user data: $e');
+      AppLogger.log('Error fetching user data: $e');
       return null;
     }
   }
@@ -193,7 +194,7 @@ class UserDataService {
 
       return response;
     } catch (e) {
-      print('Error fetching user by FCM token: $e');
+      AppLogger.log('Error fetching user by FCM token: $e');
       return null;
     }
   }
@@ -208,10 +209,10 @@ class UserDataService {
         'updated_at': DateTime.now().toIso8601String(),
       });
 
-      print('FCM token inserted successfully');
+      AppLogger.log('FCM token inserted successfully');
       return true;
     } catch (e) {
-      print('Error inserting FCM token: $e');
+      AppLogger.log('Error inserting FCM token: $e');
       return false;
     }
   }
@@ -224,10 +225,10 @@ class UserDataService {
         'updated_at': DateTime.now().toIso8601String(),
       }).eq('fcm_token', fcmToken);
 
-      print('Email linked to FCM token successfully');
+      AppLogger.log('Email linked to FCM token successfully');
       return true;
     } catch (e) {
-      print('Error linking email to FCM token: $e');
+      AppLogger.log('Error linking email to FCM token: $e');
       return false;
     }
   }
@@ -242,7 +243,7 @@ class UserDataService {
 
       return true;
     } catch (e) {
-      print('Error marking FCM token as active: $e');
+      AppLogger.log('Error marking FCM token as active: $e');
       return false;
     }
   }
@@ -257,7 +258,7 @@ class UserDataService {
 
       return true;
     } catch (e) {
-      print('Error marking FCM token as inactive: $e');
+      AppLogger.log('Error marking FCM token as inactive: $e');
       return false;
     }
   }

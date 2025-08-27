@@ -5,6 +5,7 @@ import 'news_service.dart';
 import 'category_service.dart';
 import 'article_service.dart';
 
+import '../../utils/app_logger.dart';
 /// Facade pattern to simplify service interactions and reduce UI dependencies
 /// This is the single entry point for all news-related operations
 class NewsFacade {
@@ -26,9 +27,9 @@ class NewsFacade {
       // Preload popular categories in background
       CategoryService.preloadPopularCategories();
       
-      print('NewsFacade: Initialized successfully');
+      AppLogger.log('NewsFacade: Initialized successfully');
     } catch (e) {
-      print('NewsFacade.initialize error: $e');
+      AppLogger.log('NewsFacade.initialize error: $e');
     }
   }
 
@@ -60,7 +61,7 @@ class NewsFacade {
       
     } catch (e) {
       _setLoading('All', false);
-      print('NewsFacade.loadMainFeed error: $e');
+      AppLogger.log('NewsFacade.loadMainFeed error: $e');
       rethrow;
     }
   }
@@ -94,7 +95,7 @@ class NewsFacade {
       
     } catch (e) {
       _setLoading(category, false);
-      print('NewsFacade.loadCategoryFeed error for $category: $e');
+      AppLogger.log('NewsFacade.loadCategoryFeed error for $category: $e');
       rethrow;
     }
   }
@@ -109,19 +110,18 @@ class NewsFacade {
     return _loadingStates[category] ?? false;
   }
 
-  /// Mark article as read and remove from feeds
+  /// Mark article as read (but keep in current session cache to prevent list changes)
   Future<void> markArticleAsRead(NewsArticle article) async {
     try {
       await ArticleService.markAsRead(article.id);
       
-      // Remove from all cached categories
-      for (final categoryList in _categoryCache.values) {
-        categoryList.removeWhere((a) => a.id == article.id);
-      }
+      // DON'T remove from cached categories during active session
+      // This prevents the "articles changing while viewing" issue
+      // Articles will be filtered out when cache is refreshed or app restarted
       
-      print('NewsFacade: Article marked as read and removed from feeds');
+      AppLogger.log('📖 NewsFacade: Article marked as read (kept in session cache): ${article.title}');
     } catch (e) {
-      print('NewsFacade.markArticleAsRead error: $e');
+      AppLogger.log('❌ NewsFacade.markArticleAsRead error: $e');
       rethrow;
     }
   }
@@ -131,7 +131,7 @@ class NewsFacade {
     try {
       await ArticleService.shareArticle(article);
     } catch (e) {
-      print('NewsFacade.shareArticle error: $e');
+      AppLogger.log('NewsFacade.shareArticle error: $e');
       rethrow;
     }
   }
@@ -141,7 +141,7 @@ class NewsFacade {
     try {
       return await ArticleService.getArticleColorPalette(imageUrl);
     } catch (e) {
-      print('NewsFacade.getArticleColors error: $e');
+      AppLogger.log('NewsFacade.getArticleColors error: $e');
       return ColorPalette.defaultPalette();
     }
   }
@@ -156,7 +156,7 @@ class NewsFacade {
     try {
       return await CategoryService.getUserPreferredCategories();
     } catch (e) {
-      print('NewsFacade.getUserPreferences error: $e');
+      AppLogger.log('NewsFacade.getUserPreferences error: $e');
       return CategoryService.getPopularCategories();
     }
   }
@@ -166,7 +166,7 @@ class NewsFacade {
     try {
       await CategoryService.saveUserPreferences(categories);
     } catch (e) {
-      print('NewsFacade.saveUserPreferences error: $e');
+      AppLogger.log('NewsFacade.saveUserPreferences error: $e');
       rethrow;
     }
   }
@@ -194,7 +194,7 @@ class NewsFacade {
         },
       };
     } catch (e) {
-      print('NewsFacade.getStats error: $e');
+      AppLogger.log('NewsFacade.getStats error: $e');
       return {};
     }
   }
@@ -207,9 +207,9 @@ class NewsFacade {
       CategoryService.clearAllCaches();
       ArticleService.clearColorCache();
       
-      print('NewsFacade: All caches cleared');
+      AppLogger.log('NewsFacade: All caches cleared');
     } catch (e) {
-      print('NewsFacade.clearAllCaches error: $e');
+      AppLogger.log('NewsFacade.clearAllCaches error: $e');
     }
   }
 
@@ -218,9 +218,9 @@ class NewsFacade {
     try {
       await clearAllCaches();
       await initialize();
-      print('NewsFacade: Full refresh completed');
+      AppLogger.log('NewsFacade: Full refresh completed');
     } catch (e) {
-      print('NewsFacade.refreshAll error: $e');
+      AppLogger.log('NewsFacade.refreshAll error: $e');
       rethrow;
     }
   }
@@ -230,7 +230,7 @@ class NewsFacade {
     try {
       return await NewsService.needsRefresh();
     } catch (e) {
-      print('NewsFacade.needsRefresh error: $e');
+      AppLogger.log('NewsFacade.needsRefresh error: $e');
       return true;
     }
   }

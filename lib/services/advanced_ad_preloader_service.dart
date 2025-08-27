@@ -4,6 +4,7 @@ import '../models/native_ad_model.dart';
 import 'admob_service.dart';
 import 'ad_debug_service.dart';
 
+import '../utils/app_logger.dart';
 /// Advanced ad preloading service that loads ads in background while user reads
 class AdvancedAdPreloaderService {
   static final AdvancedAdPreloaderService _instance = AdvancedAdPreloaderService._internal();
@@ -30,7 +31,7 @@ class AdvancedAdPreloaderService {
 
   /// Initialize the advanced preloader
   static Future<void> initialize() async {
-    print('🚀 ADVANCED PRELOADER: Initializing...');
+    AppLogger.info(' ADVANCED PRELOADER: Initializing...');
     
     // Initialize AdMob first
     await AdMobService.initialize();
@@ -41,7 +42,7 @@ class AdvancedAdPreloaderService {
     // Preload initial batch
     await _preloadInitialBatch();
     
-    print('✅ ADVANCED PRELOADER: Initialized with ${_adPool.length} ads ready');
+    AppLogger.success(' ADVANCED PRELOADER: Initialized with ${_adPool.length} ads ready');
   }
 
   /// Start background preloading timer
@@ -52,12 +53,12 @@ class AdvancedAdPreloaderService {
       _backgroundPreloadCheck();
     });
     
-    print('🔄 ADVANCED PRELOADER: Background preloading started');
+    AppLogger.info(' ADVANCED PRELOADER: Background preloading started');
   }
 
   /// Preload initial batch of ads
   static Future<void> _preloadInitialBatch() async {
-    print('📱 ADVANCED PRELOADER: Loading initial batch...');
+    AppLogger.info(' ADVANCED PRELOADER: Loading initial batch...');
     
     try {
       // Load ads in small batches to avoid overwhelming the system
@@ -65,7 +66,7 @@ class AdvancedAdPreloaderService {
         final batchAds = await AdMobService.createMultipleAds(3);
         _adPool.addAll(batchAds);
         
-        print('📱 BATCH $batch: Loaded ${batchAds.length} real ads (Total: ${_adPool.length})');
+        AppLogger.info(' BATCH $batch: Loaded ${batchAds.length} real ads (Total: ${_adPool.length})');
         
         // Small delay between batches
         await Future.delayed(const Duration(milliseconds: 1500));
@@ -76,7 +77,7 @@ class AdvancedAdPreloaderService {
       // If we don't have enough real ads, fill with mock ads to ensure smooth experience
       if (_adPool.length < _targetPoolSize) {
         final mockAdsNeeded = _targetPoolSize - _adPool.length;
-        print('🎭 INITIAL BATCH: Adding $mockAdsNeeded mock ads to reach target');
+        AppLogger.log('🎭 INITIAL BATCH: Adding $mockAdsNeeded mock ads to reach target');
         
         for (int i = 0; i < mockAdsNeeded; i++) {
           final mockAd = AdMobService.createMockAd();
@@ -85,45 +86,45 @@ class AdvancedAdPreloaderService {
           }
         }
         
-        print('🎭 INITIAL BATCH: Pool now has ${_adPool.length} ads (real + mock)');
+        AppLogger.log('🎭 INITIAL BATCH: Pool now has ${_adPool.length} ads (real + mock)');
       }
       
     } catch (e) {
-      print('❌ ADVANCED PRELOADER: Initial batch failed: $e');
+      AppLogger.error(' ADVANCED PRELOADER: Initial batch failed: $e');
       
       // Emergency: Create all mock ads if real ads completely fail
-      print('🎭 EMERGENCY INIT: Creating all mock ads for initial batch');
+      AppLogger.log('🎭 EMERGENCY INIT: Creating all mock ads for initial batch');
       for (int i = 0; i < _targetPoolSize; i++) {
         final mockAd = AdMobService.createMockAd();
         if (mockAd != null) {
           _adPool.add(mockAd);
         }
       }
-      print('🎭 EMERGENCY INIT: Created ${_adPool.length} mock ads');
+      AppLogger.log('🎭 EMERGENCY INIT: Created ${_adPool.length} mock ads');
     }
   }
 
   /// Background check to maintain ad pool
   static Future<void> _backgroundPreloadCheck() async {
     if (_isPreloading) {
-      print('🔄 ADVANCED PRELOADER: Already preloading, skipping...');
+      AppLogger.info(' ADVANCED PRELOADER: Already preloading, skipping...');
       return;
     }
 
     final currentPoolSize = _adPool.length;
-    print('📊 ADVANCED PRELOADER: Pool check - ${currentPoolSize}/${_targetPoolSize} ads');
+    AppLogger.log('📊 ADVANCED PRELOADER: Pool check - ${currentPoolSize}/${_targetPoolSize} ads');
 
     // Determine if we need aggressive preloading
     bool needsAggressivePreload = currentPoolSize < _minPoolThreshold;
     
     if (needsAggressivePreload) {
-      print('🚨 ADVANCED PRELOADER: Pool critically low! Starting aggressive preload...');
+      AppLogger.log('🚨 ADVANCED PRELOADER: Pool critically low! Starting aggressive preload...');
       await _aggressivePreload();
     } else if (currentPoolSize < _targetPoolSize) {
-      print('🔄 ADVANCED PRELOADER: Pool below target, gentle preload...');
+      AppLogger.info(' ADVANCED PRELOADER: Pool below target, gentle preload...');
       await _gentlePreload();
     } else {
-      print('✅ ADVANCED PRELOADER: Pool healthy, no action needed');
+      AppLogger.success(' ADVANCED PRELOADER: Pool healthy, no action needed');
     }
 
     // Clean up expired ads
@@ -136,7 +137,7 @@ class AdvancedAdPreloaderService {
     
     try {
       final adsNeeded = _targetPoolSize - _adPool.length;
-      print('🚨 AGGRESSIVE PRELOAD: Loading $adsNeeded ads quickly...');
+      AppLogger.log('🚨 AGGRESSIVE PRELOAD: Loading $adsNeeded ads quickly...');
       
       // Load in parallel batches for speed
       final futures = <Future<List<NativeAdModel>>>[];
@@ -161,10 +162,10 @@ class AdvancedAdPreloaderService {
         totalLoaded += batch.length;
       }
       
-      print('🚨 AGGRESSIVE PRELOAD: Loaded $totalLoaded ads (Pool: ${_adPool.length})');
+      AppLogger.log('🚨 AGGRESSIVE PRELOAD: Loaded $totalLoaded ads (Pool: ${_adPool.length})');
       
     } catch (e) {
-      print('❌ AGGRESSIVE PRELOAD: Failed: $e');
+      AppLogger.error(' AGGRESSIVE PRELOAD: Failed: $e');
     } finally {
       _isPreloading = false;
     }
@@ -176,15 +177,15 @@ class AdvancedAdPreloaderService {
     
     try {
       final adsNeeded = min(3, _targetPoolSize - _adPool.length);
-      print('🔄 GENTLE PRELOAD: Loading $adsNeeded ads...');
+      AppLogger.info(' GENTLE PRELOAD: Loading $adsNeeded ads...');
       
       final newAds = await AdMobService.createMultipleAds(adsNeeded);
       _adPool.addAll(newAds);
       
-      print('🔄 GENTLE PRELOAD: Loaded ${newAds.length} ads (Pool: ${_adPool.length})');
+      AppLogger.info(' GENTLE PRELOAD: Loaded ${newAds.length} ads (Pool: ${_adPool.length})');
       
     } catch (e) {
-      print('❌ GENTLE PRELOAD: Failed: $e');
+      AppLogger.error(' GENTLE PRELOAD: Failed: $e');
     } finally {
       _isPreloading = false;
     }
@@ -192,7 +193,7 @@ class AdvancedAdPreloaderService {
 
   /// Get ads from the preloaded pool
   static List<NativeAdModel> getPreloadedAds(int count, {String? category}) {
-    print('📱 POOL REQUEST: Getting $count ads from pool (${_adPool.length} available)');
+    AppLogger.info(' POOL REQUEST: Getting $count ads from pool (${_adPool.length} available)');
     
     // Track user behavior
     _articlesReadInSession++;
@@ -207,7 +208,7 @@ class AdvancedAdPreloaderService {
         validAds.add(ad);
       } else {
         invalidAds.add(ad);
-        print('❌ INVALID AD FOUND: ${ad.id} - ${ad.isLoaded ? "loaded but invalid" : "not loaded"}');
+        AppLogger.error(' INVALID AD FOUND: ${ad.id} - ${ad.isLoaded ? "loaded but invalid" : "not loaded"}');
       }
     }
     
@@ -217,7 +218,7 @@ class AdvancedAdPreloaderService {
       invalidAd.nativeAd?.dispose(); // Handle nullable nativeAd
     }
     
-    print('📊 POOL HEALTH: ${validAds.length} valid, ${invalidAds.length} invalid (removed)');
+    AppLogger.log('📊 POOL HEALTH: ${validAds.length} valid, ${invalidAds.length} invalid (removed)');
     
     // Get ads to return
     final adsToReturn = validAds.take(count).toList();
@@ -227,10 +228,10 @@ class AdvancedAdPreloaderService {
       _adPool.remove(ad);
     }
     
-    print('📱 POOL SERVED: Returned ${adsToReturn.length} ads, ${_adPool.length} remaining');
+    AppLogger.info(' POOL SERVED: Returned ${adsToReturn.length} ads, ${_adPool.length} remaining');
     
     // ALWAYS trigger preload when ads are requested (more aggressive)
-    print('🔄 TRIGGERING PRELOAD: After serving ads');
+    AppLogger.info(' TRIGGERING PRELOAD: After serving ads');
     _triggerImmediatePreload();
     
     return adsToReturn;
@@ -263,12 +264,12 @@ class AdvancedAdPreloaderService {
       final timeSinceLastRequest = now.difference(_lastAdRequest!).inSeconds;
       
       if (timeSinceLastRequest > _averageReadingSpeed * 3) {
-        print('🔮 PREDICTIVE: User reading fast, increasing preload...');
+        AppLogger.log('🔮 PREDICTIVE: User reading fast, increasing preload...');
         _targetPoolSize = min(15, _targetPoolSize + 2);
       }
     }
     
-    print('🔮 PREDICTIVE: Next ads needed around ${estimatedNextAdTime.toString().substring(11, 19)}');
+    AppLogger.log('🔮 PREDICTIVE: Next ads needed around ${estimatedNextAdTime.toString().substring(11, 19)}');
   }
 
   /// Clean up expired or invalid ads
@@ -278,7 +279,7 @@ class AdvancedAdPreloaderService {
     
     final removedCount = initialCount - _adPool.length;
     if (removedCount > 0) {
-      print('🧹 CLEANUP: Removed $removedCount expired ads (${_adPool.length} remaining)');
+      AppLogger.log('🧹 CLEANUP: Removed $removedCount expired ads (${_adPool.length} remaining)');
     }
   }
 
@@ -300,12 +301,12 @@ class AdvancedAdPreloaderService {
   static void adjustPoolSize({int? newTargetSize, double? newReadingSpeed}) {
     if (newTargetSize != null) {
       _targetPoolSize = newTargetSize.clamp(5, 20);
-      print('📊 POOL ADJUSTED: Target size set to $_targetPoolSize');
+      AppLogger.log('📊 POOL ADJUSTED: Target size set to $_targetPoolSize');
     }
     
     if (newReadingSpeed != null) {
       _averageReadingSpeed = newReadingSpeed.clamp(10.0, 120.0);
-      print('📊 READING SPEED: Adjusted to ${_averageReadingSpeed}s per article');
+      AppLogger.log('📊 READING SPEED: Adjusted to ${_averageReadingSpeed}s per article');
     }
   }
 
@@ -327,21 +328,21 @@ class AdvancedAdPreloaderService {
     }
     _categoryAdPools.clear();
     
-    print('🗑️ ADVANCED PRELOADER: Disposed all ads and timers');
+    AppLogger.log('🗑️ ADVANCED PRELOADER: Disposed all ads and timers');
   }
 
   /// Emergency ad request when pool is empty
   static Future<List<NativeAdModel>> emergencyAdRequest(int count) async {
-    print('🚨 EMERGENCY: Pool empty! Loading ads immediately...');
+    AppLogger.log('🚨 EMERGENCY: Pool empty! Loading ads immediately...');
     
     try {
       final emergencyAds = await AdMobService.createMultipleAds(count);
-      print('🚨 EMERGENCY: Loaded ${emergencyAds.length} real emergency ads');
+      AppLogger.log('🚨 EMERGENCY: Loaded ${emergencyAds.length} real emergency ads');
       
       // If we got some ads but not enough, fill with mock ads
       if (emergencyAds.length < count) {
         final mockAdsNeeded = count - emergencyAds.length;
-        print('🎭 EMERGENCY FALLBACK: Creating $mockAdsNeeded mock ads');
+        AppLogger.log('🎭 EMERGENCY FALLBACK: Creating $mockAdsNeeded mock ads');
         
         for (int i = 0; i < mockAdsNeeded; i++) {
           final mockAd = AdMobService.createMockAd();
@@ -351,11 +352,11 @@ class AdvancedAdPreloaderService {
         }
       }
       
-      print('🚨 EMERGENCY COMPLETE: Returning ${emergencyAds.length} total ads (real + mock)');
+      AppLogger.log('🚨 EMERGENCY COMPLETE: Returning ${emergencyAds.length} total ads (real + mock)');
       return emergencyAds;
     } catch (e) {
-      print('❌ EMERGENCY: Failed to load real ads: $e');
-      print('🎭 EMERGENCY FALLBACK: Creating $count mock ads');
+      AppLogger.error(' EMERGENCY: Failed to load real ads: $e');
+      AppLogger.log('🎭 EMERGENCY FALLBACK: Creating $count mock ads');
       
       // Create all mock ads as fallback
       final mockAds = <NativeAdModel>[];
@@ -366,7 +367,7 @@ class AdvancedAdPreloaderService {
         }
       }
       
-      print('🎭 EMERGENCY FALLBACK COMPLETE: Created ${mockAds.length} mock ads');
+      AppLogger.log('🎭 EMERGENCY FALLBACK COMPLETE: Created ${mockAds.length} mock ads');
       return mockAds;
     }
   }

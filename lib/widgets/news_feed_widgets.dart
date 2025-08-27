@@ -9,7 +9,9 @@ import '../services/news_feed_helper.dart';
 import '../services/text_formatting_service.dart';
 import '../services/dynamic_text_service.dart';
 import '../services/url_launcher_service.dart';
+import '../services/consolidated/article_service.dart';
 
+import '../utils/app_logger.dart';
 class NewsFeedWidgets {
   static Widget buildNoArticlesPage(BuildContext context, String error) {
     return Container(
@@ -286,16 +288,16 @@ class NewsFeedWidgets {
                   // Blurred background with article image for bottom section
                   GestureDetector(
                     onTap: () {
-                      print('🔥 BLURRED BOX TAPPED!');
-                      print('🔗 Article sourceUrl: "${article.sourceUrl}"');
-                      print('📰 Article title: "${article.title}"');
+                      AppLogger.log('🔥 BLURRED BOX TAPPED!');
+                      AppLogger.log('🔗 Article sourceUrl: "${article.sourceUrl}"');
+                      AppLogger.log('📰 Article title: "${article.title}"');
                       
                       // Open article URL directly in internal browser
                       if (article.sourceUrl != null && article.sourceUrl!.isNotEmpty) {
-                        print('✅ URL is available, opening directly in internal browser');
+                        AppLogger.success(' URL is available, opening directly in internal browser');
                         UrlLauncherService.launchInternalBrowser(article.sourceUrl!);
                       } else {
-                        print('❌ No URL available for this article');
+                        AppLogger.error(' No URL available for this article');
                       }
                     },
                     child: Container(
@@ -352,7 +354,13 @@ class NewsFeedWidgets {
                               buildActionButton(
                                 CupertinoIcons.square_arrow_up,
                                 palette.onPrimary,
-                                () {},
+                                () async {
+                                  try {
+                                    await ArticleService.shareArticle(article);
+                                  } catch (e) {
+                                    AppLogger.error('Share failed: $e');
+                                  }
+                                },
                               ),
                             ],
                           ),

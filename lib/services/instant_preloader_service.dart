@@ -3,6 +3,7 @@ import '../models/news_article.dart';
 import 'optimized_image_service.dart';
 import 'parallel_color_service.dart';
 
+import '../utils/app_logger.dart';
 /// CRITICAL FIX: Instant preloader that starts immediately when articles load
 class InstantPreloaderService {
   static Timer? _preloadTimer;
@@ -13,7 +14,7 @@ class InstantPreloaderService {
     if (articles.isEmpty || _isPreloading) return;
     
     _isPreloading = true;
-    print('🚀 INSTANT PRELOAD: Starting immediate preloading of ${articles.length} articles');
+    AppLogger.info(' INSTANT PRELOAD: Starting immediate preloading of ${articles.length} articles');
     
     // Cancel any existing timer
     _preloadTimer?.cancel();
@@ -27,21 +28,21 @@ class InstantPreloaderService {
   /// Preload ALL images instantly in batches for zero delay
   static Future<void> _preloadAllImagesInstantly(List<NewsArticle> articles) async {
     try {
-      print('🚀 INSTANT PRELOAD: Preloading first 30 images for instant access');
+      AppLogger.info(' INSTANT PRELOAD: Preloading first 30 images for instant access');
       
       // Preload first 30 images in parallel for instant access
       final imagesToPreload = articles.take(30).toList();
       
       // Preload first 5 images with highest priority (wait for them)
-      print('🚀 INSTANT PRELOAD: Priority loading first 5 images');
+      AppLogger.info(' INSTANT PRELOAD: Priority loading first 5 images');
       for (int i = 0; i < imagesToPreload.length && i < 5; i++) {
         final imageUrl = imagesToPreload[i].imageUrl;
         await OptimizedImageService.preloadSingleImageWithPriority(imageUrl);
-        print('✅ INSTANT PRELOAD: Priority image $i loaded');
+        AppLogger.success(' INSTANT PRELOAD: Priority image $i loaded');
       }
       
       // Preload next 25 images in background (don't wait)
-      print('🚀 INSTANT PRELOAD: Background loading next 25 images');
+      AppLogger.info(' INSTANT PRELOAD: Background loading next 25 images');
       final backgroundFutures = <Future<void>>[];
       for (int i = 5; i < imagesToPreload.length; i++) {
         final imageUrl = imagesToPreload[i].imageUrl;
@@ -50,16 +51,16 @@ class InstantPreloaderService {
       
       // Let background preloading continue without blocking
       Future.wait(backgroundFutures).then((_) {
-        print('✅ INSTANT PRELOAD: All 30 images preloaded successfully');
+        AppLogger.success(' INSTANT PRELOAD: All 30 images preloaded successfully');
       }).catchError((e) {
-        print('❌ INSTANT PRELOAD: Some images failed to preload: $e');
+        AppLogger.error(' INSTANT PRELOAD: Some images failed to preload: $e');
       });
       
       // Also preload colors for first 15 articles
       ParallelColorService.preloadColorsParallel(articles, 0, colorPreloadCount: 15);
       
     } catch (e) {
-      print('❌ INSTANT PRELOAD ERROR: $e');
+      AppLogger.error(' INSTANT PRELOAD ERROR: $e');
     } finally {
       _isPreloading = false;
     }
