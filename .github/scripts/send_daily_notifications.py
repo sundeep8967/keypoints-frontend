@@ -105,8 +105,9 @@ def get_unique_daily_article(supabase):
 def create_notification_message(news_item):
     """Create FCM notification message with image and title only"""
     
-    # Extract title only
-    title = news_item.get('title', 'Daily News Update')[:60]  # Slightly longer title since no body text
+    # Extract title with attention-grabbing emojis
+    raw_title = news_item.get('title', 'Daily News Update')
+    title = f"🔥 {raw_title}"[:60]  # Add fire emoji for urgency
     
     # Get image URL (check multiple possible field names)
     image_url = (
@@ -136,9 +137,13 @@ def create_notification_message(news_item):
         'android': messaging.AndroidConfig(
             notification=messaging.AndroidNotification(
                 channel_id='news_channel',
-                priority='default',
+                priority='high',
                 default_sound=True,
-                image=image_url
+                image=image_url,
+                color='#FF6B35',  # Eye-catching orange color
+                default_vibrate_timings=True,  # Vibration pattern
+                visibility='public',  # Show on lock screen
+                ticker='📰 Breaking News Update!'  # Scrolling text on older Android
             )
         ),
         'apns': messaging.APNSConfig(
@@ -146,11 +151,14 @@ def create_notification_message(news_item):
                 aps=messaging.Aps(
                     alert=messaging.ApsAlert(
                         title=title,
-                        body=''
+                        body='',
+                        subtitle='📱 Tap to read now!'  # Subtitle for iOS
                     ),
                     sound='default',
                     badge=1,
-                    mutable_content=True
+                    mutable_content=True,
+                    interruption_level='active',  # iOS 15+ - bypass Focus modes
+                    relevance_score=1.0  # iOS 15+ - highest relevance
                 )
             ),
             fcm_options=messaging.APNSFCMOptions(
