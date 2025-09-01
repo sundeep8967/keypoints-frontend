@@ -2,13 +2,13 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
-import '../models/news_article.dart';
+import '../domain/entities/news_article_entity.dart';
 import '../services/text_formatting_service.dart';
 import '../services/dynamic_text_service.dart';
 import '../services/url_launcher_service.dart';
 
 class DynamicColorNewsCard extends StatefulWidget {
-  final NewsArticle article;
+  final NewsArticleEntity article;
   final VoidCallback? onTap;
 
   const DynamicColorNewsCard({
@@ -156,7 +156,7 @@ class _DynamicColorNewsCardState extends State<DynamicColorNewsCard> {
                     // Intelligently sized content based on available space
                     Expanded(
                       child: DynamicTextService.buildAdaptiveContent(
-                        keypoints: widget.article.keypoints,
+                        keypoints: widget.article.description,
                         description: widget.article.description,
                         baseStyle: TextStyle(
                           fontSize: 16,

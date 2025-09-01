@@ -5,7 +5,7 @@ import '../../../domain/usecases/get_news.dart';
 import '../../../domain/usecases/get_news_by_category.dart';
 import '../../../domain/usecases/mark_article_as_read.dart';
 import '../../../services/ad_integration_service.dart';
-import '../../../models/news_article.dart';
+// Removed - using NewsArticleEntity from domain layer
 
 part 'news_event.dart';
 part 'news_state.dart';
@@ -43,19 +43,7 @@ class NewsBloc extends Bloc<NewsEvent, NewsState> {
   /// Gets current index
   int get currentIndex => _currentIndex;
 
-  /// Convert NewsArticleEntity to NewsArticle for ad integration
-  List<NewsArticle> _convertEntitiesToModels(List<NewsArticleEntity> entities) {
-    return entities.map((entity) => NewsArticle(
-      id: entity.id,
-      title: entity.title,
-      description: entity.description,
-      imageUrl: entity.imageUrl,
-      timestamp: entity.timestamp,
-      category: entity.category,
-      keypoints: entity.keypoints,
-      sourceUrl: entity.sourceUrl,
-    )).toList();
-  }
+  // Removed conversion method - using NewsArticleEntity directly
 
   Future<void> _onLoadNews(LoadNewsEvent event, Emitter<NewsState> emit) async {
     emit(NewsLoading());
@@ -65,11 +53,9 @@ class NewsBloc extends Bloc<NewsEvent, NewsState> {
     await result.fold(
       (failure) async => emit(NewsError(failure.message)),
       (articles) async {
-        // Convert entities to models for ad integration
-        final articleModels = _convertEntitiesToModels(articles);
-        // Integrate ads into the news feed
+        // Integrate ads into the news feed using entities directly
         final mixedFeed = await AdIntegrationService.integrateAdsIntoFeed(
-          articles: articleModels,
+          articles: articles,
           category: 'All',
           maxAds: 3,
         );
@@ -88,11 +74,9 @@ class NewsBloc extends Bloc<NewsEvent, NewsState> {
     await result.fold(
       (failure) async => emit(NewsError(failure.message)),
       (articles) async {
-        // Convert entities to models for ad integration
-        final articleModels = _convertEntitiesToModels(articles);
-        // Integrate ads into the category feed
+        // Integrate ads into the category feed using entities directly
         final mixedFeed = await AdIntegrationService.integrateAdsIntoFeed(
-          articles: articleModels,
+          articles: articles,
           category: event.category,
           maxAds: 3,
         );
@@ -138,10 +122,9 @@ class NewsBloc extends Bloc<NewsEvent, NewsState> {
       (articles) async {
         // Clear ads cache and integrate fresh ads
         AdIntegrationService.clearAllAds();
-        // Convert entities to models for ad integration
-        final articleModels = _convertEntitiesToModels(articles);
+        // Integrate fresh ads using entities directly
         final mixedFeed = await AdIntegrationService.integrateAdsIntoFeed(
-          articles: articleModels,
+          articles: articles,
           category: 'All',
           maxAds: 3,
         );

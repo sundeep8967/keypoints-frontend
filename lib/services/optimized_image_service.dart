@@ -2,8 +2,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
-import '../models/news_article.dart';
+import '../domain/entities/news_article_entity.dart';
 import 'aggressive_cache_manager.dart';
+
+enum ImagePriority { low, normal, high, critical }
 
 class OptimizedImageService {
   static final Map<String, bool> _preloadedImages = {};
@@ -67,7 +69,7 @@ class OptimizedImageService {
 
   /// Preload images aggressively for next articles
   static Future<void> preloadImagesAggressively(
-    List<NewsArticle> articles,
+    List<NewsArticleEntity> articles,
     int currentIndex, {
     int preloadCount = 15, // CRITICAL FIX: Increased from 5 to 15
   }) async {
@@ -111,15 +113,25 @@ class OptimizedImageService {
     try {
       _preloadingInProgress[imageUrl] = true;
       
-      // Use CachedNetworkImageProvider for efficient preloading
-      final imageProvider = CachedNetworkImageProvider(imageUrl);
+      // 🚀 HIGH PRIORITY: Use aggressive cache manager for priority images
+      final cacheManager = priority 
+          ? AggressiveCacheManager() 
+          : DefaultCacheManager();
+      
+      // 🎯 PRIORITY: Use appropriate cache manager based on priority
+      final imageProvider = CachedNetworkImageProvider(
+        imageUrl,
+        cacheManager: cacheManager,
+        maxHeight: priority ? null : 400, // Full resolution for priority images
+        maxWidth: priority ? null : 400,
+      );
       
       // Cache the provider for instant access
       _imageProviderCache[imageUrl] = imageProvider;
       
-      // Preload with appropriate configuration
+      // 🚀 PRIORITY: Configure based on priority level
       final imageConfiguration = ImageConfiguration(
-        size: priority ? const Size(400, 300) : const Size(200, 150), // Smaller size for background preloading
+        size: priority ? null : const Size(200, 150), // Full size for priority, smaller for background
       );
       
       final completer = Completer<void>();
@@ -172,7 +184,7 @@ class OptimizedImageService {
 
   /// Preload images when user scrolls to an article
   static Future<void> onArticleViewed(
-    List<NewsArticle> articles,
+    List<NewsArticleEntity> articles,
     int viewedIndex,
   ) async {
     // Aggressively preload next 15 images (CRITICAL FIX)
@@ -189,7 +201,7 @@ class OptimizedImageService {
 
   /// Preload first batch of images for a category
   static Future<void> preloadCategoryImages(
-    List<NewsArticle> articles, {
+    List<NewsArticleEntity> articles, {
     int maxImages = 8,
   }) async {
     if (articles.isEmpty) return;

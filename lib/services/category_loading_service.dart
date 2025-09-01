@@ -1,12 +1,12 @@
-import '../models/news_article.dart';
+import '../domain/entities/news_article_entity.dart';
 import '../services/supabase_service.dart';
 import '../services/read_articles_service.dart';
 
 import '../utils/app_logger.dart';
 class CategoryLoadingService {
-  static Future<List<NewsArticle>> loadNewsArticlesForCategory(String category) async {
+  static Future<List<NewsArticleEntity>> loadNewsArticlesForCategory(String category) async {
     try {
-      final allArticles = await SupabaseService.getNews(limit: 100);
+      final allArticles = await SupabaseService.getNews(limit: 2000);
       if (allArticles.isNotEmpty) {
         final readIds = await ReadArticlesService.getReadArticleIds();
         final unreadArticles = allArticles.where((article) => 
@@ -23,7 +23,7 @@ class CategoryLoadingService {
     }
   }
 
-  static Future<List<NewsArticle>> loadArticlesByCategoryWithSwipeContext(
+  static Future<List<NewsArticleEntity>> loadArticlesByCategoryWithSwipeContext(
     String category, 
     bool isRightSwipe,
     Function showToast,
@@ -35,7 +35,7 @@ class CategoryLoadingService {
 
       // PRIORITY 1: Try Supabase category filter
       try {
-        final allCategoryArticles = await SupabaseService.getNewsByCategory(category, limit: 100);
+        final allCategoryArticles = await SupabaseService.getNewsByCategory(category, limit: 1000);
         if (allCategoryArticles.isNotEmpty) {
           final unreadCategoryArticles = allCategoryArticles.where((article) => 
             !readIds.contains(article.id)
@@ -119,7 +119,7 @@ class CategoryLoadingService {
     }
   }
 
-  static Future<List<NewsArticle>> loadArticlesByCategory(
+  static Future<List<NewsArticleEntity>> loadArticlesByCategory(
     String category,
     Function showToast,
     Function loadAllOtherUnreadArticles,
@@ -130,7 +130,7 @@ class CategoryLoadingService {
 
       // PRIORITY 1: Try Supabase category filter
       try {
-        final allCategoryArticles = await SupabaseService.getNewsByCategory(category, limit: 100);
+        final allCategoryArticles = await SupabaseService.getNewsByCategory(category, limit: 1000);
         if (allCategoryArticles.isNotEmpty) {
           final unreadCategoryArticles = allCategoryArticles.where((article) => 
             !readIds.contains(article.id)

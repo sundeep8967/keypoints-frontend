@@ -1,5 +1,5 @@
 import 'package:flutter/cupertino.dart';
-import '../../models/news_article.dart';
+import '../../domain/entities/news_article_entity.dart';
 import '../color_extraction_service.dart';
 import 'news_service.dart';
 import 'category_service.dart';
@@ -15,7 +15,7 @@ class NewsFacade {
   NewsFacade._internal();
 
   // State management
-  final Map<String, List<NewsArticle>> _categoryCache = {};
+  final Map<String, List<NewsArticleEntity>> _categoryCache = {};
   final Map<String, bool> _loadingStates = {};
 
   /// Initialize the facade and preload essential data
@@ -34,11 +34,11 @@ class NewsFacade {
   }
 
   /// Load articles for the main feed (All category)
-  Future<List<NewsArticle>> loadMainFeed({bool forceRefresh = false}) async {
+  Future<List<NewsArticleEntity>> loadMainFeed({bool forceRefresh = false}) async {
     try {
       _setLoading('All', true);
       
-      List<NewsArticle> articles;
+      List<NewsArticleEntity> articles;
       if (forceRefresh) {
         articles = await NewsService.refreshNews();
       } else {
@@ -67,7 +67,7 @@ class NewsFacade {
   }
 
   /// Load articles for a specific category
-  Future<List<NewsArticle>> loadCategoryFeed(
+  Future<List<NewsArticleEntity>> loadCategoryFeed(
     String category, {
     bool forceRefresh = false,
   }) async {
@@ -101,7 +101,7 @@ class NewsFacade {
   }
 
   /// Get cached articles for a category
-  List<NewsArticle> getCachedArticles(String category) {
+  List<NewsArticleEntity> getCachedArticles(String category) {
     return _categoryCache[category] ?? [];
   }
 
@@ -111,7 +111,7 @@ class NewsFacade {
   }
 
   /// Mark article as read (but keep in current session cache to prevent list changes)
-  Future<void> markArticleAsRead(NewsArticle article) async {
+  Future<void> markArticleAsRead(NewsArticleEntity article) async {
     try {
       await ArticleService.markAsRead(article.id);
       
@@ -127,7 +127,7 @@ class NewsFacade {
   }
 
   /// Share an article
-  Future<void> shareArticle(NewsArticle article) async {
+  Future<void> shareArticle(NewsArticleEntity article) async {
     try {
       await ArticleService.shareArticle(article);
     } catch (e) {

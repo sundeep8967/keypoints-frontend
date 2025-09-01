@@ -1,4 +1,4 @@
-import '../models/news_article.dart';
+import '../domain/entities/news_article_entity.dart';
 import '../services/supabase_service.dart';
 import '../services/read_articles_service.dart';
 
@@ -9,7 +9,7 @@ class DynamicCategoryDiscoveryService {
   /// Discover categories by checking what's available in the backend
   /// This runs in parallel and updates the UI as categories are found
   static Future<void> discoverCategoriesInParallel({
-    required Function(String category, List<NewsArticle> articles) onCategoryDiscovered,
+    required Function(String category, List<NewsArticleEntity> articles) onCategoryDiscovered,
     required Function(String category) onCategoryEmpty,
     required Function() onDiscoveryComplete,
   }) async {
@@ -63,7 +63,7 @@ class DynamicCategoryDiscoveryService {
   
   /// Discover categories one by one with immediate UI updates
   static Future<void> discoverCategoriesSequentially({
-    required Function(String category, List<NewsArticle> articles) onCategoryDiscovered,
+    required Function(String category, List<NewsArticleEntity> articles) onCategoryDiscovered,
     required Function(String category) onCategoryEmpty,
     required Function() onDiscoveryComplete,
   }) async {

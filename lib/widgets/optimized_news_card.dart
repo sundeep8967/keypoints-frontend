@@ -1,13 +1,13 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import '../models/news_article.dart';
+import '../domain/entities/news_article_entity.dart';
 import '../services/color_extraction_service.dart';
 import '../services/dynamic_text_service.dart';
 import '../services/url_launcher_service.dart';
 
 class OptimizedNewsCard extends StatelessWidget {
-  final NewsArticle article;
+  final NewsArticleEntity article;
   final ColorPalette palette;
   final VoidCallback? onTap;
 
@@ -131,7 +131,7 @@ class OptimizedNewsCard extends StatelessWidget {
                   
                   // Dynamic content
                   DynamicTextService.buildAdaptiveContent(
-                    keypoints: article.keypoints,
+                    keypoints: article.description,
                     description: article.description,
                     baseStyle: TextStyle(
                       fontSize: 16,

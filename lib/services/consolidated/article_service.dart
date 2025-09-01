@@ -1,6 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:share_plus/share_plus.dart';
-import '../../models/news_article.dart';
+import '../../domain/entities/news_article_entity.dart';
 import '../read_articles_service.dart';
 import '../color_extraction_service.dart';
 import '../news_ui_service.dart';
@@ -94,7 +94,7 @@ class ArticleService {
 
   /// Preload color palettes for multiple articles
   static Future<void> preloadColorPalettes(
-    List<NewsArticle> articles, {
+    List<NewsArticleEntity> articles, {
     int startIndex = 0,
     int count = 3,
   }) async {
@@ -141,9 +141,9 @@ class ArticleService {
   }
 
   /// Filter articles to remove invalid ones
-  static Future<List<NewsArticle>> filterValidArticles(List<NewsArticle> articles) async {
+  static Future<List<NewsArticleEntity>> filterValidArticles(List<NewsArticleEntity> articles) async {
     try {
-      final validArticles = <NewsArticle>[];
+      final validArticles = <NewsArticleEntity>[];
       final invalidArticleIds = <String>[];
 
       for (final article in articles) {
@@ -171,7 +171,7 @@ class ArticleService {
   }
 
   /// Share an article with full functionality
-  static Future<void> shareArticle(NewsArticle article) async {
+  static Future<void> shareArticle(NewsArticleEntity article) async {
     try {
       AppLogger.log('ArticleService: Sharing article: ${article.title}');
       
@@ -226,7 +226,7 @@ ${article.sourceUrl != null && article.sourceUrl!.isNotEmpty ? '\n🔗 Source: $
   }
 
   /// Remove an article from all caches and mark as read
-  static Future<void> removeArticle(NewsArticle article) async {
+  static Future<void> removeArticle(NewsArticleEntity article) async {
     try {
       // Mark as read
       await markAsRead(article.id);
@@ -255,7 +255,7 @@ ${article.sourceUrl != null && article.sourceUrl!.isNotEmpty ? '\n🔗 Source: $
   }
 
   // Private helper methods
-  static bool _isArticleValid(NewsArticle article) {
+  static bool _isArticleValid(NewsArticleEntity article) {
     // Check if article has required fields
     if (article.title.trim().isEmpty) return false;
     if (article.description.trim().isEmpty) return false;

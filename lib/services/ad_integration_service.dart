@@ -1,4 +1,4 @@
-import '../models/news_article.dart';
+import '../domain/entities/news_article_entity.dart';
 import '../models/native_ad_model.dart';
 import 'admob_service.dart';
 import 'ad_debug_service.dart';
@@ -26,7 +26,7 @@ class AdIntegrationService {
 
   /// Mix ads into a list of news articles with unlimited ad support
   static Future<List<dynamic>> integrateAdsIntoFeed({
-    required List<NewsArticle> articles,
+    required List<NewsArticleEntity> articles,
     required String category,
     int maxAds = 999, // Default to unlimited
   }) async {
@@ -162,7 +162,7 @@ class AdIntegrationService {
 
   /// Check if an item in the mixed feed is a news article
   static bool isNewsArticle(dynamic item) {
-    return item is NewsArticle;
+    return item is NewsArticleEntity;
   }
 
   /// Get the type of item for debugging

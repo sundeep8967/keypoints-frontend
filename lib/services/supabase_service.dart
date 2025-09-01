@@ -1,6 +1,6 @@
 import 'dart:io';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../models/news_article.dart';
+import '../domain/entities/news_article_entity.dart';
 import '../config/app_config.dart';
 
 import '../utils/app_logger.dart';
@@ -66,7 +66,7 @@ class SupabaseService {
   /// * [Exception] with "Database error" for Supabase-specific issues
   /// * [Exception] with "Network connection failed" for connectivity issues
   /// * [Exception] with "Failed to load news articles" for other errors
-  static Future<List<NewsArticle>> getNews({int limit = 100}) async {
+  static Future<List<NewsArticleEntity>> getNews({int limit = 1000}) async {
     try {
       final response = await client
           .from('news_articles')
@@ -78,12 +78,7 @@ class SupabaseService {
         throw Exception('NO_ARTICLES_IN_DATABASE');
       }
 
-      final articles = response.map<NewsArticle>((json) => NewsArticle.fromSupabase(json)).toList();
-      
-      // Print source for each article
-      for (final article in articles) {
-        AppLogger.log('source--> ${article.source}');
-      }
+      final articles = response.map<NewsArticleEntity>((json) => NewsArticleEntity.fromSupabase(json)).toList();
       
       return articles;
     } on PostgrestException catch (e) {
@@ -96,20 +91,20 @@ class SupabaseService {
   }
 
   /// Get news articles stream for real-time updates
-  static Stream<List<NewsArticle>> getNewsStream({int limit = 50}) {
+  static Stream<List<NewsArticleEntity>> getNewsStream({int limit = 50}) {
     return client
         .from('news_articles')
         .stream(primaryKey: ['id'])
         .order('published', ascending: false)
         .limit(limit)
         .map((data) {
-          final articles = data.map<NewsArticle>((json) => NewsArticle.fromSupabase(json)).toList();
+          final articles = data.map<NewsArticleEntity>((json) => NewsArticleEntity.fromSupabase(json)).toList();
           return articles;
         });
   }
 
   /// Add a news article to Supabase
-  static Future<bool> addNews(NewsArticle article) async {
+  static Future<bool> addNews(NewsArticleEntity article) async {
     try {
       await client.from('news_articles').insert(article.toSupabaseMap());
       return true;
@@ -120,7 +115,7 @@ class SupabaseService {
   }
 
   /// Update a news article in Supabase
-  static Future<bool> updateNews(NewsArticle article) async {
+  static Future<bool> updateNews(NewsArticleEntity article) async {
     try {
       await client
           .from('news_articles')
@@ -161,7 +156,7 @@ class SupabaseService {
   /// * [Exception] with "Database error" for Supabase-specific issues
   /// * [Exception] with "Network connection failed" for connectivity issues
   /// * [Exception] with "Failed to load [category] articles" for other errors
-  static Future<List<NewsArticle>> getNewsByCategory(String category, {int limit = 50}) async {
+  static Future<List<NewsArticleEntity>> getNewsByCategory(String category, {int limit = 500}) async {
     if (category.trim().isEmpty) {
       throw ArgumentError('Category cannot be empty');
     }
@@ -174,7 +169,7 @@ class SupabaseService {
           .order('published', ascending: false)
           .limit(limit);
 
-      final articles = response.map<NewsArticle>((json) => NewsArticle.fromSupabase(json)).toList();
+      final articles = response.map<NewsArticleEntity>((json) => NewsArticleEntity.fromSupabase(json)).toList();
       return articles;
     } on PostgrestException catch (e) {
       throw Exception('Database error while fetching $category articles: ${e.message}');
@@ -186,7 +181,7 @@ class SupabaseService {
   }
 
   /// Get unread news by category (excludes read article IDs)
-  static Future<List<NewsArticle>> getUnreadNewsByCategory(String category, List<String> readIds, {int limit = 100, int offset = 0}) async {
+  static Future<List<NewsArticleEntity>> getUnreadNewsByCategory(String category, List<String> readIds, {int limit = 1000, int offset = 0}) async {
     if (category.trim().isEmpty) {
       throw ArgumentError('Category cannot be empty');
     }
@@ -208,13 +203,13 @@ class SupabaseService {
       // Exclude read articles if we have any - use neq for each ID or filter client-side
       if (readIds.isNotEmpty) {
         // Fetch more and filter client-side since Supabase syntax is tricky
-        // Increase fetch size to account for filtering and offset
-        final fetchLimit = (limit * 4) + offset;
+        // Increase fetch size to account for filtering and offset - use much larger multiplier
+        final fetchLimit = (limit * 10) + offset;
         final response = await query
             .order('published', ascending: false)
             .limit(fetchLimit);
             
-        final allArticles = response.map<NewsArticle>((json) => NewsArticle.fromSupabase(json)).toList();
+        final allArticles = response.map<NewsArticleEntity>((json) => NewsArticleEntity.fromSupabase(json)).toList();
         
         // Filter out read articles client-side
         final unreadArticles = allArticles.where((article) => 
@@ -229,7 +224,7 @@ class SupabaseService {
             .order('published', ascending: false)
             .range(offset, offset + limit - 1); // Use Supabase range for pagination
             
-        final articles = response.map<NewsArticle>((json) => NewsArticle.fromSupabase(json)).toList();
+        final articles = response.map<NewsArticleEntity>((json) => NewsArticleEntity.fromSupabase(json)).toList();
         return articles;
       }
     } on PostgrestException catch (e) {
@@ -244,7 +239,7 @@ class SupabaseService {
   }
 
   /// Search news articles
-  static Future<List<NewsArticle>> searchNews(String query, {int limit = 50}) async {
+  static Future<List<NewsArticleEntity>> searchNews(String query, {int limit = 50}) async {
     try {
       final response = await client
           .from('news_articles')
@@ -253,7 +248,7 @@ class SupabaseService {
           .order('published', ascending: false)
           .limit(limit);
 
-      final articles = response.map<NewsArticle>((json) => NewsArticle.fromSupabase(json)).toList();
+      final articles = response.map<NewsArticleEntity>((json) => NewsArticleEntity.fromSupabase(json)).toList();
       return articles;
     } catch (e) {
       AppLogger.log('Error searching news in Supabase: $e');

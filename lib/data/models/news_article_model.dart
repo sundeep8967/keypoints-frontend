@@ -8,24 +8,24 @@ class NewsArticleModel extends NewsArticleEntity {
     required super.imageUrl,
     required super.timestamp,
     required super.category,
-    super.keypoints,
     super.isRead,
     super.sourceUrl,
+    super.source,
   });
 
   factory NewsArticleModel.fromSupabase(Map<String, dynamic> json) {
     return NewsArticleModel(
       id: json['id']?.toString() ?? '',
       title: json['title'] ?? '',
-      description: json['summary'] ?? '',
+      description: json['summary'] ?? json['description'] ?? '',
       imageUrl: json['image_url'] ?? '',
       timestamp: json['published'] != null 
           ? DateTime.tryParse(json['published']) ?? DateTime.now()
           : DateTime.now(),
       category: json['category'] ?? 'General',
-      keypoints: json['keypoints'],
       isRead: false, // Will be determined by repository
       sourceUrl: json['link'] ?? json['source_url'] ?? json['original_url'],
+      source: json['source'],
     );
   }
 
@@ -37,8 +37,9 @@ class NewsArticleModel extends NewsArticleEntity {
       imageUrl: json['imageUrl'] ?? '',
       timestamp: DateTime.tryParse(json['timestamp'] ?? '') ?? DateTime.now(),
       category: json['category'] ?? 'General',
-      keypoints: json['keypoints'],
       isRead: json['isRead'] ?? false,
+      sourceUrl: json['sourceUrl'],
+      source: json['source'],
     );
   }
 
@@ -49,7 +50,7 @@ class NewsArticleModel extends NewsArticleEntity {
       'image_url': imageUrl,
       'published': timestamp.toIso8601String(),
       'category': category,
-      'keypoints': keypoints,
+      'link': sourceUrl,
     };
   }
 
@@ -61,8 +62,8 @@ class NewsArticleModel extends NewsArticleEntity {
       'imageUrl': imageUrl,
       'timestamp': timestamp.toIso8601String(),
       'category': category,
-      'keypoints': keypoints,
       'isRead': isRead,
+      'sourceUrl': sourceUrl,
     };
   }
 
@@ -74,9 +75,9 @@ class NewsArticleModel extends NewsArticleEntity {
       imageUrl: entity.imageUrl,
       timestamp: entity.timestamp,
       category: entity.category,
-      keypoints: entity.keypoints,
       isRead: entity.isRead,
       sourceUrl: entity.sourceUrl,
+      source: entity.source,
     );
   }
 }

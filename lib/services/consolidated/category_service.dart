@@ -1,5 +1,5 @@
 import 'package:flutter/cupertino.dart';
-import '../../models/news_article.dart';
+import '../../domain/entities/news_article_entity.dart';
 import '../local_storage_service.dart';
 import '../category_scroll_service.dart';
 import 'news_service.dart';
@@ -20,7 +20,7 @@ class CategoryService {
   ];
 
   // Cache for category articles
-  static final Map<String, List<NewsArticle>> _categoryCache = {};
+  static final Map<String, List<NewsArticleEntity>> _categoryCache = {};
   static final Map<String, bool> _categoryLoading = {};
   static final Map<String, DateTime> _categoryLastLoaded = {};
 
@@ -57,7 +57,7 @@ class CategoryService {
   }
 
   /// Load articles for a specific category with caching
-  static Future<List<NewsArticle>> loadCategoryArticles(
+  static Future<List<NewsArticleEntity>> loadCategoryArticles(
     String category, {
     bool forceRefresh = false,
     int limit = 50,
@@ -80,7 +80,7 @@ class CategoryService {
       // Set loading state
       _categoryLoading[category] = true;
 
-      List<NewsArticle> articles;
+      List<NewsArticleEntity> articles;
       if (category == 'All') {
         articles = await NewsService.loadRandomMixArticles(limit: limit);
       } else {
@@ -114,7 +114,7 @@ class CategoryService {
           // Load in background without blocking
           loadCategoryArticles(category).catchError((e) {
             AppLogger.log('Background preload failed for $category: $e');
-            return <NewsArticle>[];
+            return <NewsArticleEntity>[];
           });
           
           // Small delay between requests

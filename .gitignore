@@ -44,3 +44,11 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
+# Firebase service account files (sensitive)
+*firebase-adminsdk*.json
+keypointsnews-*-firebase-adminsdk-*.json
+
+# Environment files with secrets
+.env.local
+.env.production
+

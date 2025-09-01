@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:isolate';
 import 'package:flutter/material.dart';
-import '../models/news_article.dart';
+import '../domain/entities/news_article_entity.dart';
 import '../services/color_extraction_service.dart';
 
 /// OPTIMIZATION 3: Parallel color extraction without blocking images
@@ -174,7 +174,7 @@ class ParallelColorService {
   
   /// Preload colors for multiple articles in parallel
   static Future<void> preloadColorsParallel(
-    List<NewsArticle> articles,
+    List<NewsArticleEntity> articles,
     int startIndex, {
     int colorPreloadCount = 10,
   }) async {

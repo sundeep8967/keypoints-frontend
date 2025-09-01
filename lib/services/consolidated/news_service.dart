@@ -1,4 +1,4 @@
-import '../../models/news_article.dart';
+import '../../domain/entities/news_article_entity.dart';
 import '../supabase_service.dart';
 import '../read_articles_service.dart';
 import '../news_feed_helper.dart';
@@ -13,7 +13,7 @@ class NewsService {
   static const int _defaultLimit = 50;
 
   /// Load news articles with fallback strategy
-  static Future<List<NewsArticle>> loadNewsArticles({int limit = _defaultLimit}) async {
+  static Future<List<NewsArticleEntity>> loadNewsArticles({int limit = _defaultLimit}) async {
     try {
       // PRIORITY 1: Try to load from Supabase first
       try {
@@ -38,7 +38,7 @@ class NewsService {
 
       // PRIORITY 3: Try bundled assets as last resort
       try {
-        final bundledArticles = <NewsArticle>[];
+        final bundledArticles = <NewsArticleEntity>[];
         if (bundledArticles.isNotEmpty) {
           AppLogger.log('Loading from bundled assets: ${bundledArticles.length} articles');
           return await _processAndFilterArticles(bundledArticles, limit);
@@ -55,7 +55,7 @@ class NewsService {
   }
 
   /// Load articles by category
-  static Future<List<NewsArticle>> loadNewsByCategory(
+  static Future<List<NewsArticleEntity>> loadNewsByCategory(
     String category, {
     int limit = _defaultLimit,
   }) async {
@@ -94,10 +94,10 @@ class NewsService {
   }
 
   /// Get random mix of articles from all categories
-  static Future<List<NewsArticle>> loadRandomMixArticles({int limit = _defaultLimit}) async {
+  static Future<List<NewsArticleEntity>> loadRandomMixArticles({int limit = _defaultLimit}) async {
     try {
       final allCategories = ['technology', 'business', 'sports', 'entertainment', 'health', 'science', 'world'];
-      final List<NewsArticle> mixedArticles = [];
+      final List<NewsArticleEntity> mixedArticles = [];
       
       // Get a few articles from each category
       final articlesPerCategory = (limit / allCategories.length).ceil();
@@ -121,7 +121,7 @@ class NewsService {
   }
 
   /// Refresh news from remote sources
-  static Future<List<NewsArticle>> refreshNews({int limit = _defaultLimit}) async {
+  static Future<List<NewsArticleEntity>> refreshNews({int limit = _defaultLimit}) async {
     try {
       // Force refresh from Supabase
       final articles = await SupabaseService.getNews(limit: limit * 2);
@@ -167,8 +167,8 @@ class NewsService {
   }
 
   // Private helper methods
-  static Future<List<NewsArticle>> _processAndFilterArticles(
-    List<NewsArticle> articles, 
+  static Future<List<NewsArticleEntity>> _processAndFilterArticles(
+    List<NewsArticleEntity> articles, 
     int limit,
   ) async {
     try {

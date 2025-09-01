@@ -1,95 +1,39 @@
-import '../models/news_article.dart';
-import '../services/supabase_service.dart';
-import '../services/read_articles_service.dart';
-import '../services/news_feed_helper.dart';
+import '../domain/entities/news_article_entity.dart';
+import '../injection_container.dart' as di;
+import 'refactored/service_coordinator.dart';
+import 'supabase_service.dart';
+import 'read_articles_service.dart';
+import 'news_feed_helper.dart';
 
 import '../utils/app_logger.dart';
+
+/// Legacy NewsLoadingService - now delegates to refactored services
+/// @deprecated Use ServiceCoordinator instead
 class NewsLoadingService {
-  static Future<List<NewsArticle>> loadNewsArticles() async {
+  @deprecated
+  static Future<List<NewsArticleEntity>> loadNewsArticles() async {
     try {
-      // PRIORITY 1: Try to load from Supabase first
-      try {
-        final allArticles = await SupabaseService.getNews(limit: 100);
-        if (allArticles.isNotEmpty) {
-          // Filter out already read articles
-          final readIds = await ReadArticlesService.getReadArticleIds();
-          final unreadArticles = allArticles.where((article) => 
-            !readIds.contains(article.id)
-          ).toList();
-          
-          // Filter out articles with no content and mark them as read
-          final validArticles = await NewsFeedHelper.filterValidArticles(unreadArticles);
-          
-          AppLogger.log('SUCCESS: Loaded ${allArticles.length} total articles, ${unreadArticles.length} unread, ${validArticles.length} valid from Supabase');
-          AppLogger.log('INFO: ${readIds.length} articles already read, ${unreadArticles.length - validArticles.length} auto-marked as read (no content)');
-          
-          return validArticles;
-        } else {
-          AppLogger.log('WARNING: No articles found in Supabase');
-        }
-      } catch (e) {
-        AppLogger.error(': Supabase failed: $e');
-      }
-
-      // No fallback - show error if no Supabase articles
-      AppLogger.error(': No articles found in Supabase and no fallback used');
-      throw Exception('NO_ARTICLES_IN_DATABASE');
+      final coordinator = di.sl<ServiceCoordinator>();
+      return await coordinator.newsLoader.loadNewsArticles();
     } catch (e) {
-      AppLogger.error(': Failed to load articles: $e');
+      AppLogger.log('NewsLoadingService.loadNewsArticles error: $e');
       return [];
     }
   }
 
-  static Future<List<NewsArticle>> loadArticlesByCategory(String category, {bool isRightSwipe = false}) async {
+  @deprecated
+  static Future<List<NewsArticleEntity>> loadArticlesByCategory(String category, {bool isRightSwipe = false}) async {
     try {
-      // Get read articles to filter them out
-      final readIds = await ReadArticlesService.getReadArticleIds();
-
-      // PRIORITY 1: Try Supabase category filter
-      try {
-        final allCategoryArticles = await SupabaseService.getNewsByCategory(category, limit: 100);
-        if (allCategoryArticles.isNotEmpty) {
-          final unreadCategoryArticles = allCategoryArticles.where((article) => 
-            !readIds.contains(article.id)
-          ).toList();
-          
-          AppLogger.log('SUCCESS: Loaded ${allCategoryArticles.length} total $category articles, ${unreadCategoryArticles.length} unread from Supabase');
-          return unreadCategoryArticles;
-        }
-      } catch (e) {
-        AppLogger.error(': Supabase category filter failed: $e');
-      }
-
-      // PRIORITY 2: Try filtering all Supabase articles locally
-      try {
-        final allSupabaseArticles = await SupabaseService.getNews(limit: 100);
-        if (allSupabaseArticles.isNotEmpty) {
-          final filteredArticles = allSupabaseArticles.where((article) => 
-            article.category.toLowerCase() == category.toLowerCase()
-          ).toList();
-          
-          final unreadFilteredArticles = filteredArticles.where((article) => 
-            !readIds.contains(article.id)
-          ).toList();
-          
-          if (unreadFilteredArticles.isNotEmpty) {
-            AppLogger.log('SUCCESS: Filtered ${unreadFilteredArticles.length} unread $category articles from ${filteredArticles.length} total');
-            return unreadFilteredArticles;
-          }
-        }
-      } catch (e) {
-        AppLogger.error(': Failed to filter Supabase articles: $e');
-      }
-
-      AppLogger.error(': Supabase completely unavailable for $category');
-      return [];
+      final coordinator = di.sl<ServiceCoordinator>();
+      return await coordinator.newsLoader.loadArticlesByCategory(category, isRightSwipe: isRightSwipe);
     } catch (e) {
-      AppLogger.error(': Failed to load articles for $category: $e');
+      AppLogger.log('NewsLoadingService.loadArticlesByCategory error: $e');
       return [];
     }
   }
 
-  static Future<List<NewsArticle>> loadArticlesByCategoryForCache(String category) async {
+  @deprecated
+  static Future<List<NewsArticleEntity>> loadArticlesByCategoryForCache(String category) async {
     try {
       final readIds = await ReadArticlesService.getReadArticleIds();
       
@@ -101,7 +45,7 @@ class NewsLoadingService {
       AppLogger.log('Read articles count: ${readIds.length}');
       
       // Use the new method that directly fetches unread articles - get more to ensure enough unread
-      final unreadCategoryArticles = await SupabaseService.getUnreadNewsByCategory(dbCategory, readIds, limit: 200);
+      final unreadCategoryArticles = await SupabaseService.getUnreadNewsByCategory(dbCategory, readIds, limit: 1500);
       AppLogger.log('Found ${unreadCategoryArticles.length} unread articles for "$dbCategory"');
       
       // Debug: Also try the old method to compare
@@ -205,8 +149,8 @@ class NewsLoadingService {
         AppLogger.log('Published: ${article.timestamp}');
         
         // Check keypoints
-        if (article.keypoints != null && article.keypoints!.isNotEmpty) {
-          AppLogger.log('Keypoints: ${article.keypoints!.substring(0, article.keypoints!.length > 100 ? 100 : article.keypoints!.length)}...');
+        if (article.description != null && article.description!.isNotEmpty) {
+          AppLogger.log('Keypoints: ${article.description!.substring(0, article.description!.length > 100 ? 100 : article.description!.length)}...');
         } else {
           AppLogger.log('Keypoints: [NONE]');
         }
@@ -219,7 +163,7 @@ class NewsLoadingService {
         }
         
         // Content validation
-        final hasKeypoints = article.keypoints != null && article.keypoints!.trim().isNotEmpty;
+        final hasKeypoints = article.description != null && article.description!.trim().isNotEmpty;
         final hasDescription = article.description.trim().isNotEmpty;
         final isValid = hasKeypoints || hasDescription;
         
@@ -230,7 +174,7 @@ class NewsLoadingService {
       
       // Summary
       final validCount = allArticles.where((a) => 
-        (a.keypoints != null && a.keypoints!.trim().isNotEmpty) || 
+        (a.description != null && a.description!.trim().isNotEmpty) || 
         a.description.trim().isNotEmpty
       ).length;
       

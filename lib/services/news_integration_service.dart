@@ -1,4 +1,4 @@
-import '../models/news_article.dart';
+import '../domain/entities/news_article_entity.dart';
 import 'supabase_service.dart';
 import 'local_storage_service.dart';
 import 'read_articles_service.dart';
@@ -8,7 +8,7 @@ import '../utils/app_logger.dart';
 class NewsIntegrationService {
   
   /// Load unread news articles with smart caching
-  static Future<List<NewsArticle>> loadUnreadNews({int displayLimit = 20}) async {
+  static Future<List<NewsArticleEntity>> loadUnreadNews({int displayLimit = 20}) async {
     try {
       AppLogger.info(' Loading unread news articles...');
 
@@ -24,7 +24,7 @@ class NewsIntegrationService {
         
         try {
           // Fetch 100 new articles from Supabase
-          final newArticles = await SupabaseService.getNews(limit: 100);
+          final newArticles = await SupabaseService.getNews(limit: 2000);
           AppLogger.log('📥 Fetched ${newArticles.length} new articles from Supabase');
           
           if (newArticles.isNotEmpty) {
@@ -56,9 +56,9 @@ class NewsIntegrationService {
   }
 
   /// Mark an article as read and get next unread articles
-  static Future<List<NewsArticle>> markAsReadAndGetNext(
+  static Future<List<NewsArticleEntity>> markAsReadAndGetNext(
     String articleId, 
-    List<NewsArticle> currentArticles,
+    List<NewsArticleEntity> currentArticles,
     {int displayLimit = 20}
   ) async {
     try {
@@ -109,7 +109,7 @@ class NewsIntegrationService {
   }
 
   /// Force refresh - clear cache and fetch fresh articles
-  static Future<List<NewsArticle>> forceRefresh({int displayLimit = 20}) async {
+  static Future<List<NewsArticleEntity>> forceRefresh({int displayLimit = 20}) async {
     try {
       AppLogger.info(' Force refreshing articles...');
       

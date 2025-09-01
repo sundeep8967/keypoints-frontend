@@ -1,5 +1,5 @@
 import 'dart:async';
-import '../models/news_article.dart';
+import '../domain/entities/news_article_entity.dart';
 import 'optimized_image_service.dart';
 import 'parallel_color_service.dart';
 
@@ -10,7 +10,7 @@ class InstantPreloaderService {
   static bool _isPreloading = false;
   
   /// Start instant preloading the moment articles are available
-  static void startInstantPreloading(List<NewsArticle> articles) {
+  static void startInstantPreloading(List<NewsArticleEntity> articles, {bool highPriority = true}) {
     if (articles.isEmpty || _isPreloading) return;
     
     _isPreloading = true;
@@ -26,7 +26,7 @@ class InstantPreloaderService {
   }
   
   /// Preload ALL images instantly in batches for zero delay
-  static Future<void> _preloadAllImagesInstantly(List<NewsArticle> articles) async {
+  static Future<void> _preloadAllImagesInstantly(List<NewsArticleEntity> articles) async {
     try {
       AppLogger.info(' INSTANT PRELOAD: Preloading first 30 images for instant access');
       
@@ -37,6 +37,7 @@ class InstantPreloaderService {
       AppLogger.info(' INSTANT PRELOAD: Priority loading first 5 images');
       for (int i = 0; i < imagesToPreload.length && i < 5; i++) {
         final imageUrl = imagesToPreload[i].imageUrl;
+        // 🚀 HIGH PRIORITY: Use priority preloading for instant loading
         await OptimizedImageService.preloadSingleImageWithPriority(imageUrl);
         AppLogger.success(' INSTANT PRELOAD: Priority image $i loaded');
       }
@@ -46,6 +47,7 @@ class InstantPreloaderService {
       final backgroundFutures = <Future<void>>[];
       for (int i = 5; i < imagesToPreload.length; i++) {
         final imageUrl = imagesToPreload[i].imageUrl;
+        // 🔄 BACKGROUND: Use normal priority for background preloading
         backgroundFutures.add(OptimizedImageService.preloadSingleImageWithPriority(imageUrl));
       }
       

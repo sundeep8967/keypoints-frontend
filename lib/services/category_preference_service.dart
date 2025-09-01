@@ -1,4 +1,4 @@
-import '../models/news_article.dart';
+import '../domain/entities/news_article_entity.dart';
 import '../services/local_storage_service.dart';
 import '../services/news_feed_helper.dart';
 
@@ -27,7 +27,7 @@ class CategoryPreferenceService {
     updateCategoryPreferences();
   }
 
-  static void trackArticleRead(NewsArticle article, String selectedCategory) {
+  static void trackArticleRead(NewsArticleEntity article, String selectedCategory) {
     // Determine article category (could be from title/content analysis or database category)
     String articleCategory = NewsFeedHelper.detectArticleCategory(article, selectedCategory);
     
@@ -100,7 +100,7 @@ class CategoryPreferenceService {
     _categoryStartTime = DateTime.now();
   }
 
-  static void removeReadArticleFromCaches(String articleId, Map<String, List<NewsArticle>> categoryArticles) {
+  static void removeReadArticleFromCaches(String articleId, Map<String, List<NewsArticleEntity>> categoryArticles) {
     // DON'T remove articles from active session cache
     // This prevents the "articles changing while viewing" issue
     // Articles will be filtered out on next app launch or manual refresh

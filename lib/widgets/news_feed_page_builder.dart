@@ -1,7 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
-import '../models/news_article.dart';
+import '../domain/entities/news_article_entity.dart';
 import '../services/color_extraction_service.dart';
 import '../services/parallel_color_service.dart';
 import '../services/predictive_preloader_service.dart';
@@ -13,11 +13,12 @@ import '../services/scroll_state_service.dart';
 import '../services/ad_integration_service.dart';
 import '../models/native_ad_model.dart';
 import '../widgets/news_feed_widgets.dart';
+import '../services/infinite_scroll_service.dart';
 
 import '../utils/app_logger.dart';
 // Helper function to preload colors for upcoming articles
 Future<void> _preloadColorsForUpcomingArticles(
-  List<NewsArticle> articles, 
+  List<NewsArticleEntity> articles, 
   int currentIndex, 
   Map<String, ColorPalette> colorCache
 ) async {
@@ -45,7 +46,7 @@ class NewsFeedPageBuilder {
   static Widget buildCategoryContent(
     BuildContext context,
     String category,
-    Map<String, List<NewsArticle>> categoryArticles,
+    Map<String, List<NewsArticleEntity>> categoryArticles,
     Map<String, bool> categoryLoading,
     String selectedCategory,
     int currentIndex,
@@ -84,7 +85,7 @@ class NewsFeedPageBuilder {
 
   // Helper method to create mixed feed with ads
   static Future<List<dynamic>> _createMixedFeedWithAds(
-    List<NewsArticle> articles, 
+    List<NewsArticleEntity> articles, 
     String category
   ) async {
     if (articles.isEmpty) return articles;
@@ -171,19 +172,17 @@ class NewsFeedPageBuilder {
           if (index < mixedFeed.length) {
             final currentItem = mixedFeed[index];
             if (AdIntegrationService.isNewsArticle(currentItem)) {
-              final currentArticle = currentItem as NewsArticle;
+              final currentArticle = currentItem as NewsArticleEntity;
               await ReadArticlesService.markAsRead(currentArticle.id);
               AppLogger.success('📖 IMMEDIATE MARK AS READ: "${currentArticle.title}" (ID: ${currentArticle.id}) - user viewing article');
             }
           }
           
-          // IMPROVED: Load more articles much earlier to prevent "no articles" scenario
-          // Load when user is halfway through the current batch OR when approaching end
-          final shouldLoadMore = (index >= (mixedFeed.length * 0.5).floor() && mixedFeed.length < 50) || // Load at 50% if we have less than 50 items
-                                 (index >= mixedFeed.length - 8); // Load when 8 items remaining (increased from 3)
+          // ENHANCED: Use InfiniteScrollService for smart loading detection
+          final shouldLoadMore = InfiniteScrollService.shouldLoadMore(index, mixedFeed.length, threshold: 20);
           
           if (shouldLoadMore && loadMoreArticles != null && index < mixedFeed.length && !ScrollStateService.isActivelyScrolling) {
-            AppLogger.info(' PROACTIVE LOADING: Loading more articles at index $index (total: ${mixedFeed.length}) for $category');
+            AppLogger.info('🔄 INFINITE SCROLL TRIGGER: Loading more articles at index $index (total: ${mixedFeed.length}) for $category');
             loadMoreArticles(category);
           }
           
@@ -191,7 +190,7 @@ class NewsFeedPageBuilder {
           if (index < mixedFeed.length) {
             final currentItem = mixedFeed[index];
             if (AdIntegrationService.isNewsArticle(currentItem)) {
-              final currentArticle = currentItem as NewsArticle;
+              final currentArticle = currentItem as NewsArticleEntity;
               CategoryPreferenceService.trackArticleRead(currentArticle, selectedCategory);
               
               // Track user reading behavior for ad preloading optimization
@@ -219,8 +218,8 @@ class NewsFeedPageBuilder {
               AppLogger.info(' SCROLL PRELOAD: User at article index $index, preloading next images');
               
               // Extract only articles from mixed feed for preloading
-              final articlesOnly = mixedFeed.whereType<NewsArticle>().toList();
-              final articleIndex = articlesOnly.indexOf(currentItem as NewsArticle);
+              final articlesOnly = mixedFeed.whereType<NewsArticleEntity>().toList();
+              final articleIndex = articlesOnly.indexOf(currentItem as NewsArticleEntity);
               
               if (articleIndex >= 0) {
                 OptimizedImageService.preloadImagesAggressively(articlesOnly, articleIndex, preloadCount: 25);
@@ -391,7 +390,7 @@ class NewsFeedPageBuilder {
           }
         } else if (AdIntegrationService.isNewsArticle(item)) {
           // Render news article card
-          final article = item as NewsArticle;
+          final article = item as NewsArticleEntity;
           return Container(
             width: double.infinity,
             height: double.infinity,
@@ -443,7 +442,7 @@ class NewsFeedPageBuilder {
 
   static Widget buildFullScreenCard(
     BuildContext context,
-    NewsArticle article, 
+    NewsArticleEntity article, 
     int index, 
     Map<String, ColorPalette> colorCache
   ) {
@@ -477,7 +476,7 @@ class NewsFeedPageBuilder {
     PageController categoryPageController,
     String selectedCategory,
     int currentIndex,
-    Map<String, List<NewsArticle>> categoryArticles,
+    Map<String, List<NewsArticleEntity>> categoryArticles,
     Map<String, bool> categoryLoading,
     String error,
     Function(String) onCategoryChanged,

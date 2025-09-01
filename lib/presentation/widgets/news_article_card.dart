@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../domain/entities/news_article_entity.dart';
 import '../../services/consolidated/article_service.dart';
-import '../../models/news_article.dart';
+import '../../domain/entities/news_article_entity.dart';
 import '../../utils/app_logger.dart';
 
 class NewsArticleCard extends StatelessWidget {
@@ -188,8 +188,8 @@ class NewsArticleCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(25),
           onPressed: () async {
             try {
-              // Convert NewsArticleEntity to NewsArticle for sharing
-              final newsArticle = NewsArticle(
+              // Convert NewsArticleEntity to NewsArticleEntity for sharing
+              final newsArticle = NewsArticleEntity(
                 id: article.id,
                 title: article.title,
                 description: article.description,

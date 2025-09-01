@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
-import '../models/news_article.dart';
+import '../domain/entities/news_article_entity.dart';
 import '../services/consolidated/news_facade.dart';
 import '../services/color_extraction_service.dart';
 import '../services/error_message_service.dart';
@@ -21,7 +21,7 @@ import '../utils/app_logger.dart';
 /// * Category-specific article management
 class NewsFeedController extends ChangeNotifier {
   /// List of currently displayed articles.
-  List<NewsArticle> _articles = [];
+  List<NewsArticleEntity> _articles = [];
   
   /// Loading state indicator.
   bool _isLoading = true;
@@ -36,13 +36,13 @@ class NewsFeedController extends ChangeNotifier {
   final Map<String, ColorPalette> _colorCache = {};
   
   /// Cache for articles organized by category.
-  final Map<String, List<NewsArticle>> _categoryArticles = {};
+  final Map<String, List<NewsArticleEntity>> _categoryArticles = {};
   
   /// Loading state for each category.
   final Map<String, bool> _categoryLoading = {};
 
   /// Gets the list of currently displayed articles.
-  List<NewsArticle> get articles => _articles;
+  List<NewsArticleEntity> get articles => _articles;
   
   /// Gets the current loading state.
   bool get isLoading => _isLoading;
@@ -57,7 +57,7 @@ class NewsFeedController extends ChangeNotifier {
   Map<String, ColorPalette> get colorCache => _colorCache;
   
   /// Gets the cache of articles organized by category.
-  Map<String, List<NewsArticle>> get categoryArticles => _categoryArticles;
+  Map<String, List<NewsArticleEntity>> get categoryArticles => _categoryArticles;
 
   /// Loads news articles for the "All" category.
   /// 
@@ -169,7 +169,7 @@ class NewsFeedController extends ChangeNotifier {
   }
 
   /// Mark article as read (but keep in current session to prevent list changes)
-  Future<void> markArticleAsRead(NewsArticle article) async {
+  Future<void> markArticleAsRead(NewsArticleEntity article) async {
     try {
       await NewsFacade().markArticleAsRead(article);
       

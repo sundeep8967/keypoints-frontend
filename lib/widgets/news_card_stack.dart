@@ -1,15 +1,15 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import '../models/news_article.dart';
+import '../domain/entities/news_article_entity.dart';
 import '../services/color_extraction_service.dart';
 
 class NewsCardStack extends StatelessWidget {
-  final List<NewsArticle> articles;
+  final List<NewsArticleEntity> articles;
   final int currentIndex;
   final Map<String, ColorPalette> colorCache;
   final Function(int) onIndexChanged;
-  final Function(NewsArticle) onArticleRead;
-  final Function(NewsArticle) onArticleShare;
+  final Function(NewsArticleEntity) onArticleRead;
+  final Function(NewsArticleEntity) onArticleShare;
 
   const NewsCardStack({
     super.key,

@@ -2,7 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'dart:ui';
 import 'package:cached_network_image/cached_network_image.dart';
-import '../models/news_article.dart';
+import '../domain/entities/news_article_entity.dart';
 import '../screens/news_detail_screen.dart';
 import '../services/color_extraction_service.dart';
 import '../services/news_feed_helper.dart';
@@ -10,6 +10,7 @@ import '../services/text_formatting_service.dart';
 import '../services/dynamic_text_service.dart';
 import '../services/url_launcher_service.dart';
 import '../services/consolidated/article_service.dart';
+import '../widgets/banner_ad_widgets.dart';
 
 import '../utils/app_logger.dart';
 class NewsFeedWidgets {
@@ -142,7 +143,7 @@ class NewsFeedWidgets {
 
   static Widget buildCardWithPalette(
     BuildContext context,
-    NewsArticle article, 
+    NewsArticleEntity article, 
     int index, 
     ColorPalette palette
   ) {
@@ -271,7 +272,7 @@ class NewsFeedWidgets {
                   const SizedBox(height: 12),
                   // Intelligently fill available space with content
                   DynamicTextService.buildAdaptiveContent(
-                    keypoints: article.keypoints,
+                    keypoints: article.description,
                     description: article.description,
                     baseStyle: TextStyle(
                       fontSize: 16,
@@ -285,94 +286,103 @@ class NewsFeedWidgets {
                   
                   // Small gap before bottom content
                   const SizedBox(height: 16),
-                  // Blurred background with article image for bottom section
-                  GestureDetector(
-                    onTap: () {
-                      AppLogger.log('🔥 BLURRED BOX TAPPED!');
-                      AppLogger.log('🔗 Article sourceUrl: "${article.sourceUrl}"');
-                      AppLogger.log('📰 Article title: "${article.title}"');
-                      
-                      // Open article URL directly in internal browser
-                      if (article.sourceUrl != null && article.sourceUrl!.isNotEmpty) {
-                        AppLogger.success(' URL is available, opening directly in internal browser');
-                        UrlLauncherService.launchInternalBrowser(article.sourceUrl!);
-                      } else {
-                        AppLogger.error(' No URL available for this article');
-                      }
-                    },
-                    child: Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12),
-                        image: DecorationImage(
-                          image: CachedNetworkImageProvider(article.imageUrl),
-                          fit: BoxFit.cover,
+                  // Show banner ad for every 2nd article, otherwise show blurred box
+                  (index % 2 == 1) ? 
+                    // Banner ad for every 2nd article (index 1, 3, 5, etc.) - CENTERED
+                    Center(
+                      child: Container(
+                        width: double.infinity,
+                        child: StandardBannerAdWidget(
+                          palette: palette,
+                          margin: EdgeInsets.zero,
                         ),
                       ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: BackdropFilter(
-                          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-                          child: Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.3),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          // Source display on the left (moved from center)
-                          Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                article.source ?? 'Unknown',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: palette.onPrimary,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                'tap to read more!!',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  color: palette.onPrimary.withOpacity(0.7),
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
+                    )
+                    :
+                    // Normal blurred box for other articles
+                    GestureDetector(
+                      onTap: () {
+                        AppLogger.log('🔥 BLURRED BOX TAPPED!');
+                        AppLogger.log('🔗 Article sourceUrl: "${article.sourceUrl}"');
+                        AppLogger.log('📰 Article title: "${article.title}"');
+                        
+                        // Open article URL directly in internal browser
+                        if (article.sourceUrl != null && article.sourceUrl!.isNotEmpty) {
+                          AppLogger.success('✅ URL is available, opening directly in internal browser');
+                          UrlLauncherService.launchInternalBrowser(article.sourceUrl!);
+                        } else {
+                          AppLogger.error('❌ No URL available for this article');
+                        }
+                      },
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          image: DecorationImage(
+                            image: CachedNetworkImageProvider(article.imageUrl),
+                            fit: BoxFit.cover,
                           ),
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              buildActionButton(
-                                CupertinoIcons.square_arrow_up,
-                                palette.onPrimary,
-                                () async {
-                                  try {
-                                    await ArticleService.shareArticle(article);
-                                  } catch (e) {
-                                    AppLogger.error('Share failed: $e');
-                                  }
-                                },
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: BackdropFilter(
+                            filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                            child: Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withOpacity(0.3),
+                                borderRadius: BorderRadius.circular(12),
                               ),
-                            ],
-                          ),
-                        ],
-                      ),
-                              ],
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      // Source display on the left
+                                      Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            article.source ?? 'Unknown',
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              color: palette.onPrimary,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            'tap to read more!!',
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              color: palette.onPrimary.withOpacity(0.7),
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      // Share button
+                                      buildActionButton(
+                                        CupertinoIcons.square_arrow_up,
+                                        palette.onPrimary,
+                                        () async {
+                                          try {
+                                            await ArticleService.shareArticle(article);
+                                          } catch (e) {
+                                            AppLogger.error('Share failed: $e');
+                                          }
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ),
                       ),
                     ),
-                  ),
                   SizedBox(height: MediaQuery.of(context).padding.bottom + 4),
                 ],
               ),

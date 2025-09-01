@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../models/news_article.dart';
+import '../domain/entities/news_article_entity.dart';
 import 'read_articles_service.dart';
 
 import '../utils/app_logger.dart';
@@ -13,7 +13,7 @@ class LocalStorageService {
   static const String _categoryPreferencesKey = 'category_preferences';
 
   /// Save articles to local storage (only saves unread articles to prevent duplicates)
-  static Future<void> saveArticles(List<NewsArticle> articles) async {
+  static Future<void> saveArticles(List<NewsArticleEntity> articles) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       
@@ -51,7 +51,7 @@ class LocalStorageService {
   }
 
   /// Load unread articles from local storage
-  static Future<List<NewsArticle>> loadUnreadArticles() async {
+  static Future<List<NewsArticleEntity>> loadUnreadArticles() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final articlesString = prefs.getString(_articlesKey);
@@ -62,7 +62,7 @@ class LocalStorageService {
       }
       
       final List<dynamic> articlesJson = jsonDecode(articlesString);
-      final allArticles = articlesJson.map((json) => NewsArticle(
+      final allArticles = articlesJson.map((json) => NewsArticleEntity(
         id: json['id'] ?? '',
         title: json['title'] ?? '',
         description: json['description'] ?? '',
@@ -98,7 +98,7 @@ class LocalStorageService {
   }
 
   /// Add new unread articles to existing cache (for incremental updates)
-  static Future<void> addNewArticles(List<NewsArticle> newArticles) async {
+  static Future<void> addNewArticles(List<NewsArticleEntity> newArticles) async {
     try {
       // Load existing articles (all, not just unread)
       final existingArticles = await _loadAllArticles();
@@ -107,7 +107,7 @@ class LocalStorageService {
       final allArticles = [...newArticles, ...existingArticles];
       
       // Remove duplicates based on ID
-      final uniqueArticles = <String, NewsArticle>{};
+      final uniqueArticles = <String, NewsArticleEntity>{};
       for (final article in allArticles) {
         uniqueArticles[article.id] = article;
       }
@@ -180,7 +180,7 @@ class LocalStorageService {
   }
 
   /// Load all articles (including read ones) - internal method
-  static Future<List<NewsArticle>> _loadAllArticles() async {
+  static Future<List<NewsArticleEntity>> _loadAllArticles() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final articlesString = prefs.getString(_articlesKey);
@@ -188,7 +188,7 @@ class LocalStorageService {
       if (articlesString == null) return [];
       
       final List<dynamic> articlesJson = jsonDecode(articlesString);
-      return articlesJson.map((json) => NewsArticle(
+      return articlesJson.map((json) => NewsArticleEntity(
         id: json['id'] ?? '',
         title: json['title'] ?? '',
         description: json['description'] ?? '',

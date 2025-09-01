@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import '../models/news_article.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
+import '../domain/entities/news_article_entity.dart';
+import 'aggressive_cache_manager.dart';
 
 import '../utils/app_logger.dart';
 class ImagePreloaderService {
@@ -10,7 +12,7 @@ class ImagePreloaderService {
 
   /// Preload images for the next few articles to improve user experience
   static Future<void> preloadNextArticleImages(
-    List<NewsArticle> articles,
+    List<NewsArticleEntity> articles,
     int currentIndex, {
     int preloadCount = 15, // CRITICAL FIX: Increased from 3 to 15
   }) async {
@@ -46,7 +48,9 @@ class ImagePreloaderService {
           continue;
         }
 
-        preloadFutures.add(_preloadSingleImage(imageUrl));
+        // 🎯 HIGH PRIORITY: First 3 images get high priority, rest get normal priority
+        final isHighPriority = (i - startIndex) < 3;
+        preloadFutures.add(_preloadSingleImage(imageUrl, highPriority: isHighPriority));
       }
     }
 
@@ -55,14 +59,23 @@ class ImagePreloaderService {
   }
 
   /// Preload a single image
-  static Future<void> _preloadSingleImage(String imageUrl) async {
+  static Future<void> _preloadSingleImage(String imageUrl, {bool highPriority = false}) async {
     if (imageUrl.isEmpty) return;
 
     try {
       _preloadingInProgress[imageUrl] = true;
       
-      // Use CachedNetworkImage to preload and cache the image
-      final imageProvider = CachedNetworkImageProvider(imageUrl);
+      // 🚀 HIGH PRIORITY: Use aggressive cache for high priority images
+      final cacheManager = highPriority 
+          ? AggressiveCacheManager() 
+          : DefaultCacheManager();
+          
+      final imageProvider = CachedNetworkImageProvider(
+        imageUrl,
+        cacheManager: cacheManager,
+        maxHeight: highPriority ? null : 400, // Full resolution for high priority
+        maxWidth: highPriority ? null : 400,
+      );
       
       // Create a completer to wait for image loading
       final completer = Completer<void>();
@@ -100,7 +113,7 @@ class ImagePreloaderService {
 
   /// Preload images when user is reading an article (triggered by page change)
   static Future<void> onArticleViewed(
-    List<NewsArticle> articles,
+    List<NewsArticleEntity> articles,
     int viewedIndex,
   ) async {
     AppLogger.log('\n🎯 USER VIEWED ARTICLE AT INDEX: $viewedIndex');
@@ -117,7 +130,7 @@ class ImagePreloaderService {
       final prevImageUrl = articles[viewedIndex - 1].imageUrl;
       if (_preloadedImages[prevImageUrl] != true && _preloadingInProgress[prevImageUrl] != true) {
         AppLogger.log('⬅️ Also preloading previous image for article ${viewedIndex - 1}');
-        _preloadSingleImage(prevImageUrl);
+        _preloadSingleImage(prevImageUrl, highPriority: true); // Previous image gets high priority
       }
     }
     AppLogger.log('─────────────────────────────────────────────────────\n');
@@ -151,7 +164,7 @@ class ImagePreloaderService {
 
   /// Preload images for an entire category when it's selected
   static Future<void> preloadCategoryImages(
-    List<NewsArticle> categoryArticles, {
+    List<NewsArticleEntity> categoryArticles, {
     int maxImages = 10,
   }) async {
     if (categoryArticles.isEmpty) return;
@@ -165,7 +178,9 @@ class ImagePreloaderService {
       final imageUrl = article.imageUrl;
       
       if (_preloadedImages[imageUrl] != true && _preloadingInProgress[imageUrl] != true) {
-        preloadFutures.add(_preloadSingleImage(imageUrl));
+        // 🚀 HIGH PRIORITY: First 5 category images get high priority
+        final isHighPriority = preloadFutures.length < 5;
+        preloadFutures.add(_preloadSingleImage(imageUrl, highPriority: isHighPriority));
       }
     }
 

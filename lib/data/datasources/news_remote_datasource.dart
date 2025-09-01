@@ -24,13 +24,6 @@ class NewsRemoteDataSourceImpl implements NewsRemoteDataSource {
 
       final articles = response.map<NewsArticleModel>((json) => NewsArticleModel.fromSupabase(json)).toList();
       
-      // Sort by quality score after fetching (highest quality first)
-      articles.sort((a, b) {
-        final scoreA = a.score ?? 0.0;
-        final scoreB = b.score ?? 0.0;
-        return scoreB.compareTo(scoreA); // Descending order (highest first)
-      });
-      
       return articles;
     } catch (e) {
       throw Exception('Failed to fetch news: $e');
@@ -48,13 +41,6 @@ class NewsRemoteDataSourceImpl implements NewsRemoteDataSource {
           .limit(limit);
 
       final articles = response.map<NewsArticleModel>((json) => NewsArticleModel.fromSupabase(json)).toList();
-      
-      // Sort by quality score after fetching (highest quality first)
-      articles.sort((a, b) {
-        final scoreA = a.score ?? 0.0;
-        final scoreB = b.score ?? 0.0;
-        return scoreB.compareTo(scoreA); // Descending order (highest first)
-      });
       
       return articles;
     } catch (e) {
@@ -74,13 +60,6 @@ class NewsRemoteDataSourceImpl implements NewsRemoteDataSource {
 
       final articles = response.map<NewsArticleModel>((json) => NewsArticleModel.fromSupabase(json)).toList();
       
-      // Sort by quality score after fetching (highest quality first)
-      articles.sort((a, b) {
-        final scoreA = a.score ?? 0.0;
-        final scoreB = b.score ?? 0.0;
-        return scoreB.compareTo(scoreA); // Descending order (highest first)
-      });
-      
       return articles;
     } catch (e) {
       throw Exception('Failed to search news: $e');
@@ -96,13 +75,6 @@ class NewsRemoteDataSourceImpl implements NewsRemoteDataSource {
         .limit(limit)
         .map((data) {
           final articles = data.map<NewsArticleModel>((json) => NewsArticleModel.fromSupabase(json)).toList();
-          
-          // Sort by quality score after fetching (highest quality first)
-          articles.sort((a, b) {
-            final scoreA = a.score ?? 0.0;
-            final scoreB = b.score ?? 0.0;
-            return scoreB.compareTo(scoreA); // Descending order (highest first)
-          });
           
           return articles;
         });

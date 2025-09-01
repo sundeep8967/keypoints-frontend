@@ -1,12 +1,12 @@
 import 'package:flutter/cupertino.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
-import '../models/news_article.dart';
+import '../domain/entities/news_article_entity.dart';
 import '../services/consolidated/article_service.dart';
 import '../utils/app_logger.dart';
 
 class NewsDetailScreen extends StatelessWidget {
-  final NewsArticle article;
+  final NewsArticleEntity article;
 
   const NewsDetailScreen({
     super.key,

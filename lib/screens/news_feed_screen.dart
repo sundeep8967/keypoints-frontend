@@ -1,6 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import '../models/news_article.dart';
+import '../domain/entities/news_article_entity.dart';
 import '../services/supabase_service.dart';
 import '../services/local_storage_service.dart';
 import '../utils/app_logger.dart';
@@ -18,6 +18,7 @@ import '../services/parallel_color_service.dart';
 import '../services/instant_preloader_service.dart';
 import '../services/error_message_service.dart';
 import '../services/scroll_state_service.dart';
+import '../services/infinite_scroll_service.dart';
 import 'settings_screen.dart';
 
 class NewsFeedScreen extends StatefulWidget {
@@ -28,7 +29,7 @@ class NewsFeedScreen extends StatefulWidget {
 }
 
 class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStateMixin {
-  List<NewsArticle> _articles = [];
+  List<NewsArticleEntity> _articles = [];
   bool _isLoading = true;
   String _error = '';
   int _currentIndex = 0;
@@ -39,7 +40,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
   final Map<String, ColorPalette> _colorCache = {};
   
   // Cache for category articles - pre-load all categories
-  final Map<String, List<NewsArticle>> _categoryArticles = {};
+  final Map<String, List<NewsArticleEntity>> _categoryArticles = {};
   final Map<String, bool> _categoryLoading = {};
   
   // Dynamic categories discovered from backend
@@ -179,7 +180,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
     super.dispose();
   }
 
-  Future<void> _loadNewsArticles() async {
+  Future<void> _loadNewsArticleEntitys() async {
     try {
       setState(() {
         _isLoading = true;
@@ -199,16 +200,16 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
         'National', 'India', 'Education'
       ];
       
-      final List<NewsArticle> allCombinedArticles = [];
+      final List<NewsArticleEntity> allCombinedArticles = [];
       
       // Fetch articles from each category in parallel for faster loading
       final futures = allCategories.map((cat) async {
         try {
-          final categoryArticles = await SupabaseService.getUnreadNewsByCategory(cat, readIds, limit: 20);
+          final categoryArticles = await SupabaseService.getUnreadNewsByCategory(cat, readIds, limit: 200);
           return categoryArticles;
         } catch (e) {
           // Log error but continue with other categories
-          return <NewsArticle>[];
+          return <NewsArticleEntity>[];
         }
       });
       
@@ -218,7 +219,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
       }
       
       // Remove duplicates based on article ID
-      final uniqueArticles = <String, NewsArticle>{};
+      final uniqueArticles = <String, NewsArticleEntity>{};
       for (final article in allCombinedArticles) {
         uniqueArticles[article.id] = article;
       }
@@ -573,9 +574,9 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
       return;
     }
     
-    // Check if we already have enough articles (buffer of 30+)
+    // Check if we already have enough articles (buffer of 200+)
     final currentArticles = _categoryArticles[category] ?? [];
-    if (currentArticles.length >= 100) {
+    if (currentArticles.length >= 500) {
       AppLogger.info(' LOAD MORE: Already have ${currentArticles.length} articles for $category, sufficient buffer');
       return;
     }
@@ -603,7 +604,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
       // Get IDs of articles we already have to avoid duplicates
       final existingIds = currentArticles.map((a) => a.id).toSet();
       
-      List<NewsArticle> newArticles = [];
+      List<NewsArticleEntity> newArticles = [];
       
       if (category == 'All') {
         // For "All" category, fetch from all categories
@@ -613,16 +614,16 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
           'National', 'India', 'Education'
         ];
         
-        final List<NewsArticle> allCombinedArticles = [];
+        final List<NewsArticleEntity> allCombinedArticles = [];
         
         // Fetch more articles from each category
         final futures = allCategories.map((cat) async {
           try {
             // Fetch with higher limit and offset to get different articles
-            final categoryArticles = await SupabaseService.getUnreadNewsByCategory(cat, readIds, limit: 20, offset: currentArticles.length ~/ allCategories.length);
+            final categoryArticles = await SupabaseService.getUnreadNewsByCategory(cat, readIds, limit: 200, offset: currentArticles.length ~/ allCategories.length);
             return categoryArticles;
           } catch (e) {
-            return <NewsArticle>[];
+            return <NewsArticleEntity>[];
           }
         });
         
@@ -632,7 +633,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
         }
         
         // Remove duplicates and articles we already have
-        final uniqueArticles = <String, NewsArticle>{};
+        final uniqueArticles = <String, NewsArticleEntity>{};
         for (final article in allCombinedArticles) {
           if (!existingIds.contains(article.id)) {
             uniqueArticles[article.id] = article;
@@ -654,7 +655,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
         final moreArticles = await SupabaseService.getUnreadNewsByCategory(
           dbCategory, 
           readIds, 
-          limit: 20, 
+          limit: 200, 
           offset: currentArticles.length
         );
         
@@ -666,24 +667,34 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
         ).toList();
       }
       
-      if (newArticles.isNotEmpty) {
+      // ENHANCED: Use the new infinite scroll service for better article loading
+      final enhancedNewArticles = await InfiniteScrollService.loadMoreArticlesEnhanced(
+        category: category,
+        currentArticles: currentArticles,
+        readIds: readIds,
+      );
+      
+      if (enhancedNewArticles.isNotEmpty) {
         // Append new articles to existing ones
-        final updatedArticles = [...currentArticles, ...newArticles];
-        _categoryArticles[category] = updatedArticles;
+        final updatedArticles = [...currentArticles, ...enhancedNewArticles];
         
-        AppLogger.info(' LOAD MORE: Added ${newArticles.length} new articles to $category (total: ${updatedArticles.length})');
+        // Optimize buffer if it gets too large
+        final optimizedArticles = InfiniteScrollService.optimizeBuffer(updatedArticles, _currentIndex);
+        _categoryArticles[category] = optimizedArticles;
+        
+        AppLogger.info(' ENHANCED LOAD MORE: Added ${enhancedNewArticles.length} new articles to $category (total: ${optimizedArticles.length})');
         
         // CRITICAL FIX: DON'T update UI during active scrolling to prevent article changes
         if (category == _selectedCategory && !ScrollStateService.isActivelyScrolling) {
           setState(() {
-            _articles = updatedArticles;
+            _articles = optimizedArticles;
           });
-          AppLogger.success('📖 LOAD MORE: Updated UI with ${updatedArticles.length} articles (user not scrolling)');
+          AppLogger.success('📖 ENHANCED LOAD MORE: Updated UI with ${optimizedArticles.length} articles (user not scrolling)');
         } else if (category == _selectedCategory) {
-          AppLogger.info('📖 LOAD MORE: Articles loaded but UI not updated (user actively scrolling)');
+          AppLogger.info('📖 ENHANCED LOAD MORE: Articles loaded but UI not updated (user actively scrolling)');
         }
       } else {
-        AppLogger.info(' LOAD MORE: No new articles found for $category');
+        AppLogger.info(' ENHANCED LOAD MORE: No new articles found for $category');
         
         // IMPROVED: Try alternative strategies when no new articles are found
         await _handleNoMoreArticles(category, currentArticles);
@@ -747,17 +758,17 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
           'National', 'India', 'Education'
         ];
         
-        final List<NewsArticle> allCombinedArticles = [];
+        final List<NewsArticleEntity> allCombinedArticles = [];
         
         // Fetch articles from each category in parallel for faster loading
         final futures = allCategories.map((cat) async {
           try {
-            final categoryArticles = await SupabaseService.getUnreadNewsByCategory(cat, readIds, limit: 30);
+            final categoryArticles = await SupabaseService.getUnreadNewsByCategory(cat, readIds, limit: 300);
             AppLogger.debug(' ALL: Fetched ${categoryArticles.length} unread articles from $cat');
             return categoryArticles;
           } catch (e) {
             AppLogger.debug(' ALL: Error fetching $cat articles: $e');
-            return <NewsArticle>[];
+            return <NewsArticleEntity>[];
           }
         });
         
@@ -769,7 +780,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
         AppLogger.debug(' ALL: Total combined articles from all categories: ${allCombinedArticles.length}');
         
         // Remove duplicates based on article ID
-        final uniqueArticles = <String, NewsArticle>{};
+        final uniqueArticles = <String, NewsArticleEntity>{};
         for (final article in allCombinedArticles) {
           uniqueArticles[article.id] = article;
         }
@@ -863,11 +874,11 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
       AppLogger.log('UI Category: "$category" -> DB Category: "$dbCategory"');
       
       // Use the new method that directly fetches unread articles - get more to ensure enough unread
-      final unreadCategoryArticles = await SupabaseService.getUnreadNewsByCategory(dbCategory, readIds, limit: 50);
+      final unreadCategoryArticles = await SupabaseService.getUnreadNewsByCategory(dbCategory, readIds, limit: 1000);
       AppLogger.log('Found ${unreadCategoryArticles.length} unread articles for "$dbCategory"');
       
       // Debug: Also try the old method to compare
-      final allCategoryArticles = await SupabaseService.getNewsByCategory(dbCategory, limit: 100);
+      final allCategoryArticles = await SupabaseService.getNewsByCategory(dbCategory, limit: 1000);
       AppLogger.debug(': Total articles in "$dbCategory" category: ${allCategoryArticles.length}');
       
       if (allCategoryArticles.isNotEmpty) {
@@ -926,7 +937,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
     try {
       await ArticleManagementService.loadAllOtherUnreadArticles(
         (category) => setState(() => _selectedCategory = category),
-        _loadNewsArticles,
+        _loadNewsArticleEntitys,
       );
     } catch (e) {
       setState(() {
@@ -988,7 +999,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
   /// Load articles progressively - show first batch immediately, then load more in background
   /// STABILIZED: No shuffling during progressive loading to prevent article order changes
   Future<void> _loadArticlesProgressively(List<String> readIds) async {
-    final List<NewsArticle> allProgressiveArticles = [];
+    final List<NewsArticleEntity> allProgressiveArticles = [];
     bool hasShownFirstBatch = false;
     
     // Define categories to load from
@@ -1006,7 +1017,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
       try {
         // Load articles from this category
         final categoryArticles = await SupabaseService.getUnreadNewsByCategory(
-          category, readIds, limit: 8 // Small batch size for speed
+          category, readIds, limit: 100 // Larger batch size for more articles
         );
         
         if (categoryArticles.isNotEmpty) {
@@ -1014,8 +1025,8 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
           allProgressiveArticles.addAll(categoryArticles);
           
           // Remove duplicates but MAINTAIN ORDER - no shuffling during progressive loading
-          final uniqueArticles = <String, NewsArticle>{};
-          final stableOrderedArticles = <NewsArticle>[];
+          final uniqueArticles = <String, NewsArticleEntity>{};
+          final stableOrderedArticles = <NewsArticleEntity>[];
           
           for (final article in allProgressiveArticles) {
             if (!uniqueArticles.containsKey(article.id)) {
@@ -1075,7 +1086,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
     
     // Final update - ONLY NOW do we shuffle for variety
     if (allProgressiveArticles.isNotEmpty) {
-      final uniqueArticles = <String, NewsArticle>{};
+      final uniqueArticles = <String, NewsArticleEntity>{};
       for (final article in allProgressiveArticles) {
         uniqueArticles[article.id] = article;
       }
@@ -1125,7 +1136,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
     AppLogger.debug(' DISCOVERY: Starting dynamic category discovery...');
     
     DynamicCategoryDiscoveryService.discoverCategoriesInParallel(
-      onCategoryDiscovered: (String dbCategory, List<NewsArticle> articles) {
+      onCategoryDiscovered: (String dbCategory, List<NewsArticleEntity> articles) {
         final uiCategory = DynamicCategoryDiscoveryService.getUIFriendlyName(dbCategory);
         
         AppLogger.success(' DISCOVERY: Found $uiCategory ($dbCategory) with ${articles.length} articles');
@@ -1151,7 +1162,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
   }
 
   /// 🚀 ASYNC: Start all preloading asynchronously - NEVER BLOCKS UI
-  void _startAsyncPreloading(List<NewsArticle> articles) {
+  void _startAsyncPreloading(List<NewsArticleEntity> articles) {
     if (articles.isEmpty) return;
     
     AppLogger.info('🚀 ASYNC PRELOAD: Starting all preloading for ${articles.length} articles');
@@ -1171,7 +1182,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
   }
   
   /// Preload images completely asynchronously
-  void _preloadImagesAsync(List<NewsArticle> articles) {
+  void _preloadImagesAsync(List<NewsArticleEntity> articles) {
     Future.microtask(() async {
       try {
         AppLogger.info('🖼️ ASYNC IMAGES: Starting image preloading for ${articles.length} articles...');
@@ -1188,7 +1199,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
   }
   
   /// Preload colors completely asynchronously
-  void _preloadColorsAsync(List<NewsArticle> articles) {
+  void _preloadColorsAsync(List<NewsArticleEntity> articles) {
     Future.microtask(() async {
       try {
         AppLogger.info('🎨 ASYNC COLORS: Starting color extraction for ${articles.length} articles...');
@@ -1205,7 +1216,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
   }
   
   /// Start instant preloader asynchronously
-  void _startInstantPreloaderAsync(List<NewsArticle> articles) {
+  void _startInstantPreloaderAsync(List<NewsArticleEntity> articles) {
     Future.microtask(() async {
       try {
         AppLogger.info('⚡ ASYNC INSTANT: Starting instant preloader...');
@@ -1227,7 +1238,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
   }
 
   /// Handle the case when no more articles are available for a category
-  Future<void> _handleNoMoreArticles(String category, List<NewsArticle> currentArticles) async {
+  Future<void> _handleNoMoreArticles(String category, List<NewsArticleEntity> currentArticles) async {
     try {
       AppLogger.info(' NO MORE ARTICLES: Implementing fallback strategies for $category');
       
@@ -1324,7 +1335,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
       AppLogger.info(' EXTENDED REFRESH: Trying to get more articles for All category');
       
       // Try getting articles with a larger limit and different sorting
-      final allArticles = await SupabaseService.getNews(limit: 200); // Increased limit
+      final allArticles = await SupabaseService.getNews(limit: 3000); // Much larger limit
       
       if (allArticles.isNotEmpty) {
         final freshReadIds = await ReadArticlesService.getReadArticleIds();
@@ -1368,7 +1379,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
         'Entertainment', 'World', 'Top', 'Travel', 'Politics'
       ];
       
-      final List<NewsArticle> allFreshArticles = [];
+      final List<NewsArticleEntity> allFreshArticles = [];
       
       // Fetch fresh articles from each category in parallel
       final futures = allCategories.map((cat) async {
@@ -1377,7 +1388,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
           return categoryArticles;
         } catch (e) {
           AppLogger.error('🔄 SMART REFRESH: Error loading $cat: $e');
-          return <NewsArticle>[];
+          return <NewsArticleEntity>[];
         }
       });
       
@@ -1387,7 +1398,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
       }
       
       // Remove duplicates
-      final uniqueArticles = <String, NewsArticle>{};
+      final uniqueArticles = <String, NewsArticleEntity>{};
       for (final article in allFreshArticles) {
         uniqueArticles[article.id] = article;
       }

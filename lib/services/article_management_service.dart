@@ -1,4 +1,4 @@
-import '../models/news_article.dart';
+import '../domain/entities/news_article_entity.dart';
 import '../services/read_articles_service.dart';
 import '../services/news_feed_helper.dart';
 import '../services/color_extraction_service.dart';
@@ -6,7 +6,7 @@ import '../services/color_extraction_service.dart';
 import '../utils/app_logger.dart';
 class ArticleManagementService {
   static Future<void> preloadColors(
-    List<NewsArticle> articles, 
+    List<NewsArticleEntity> articles, 
     int currentIndex, 
     Map<String, ColorPalette> colorCache
   ) async {
@@ -31,7 +31,7 @@ class ArticleManagementService {
   }
 
   static Future<void> tryLoadMoreArticles(
-    List<NewsArticle> articles,
+    List<NewsArticleEntity> articles,
     int currentIndex,
     String selectedCategory,
     Function loadNewsArticles,
@@ -65,78 +65,21 @@ class ArticleManagementService {
     }
   }
 
-  static Future<List<NewsArticle>> filterValidArticles(List<NewsArticle> articles) async {
-    final validArticles = <NewsArticle>[];
-    final invalidArticles = <NewsArticle>[];
-    
-    for (final article in articles) {
-      if (NewsFeedHelper.hasValidContent(article)) {
-        validArticles.add(article);
-      } else {
-        invalidArticles.add(article);
-        // Mark invalid articles as read automatically
-        await ReadArticlesService.markAsRead(article.id);
-        
-        AppLogger.log('Auto-marked as read (no content): "${article.title}"');
-      }
-    }
-    
-    if (invalidArticles.isNotEmpty) {
-      AppLogger.log('Filtered out ${invalidArticles.length} articles with no content');
-    }
-    
-    return validArticles;
+  @deprecated
+  static Future<List<NewsArticleEntity>> filterValidArticles(List<NewsArticleEntity> articles) async {
+    // Delegate to refactored service
+    return await NewsFeedHelper.filterValidArticles(articles);
   }
 
-  static bool hasValidContent(NewsArticle article) {
-    // Check if article has valid image URL
-    if (!hasValidImage(article.imageUrl)) {
-      AppLogger.log('Invalid image for article: "${article.title}" - URL: "${article.imageUrl}"');
-      return false;
-    }
-    
-    // Check if article has keypoints
-    if (article.keypoints != null && article.keypoints!.trim().isNotEmpty) {
-      return true;
-    }
-    
-    // Check if article has description/summary
-    if (article.description.trim().isNotEmpty) {
-      return true;
-    }
-    
-    // No valid content found
-    return false;
+  @deprecated
+  static bool hasValidContent(NewsArticleEntity article) {
+    // Delegate to refactored service
+    return NewsFeedHelper.hasValidContent(article);
   }
 
+  @deprecated
   static bool hasValidImage(String imageUrl) {
-    // Check if image URL is not empty
-    if (imageUrl.trim().isEmpty) {
-      return false;
-    }
-    
-    // Check if it's a valid URL format
-    try {
-      final uri = Uri.parse(imageUrl);
-      if (!uri.hasScheme || (!uri.scheme.startsWith('http'))) {
-        return false;
-      }
-    } catch (e) {
-      return false;
-    }
-    
-    // Check if URL ends with common image extensions
-    final lowercaseUrl = imageUrl.toLowerCase();
-    
-    // Allow URLs without extensions (many news sites use dynamic image URLs)
-    // But reject obviously invalid ones
-    if (lowercaseUrl.contains('placeholder') || 
-        lowercaseUrl.contains('default') ||
-        lowercaseUrl.contains('no-image') ||
-        lowercaseUrl.contains('missing')) {
-      return false;
-    }
-    
-    return true;
+    // Delegate to refactored service
+    return NewsFeedHelper.hasValidImage(imageUrl);
   }
 }

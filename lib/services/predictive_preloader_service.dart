@@ -1,5 +1,5 @@
 import 'dart:async';
-import '../models/news_article.dart';
+import '../domain/entities/news_article_entity.dart';
 import 'optimized_image_service.dart';
 import 'parallel_color_service.dart';
 
@@ -47,7 +47,7 @@ class PredictivePreloaderService {
   
   /// Predictive preloading with velocity-based strategy
   static Future<void> predictivePreload(
-    List<NewsArticle> articles,
+    List<NewsArticleEntity> articles,
     int currentIndex,
   ) async {
     final preloadCount = getDynamicPreloadCount();
@@ -70,7 +70,7 @@ class PredictivePreloaderService {
   }
   
   /// Instant cache warming for category selection
-  static Future<void> warmCategoryCache(List<NewsArticle> articles) async {
+  static Future<void> warmCategoryCache(List<NewsArticleEntity> articles) async {
     if (articles.isEmpty) return;
     
     AppLogger.log('🔥 CACHE WARMING: Preloading ${articles.length.clamp(0, 20)} articles');
