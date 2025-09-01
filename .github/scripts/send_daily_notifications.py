@@ -140,7 +140,7 @@ def create_notification_message(news_item):
                 priority='high',
                 default_sound=True,
                 image=image_url,
-                color='#FF6B35',  # Eye-catching orange color
+                # Removed color to show actual app icon instead of tinted version
                 default_vibrate_timings=True,  # Vibration pattern
                 visibility='public',  # Show on lock screen
                 ticker='📰 Breaking News Update!'  # Scrolling text on older Android
