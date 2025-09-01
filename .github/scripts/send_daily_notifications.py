@@ -156,9 +156,7 @@ def create_notification_message(news_item):
                     ),
                     sound='default',
                     badge=1,
-                    mutable_content=True,
-                    interruption_level='active',  # iOS 15+ - bypass Focus modes
-                    relevance_score=1.0  # iOS 15+ - highest relevance
+                    mutable_content=True
                 )
             ),
             fcm_options=messaging.APNSFCMOptions(
