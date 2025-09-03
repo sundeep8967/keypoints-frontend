@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'dart:async';
 import '../services/color_extraction_service.dart';
 import '../utils/app_logger.dart';
 
@@ -351,6 +352,194 @@ class _StickyBottomBannerWidgetState extends State<StickyBottomBannerWidget> {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Smart Sticky Banner Widget with intelligent loading and user behavior tracking
+class SmartStickyBannerWidget extends StatefulWidget {
+  final bool showAtBottom;
+  final int articlesRead;
+  final bool isScrolling;
+  final VoidCallback? onAdLoaded;
+  final VoidCallback? onAdFailed;
+
+  const SmartStickyBannerWidget({
+    Key? key,
+    this.showAtBottom = true,
+    this.articlesRead = 0,
+    this.isScrolling = false,
+    this.onAdLoaded,
+    this.onAdFailed,
+  }) : super(key: key);
+
+  @override
+  State<SmartStickyBannerWidget> createState() => _SmartStickyBannerWidgetState();
+}
+
+class _SmartStickyBannerWidgetState extends State<SmartStickyBannerWidget> {
+  BannerAd? _stickyBannerAd;
+  bool _isBannerLoaded = false;
+  Timer? _refreshTimer;
+  int _impressionCount = 0;
+  DateTime? _lastLoadTime;
+  
+  // Smart banner configuration
+  static const Duration _refreshInterval = Duration(minutes: 3);
+  static const int _maxImpressionsBeforeRefresh = 8;
+
+  @override
+  void initState() {
+    super.initState();
+    // Only load banner if user has read at least 2 articles
+    if (widget.articlesRead >= 2) {
+      _loadStickyBanner();
+      _startSmartRefresh();
+    }
+  }
+
+  @override
+  void didUpdateWidget(SmartStickyBannerWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    
+    // Start loading banner when user reaches 2 articles
+    if (oldWidget.articlesRead < 2 && widget.articlesRead >= 2 && !_isBannerLoaded) {
+      AppLogger.info('🧠 SMART STICKY: User reached 2 articles, loading banner...');
+      _loadStickyBanner();
+      _startSmartRefresh();
+    }
+  }
+
+  void _loadStickyBanner() {
+    _stickyBannerAd?.dispose();
+    _stickyBannerAd = null;
+    _isBannerLoaded = false;
+
+    AppLogger.info('🎯 SMART STICKY: Loading banner...');
+
+    _stickyBannerAd = BannerAd(
+      adUnitId: _getStickyBannerAdUnitId(),
+      size: AdSize.banner,
+      request: const AdRequest(),
+      listener: BannerAdListener(
+        onAdLoaded: (ad) {
+          if (mounted) {
+            setState(() {
+              _isBannerLoaded = true;
+              _lastLoadTime = DateTime.now();
+              _impressionCount = 0;
+            });
+            AppLogger.success('✅ SMART STICKY: Banner loaded successfully');
+            widget.onAdLoaded?.call();
+          }
+        },
+        onAdFailedToLoad: (ad, error) {
+          AppLogger.error('❌ SMART STICKY: Failed to load: $error');
+          ad.dispose();
+          if (mounted) {
+            setState(() {
+              _stickyBannerAd = null;
+              _isBannerLoaded = false;
+            });
+            widget.onAdFailed?.call();
+          }
+        },
+        onAdClicked: (ad) {
+          AppLogger.log('👆 SMART STICKY: Banner clicked');
+          _trackImpression();
+        },
+        onAdImpression: (ad) {
+          AppLogger.log('👁️ SMART STICKY: Banner impression');
+          _trackImpression();
+        },
+      ),
+    );
+
+    _stickyBannerAd!.load();
+  }
+
+  String _getStickyBannerAdUnitId() {
+    const bool isDebug = bool.fromEnvironment('dart.vm.product') == false;
+    if (isDebug) {
+      return 'ca-app-pub-3940256099942544/6300978111'; // Test banner
+    }
+    return 'ca-app-pub-1095663786072620/3038197387'; // Production banner
+  }
+
+  void _trackImpression() {
+    _impressionCount++;
+    AppLogger.log('📊 SMART STICKY: Impression count: $_impressionCount');
+    
+    if (_impressionCount >= _maxImpressionsBeforeRefresh) {
+      AppLogger.info('🔄 SMART STICKY: Max impressions reached, refreshing...');
+      _loadStickyBanner();
+    }
+  }
+
+  void _startSmartRefresh() {
+    _refreshTimer?.cancel();
+    
+    _refreshTimer = Timer.periodic(_refreshInterval, (timer) {
+      if (mounted && _isBannerLoaded) {
+        final timeSinceLoad = DateTime.now().difference(_lastLoadTime ?? DateTime.now());
+        
+        if (timeSinceLoad >= _refreshInterval) {
+          AppLogger.info('🔄 SMART STICKY: Auto-refresh triggered');
+          _loadStickyBanner();
+        }
+      } else if (mounted && !_isBannerLoaded && widget.articlesRead >= 2) {
+        AppLogger.info('🔄 SMART STICKY: Banner not loaded, attempting reload...');
+        _loadStickyBanner();
+      }
+    });
+  }
+
+  bool _shouldShowBanner() {
+    if (!_isBannerLoaded || _stickyBannerAd == null) return false;
+    if (widget.articlesRead < 2) return false;
+    if (widget.isScrolling) return false; // Hide while scrolling for better UX
+    return true;
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    _stickyBannerAd?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_shouldShowBanner()) {
+      return const SizedBox.shrink();
+    }
+
+    return Positioned(
+      left: 0,
+      right: 0,
+      bottom: widget.showAtBottom ? 0 : null,
+      top: !widget.showAtBottom ? MediaQuery.of(context).padding.top : null,
+      child: Container(
+        width: double.infinity,
+        height: 60,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 4,
+              offset: Offset(0, widget.showAtBottom ? -2 : 2),
+            ),
+          ],
+        ),
+        child: SafeArea(
+          child: Container(
+            height: 50,
+            alignment: Alignment.center,
+            child: AdWidget(ad: _stickyBannerAd!),
+          ),
+        ),
       ),
     );
   }

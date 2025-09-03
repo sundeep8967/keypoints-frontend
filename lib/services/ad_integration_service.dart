@@ -139,7 +139,14 @@ class AdIntegrationService {
         AppLogger.success(' Test ad created successfully! Issue might be with batch creation.');
         return [testAd]; // Return the test ad
       } else {
-        AppLogger.error(' Test ad also failed. Check network, emulator, or AdMob configuration.');
+        AppLogger.error(' Test ad also failed. Trying banner fallback...');
+        final bannerFallback = await AdMobService.createBannerFallback();
+        if (bannerFallback != null) {
+          AppLogger.success(' Banner fallback ad created successfully!');
+          return [bannerFallback];
+        } else {
+          AppLogger.error(' Both native and banner ads failed. Check network, emulator, or AdMob configuration.');
+        }
       }
     } else {
       AppLogger.success(' Successfully loaded ${newAds.length} emergency ads for $category');
@@ -220,21 +227,51 @@ class AdIntegrationService {
     AppLogger.success(' Finished preloading ads');
   }
 
-  /// Track user reading behavior to optimize ad preloading
+  /// Track user reading behavior and smart lazy loading
   static void trackUserReading({
     required int articlesRead,
     required double averageTimePerArticle,
     required String currentCategory,
   }) {
-    AppLogger.log('📊 TRACKING: User read $articlesRead articles, avg ${averageTimePerArticle}s each');
+    AppLogger.log('📊 SMART TRACKING: User read $articlesRead articles, avg ${averageTimePerArticle}s each');
+    
+    // SMART LAZY LOADING: Load more ads when user approaches the limit
+    if (articlesRead >= 25 && articlesRead % 5 == 0) {
+      AppLogger.info('🧠 SMART LAZY LOADING: User at article $articlesRead, preloading more ads...');
+      
+      // Load 2-3 more ads for next batch of articles
+      _preloadMoreAdsForActiveUser(currentCategory, 2);
+    }
     
     // Update preloader with user behavior
     AdvancedAdPreloaderService.adjustPoolSize(
       newReadingSpeed: averageTimePerArticle,
     );
     
-    // Trigger predictive preloading
-    AdvancedAdPreloaderService.predictivePreload();
+    // Trigger predictive preloading only if user is actively reading
+    if (articlesRead > 10) {
+      AdvancedAdPreloaderService.predictivePreload();
+    }
+  }
+
+  /// Preload more ads when user is actively reading (lazy loading)
+  static Future<void> _preloadMoreAdsForActiveUser(String category, int count) async {
+    try {
+      AppLogger.info('🧠 LAZY LOADING: User is actively reading, loading $count more ads for $category');
+      
+      final moreAds = await _createAdsBatch(count);
+      if (moreAds.isNotEmpty) {
+        // Add to category cache for immediate use
+        if (!_categoryAds.containsKey(category)) {
+          _categoryAds[category] = [];
+        }
+        _categoryAds[category]!.addAll(moreAds);
+        
+        AppLogger.success('✅ LAZY LOADING: Added ${moreAds.length} ads to $category cache');
+      }
+    } catch (e) {
+      AppLogger.error('❌ LAZY LOADING: Failed to load more ads: $e');
+    }
   }
 
   /// Smart batching for large ad requests to avoid overwhelming the system
@@ -286,13 +323,20 @@ class AdIntegrationService {
       AppLogger.error(' Direct ad creation failed: $e');
     }
     
-    // If still no ads, create mock ads to maintain user experience
+    // If still no ads, create banner fallback ads to maintain user experience and revenue
     if (ads.isEmpty && count > 0) {
-      AppLogger.info(' 🎭 Creating ${count} mock ads as fallback');
+      AppLogger.info(' 📱 Creating ${count} banner fallback ads for better monetization');
       for (int i = 0; i < count; i++) {
-        final mockAd = AdMobService.createMockAd();
-        if (mockAd != null) {
-          ads.add(mockAd);
+        final bannerFallback = await AdMobService.createBannerFallback();
+        if (bannerFallback != null) {
+          ads.add(bannerFallback);
+        } else {
+          // Only use mock ads as absolute last resort
+          AppLogger.warning(' ⚠️ Banner fallback failed, using mock ad as last resort');
+          final mockAd = AdMobService.createMockAd();
+          if (mockAd != null) {
+            ads.add(mockAd);
+          }
         }
       }
     }
@@ -300,25 +344,31 @@ class AdIntegrationService {
     return ads;
   }
 
-  /// Calculate optimal ad positions for better distribution
+  /// Calculate smart ad positions based on realistic user reading behavior
   static List<int> _calculateOptimalAdPositions(int articleCount) {
-    if (articleCount <= 3) return []; // No ads for very short feeds
+    if (articleCount <= 5) return []; // No ads for very short feeds
     
     final positions = <int>[];
     
-    // Start placing ads after the 3rd article, then every 4-6 articles
-    int nextAdPosition = 3; // First ad after 3rd article
+    // SMART APPROACH: Only prepare ads for articles user will likely read
+    // Most users read 10-30 articles, so prepare ads accordingly
+    final realisticReadingLimit = articleCount > 50 ? 30 : articleCount;
     
-    while (nextAdPosition < articleCount - 1) { // Don't place ad at the very end
+    AppLogger.info('🧠 SMART AD CALCULATION: Preparing ads for $realisticReadingLimit articles (out of $articleCount total)');
+    
+    // Place first ad after 4th article, then every 5 articles
+    int nextAdPosition = 4;
+    
+    while (nextAdPosition < realisticReadingLimit - 1) {
       positions.add(nextAdPosition);
-      
-      // Vary the spacing: 4-6 articles between ads for natural feel
-      final spacing = 4 + (positions.length % 3); // Alternates between 4, 5, 6
-      nextAdPosition += spacing;
+      nextAdPosition += 5; // Every 5 articles
     }
     
-    AppLogger.debug(' OPTIMAL AD POSITIONS: For $articleCount articles, placing ads at: $positions');
-    return positions;
+    // Limit to maximum 6 ads initially (enough for 30 articles)
+    final smartPositions = positions.take(6).toList();
+    
+    AppLogger.debug('🧠 SMART AD POSITIONS: For realistic reading of $realisticReadingLimit articles, placing ${smartPositions.length} ads at: $smartPositions');
+    return smartPositions;
   }
 
   /// Get comprehensive ad statistics including preloader stats

@@ -16,8 +16,8 @@ class AdvancedAdPreloaderService {
   static final Map<String, List<NativeAdModel>> _categoryAdPools = {};
   static bool _isPreloading = false;
   static Timer? _preloadTimer;
-  static int _targetPoolSize = 10; // Keep 10 ads ready at all times
-  static int _maxPoolSize = 15; // Maximum ads to keep in memory
+  static int _targetPoolSize = 3; // Keep only 3 ads ready (for ~15 articles)
+  static int _maxPoolSize = 5; // Maximum ads to keep in memory
   
   // Preloading strategy
   static const Duration _preloadInterval = Duration(seconds: 30); // Check every 30 seconds
@@ -56,33 +56,37 @@ class AdvancedAdPreloaderService {
     AppLogger.info(' ADVANCED PRELOADER: Background preloading started');
   }
 
-  /// Preload initial batch of ads
+  /// Preload initial batch of ads (smart loading for typical user behavior)
   static Future<void> _preloadInitialBatch() async {
-    AppLogger.info(' ADVANCED PRELOADER: Loading initial batch...');
+    AppLogger.info('🧠 SMART PRELOADER: Loading initial batch for ~15 articles...');
     
     try {
-      // Load ads in small batches to avoid overwhelming the system
-      for (int batch = 0; batch < 3; batch++) {
-        final batchAds = await AdMobService.createMultipleAds(3);
-        _adPool.addAll(batchAds);
-        
-        AppLogger.info(' BATCH $batch: Loaded ${batchAds.length} real ads (Total: ${_adPool.length})');
-        
-        // Small delay between batches
-        await Future.delayed(const Duration(milliseconds: 1500));
-        
-        if (_adPool.length >= _targetPoolSize) break;
+      // Load only 2 ads initially (enough for first 10 articles)
+      final initialAds = await AdMobService.createMultipleAds(2);
+      _adPool.addAll(initialAds);
+      
+      AppLogger.info('📦 SMART BATCH: Loaded ${initialAds.length} real ads (enough for first 10 articles)');
+      
+      if (_adPool.length >= _targetPoolSize) {
+        AppLogger.success('✅ Initial batch complete, ready for user reading');
+        return;
       }
       
       // If we don't have enough real ads, fill with mock ads to ensure smooth experience
       if (_adPool.length < _targetPoolSize) {
         final mockAdsNeeded = _targetPoolSize - _adPool.length;
-        AppLogger.log('🎭 INITIAL BATCH: Adding $mockAdsNeeded mock ads to reach target');
+        AppLogger.log('📱 INITIAL BATCH: Adding $mockAdsNeeded banner fallback ads to reach target');
         
         for (int i = 0; i < mockAdsNeeded; i++) {
-          final mockAd = AdMobService.createMockAd();
-          if (mockAd != null) {
-            _adPool.add(mockAd);
+          final bannerFallback = await AdMobService.createBannerFallback();
+          if (bannerFallback != null) {
+            _adPool.add(bannerFallback);
+          } else {
+            // Only use mock as absolute last resort
+            final mockAd = AdMobService.createMockAd();
+            if (mockAd != null) {
+              _adPool.add(mockAd);
+            }
           }
         }
         

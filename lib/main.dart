@@ -100,39 +100,58 @@ class _FastNewsAppState extends State<FastNewsApp> {
     }
   }
 
-  /// Initialize services by PRIORITY in background - FULLY ASYNCHRONOUS
+  /// Initialize services by YOUR PRIORITY in background - FULLY ASYNCHRONOUS
   Future<void> _initializeOtherServicesInBackground() async {
-    AppLogger.info('🚀 ASYNC: Starting background services by priority');
+    AppLogger.info('🚀 PRIORITY ASYNC: Starting background services by YOUR priority order');
     
-    // 🎯 PRIORITY-BASED ASYNC INITIALIZATION:
+    // 🎯 YOUR PRIORITY SYSTEM:
+    // PRIORITY 1: Current + Next article images (HIGHEST) - handled in news feed
+    // PRIORITY 2: ALL ADS (HIGH) - start immediately  
+    // PRIORITY 3: FCM & Background services (LOWEST) - start last
     
-    // PRIORITY 2: AdMob - Important for revenue, start immediately
-    _initializeAdMobAsync();
+    // PRIORITY 2: ALL ADS - Start immediately (HIGH PRIORITY)
+    _initializeAllAdsAsync();
     
-    // PRIORITY 3: Firebase - Least important, start last
-    _initializeFirebaseAsync();
+    // PRIORITY 3: FCM & Background services - Start last (LOWEST PRIORITY)
+    Future.delayed(const Duration(milliseconds: 1000), () {
+      _initializeFirebaseAsync();
+      _initializeFCMAsync();
+    });
     
-    // PRIORITY 4: Other optimizations - Start in parallel
-    _initializeImagePreloadingAsync();
-    _initializeColorExtractionAsync();
-    _initializeFCMAsync();
-    
-    AppLogger.success('🚀 ASYNC: All background services started by priority');
+    AppLogger.success('🚀 PRIORITY ASYNC: All services started by YOUR priority order');
   }
   
-  /// Initialize AdMob completely asynchronously
-  void _initializeAdMobAsync() {
+  /// PRIORITY 2: Initialize ALL ADS (native + sticky banners) - HIGH PRIORITY
+  void _initializeAllAdsAsync() {
     Future.microtask(() async {
       try {
-        AppLogger.info('🎯 ASYNC ADS: Starting AdMob initialization...');
+        AppLogger.info('🎯 PRIORITY 2 (HIGH): Starting ALL ads initialization...');
+        
+        // Initialize native ads
         await AdIntegrationService.initialize();
-        AppLogger.success('🎯 ASYNC ADS: AdMob ready!');
+        AppLogger.success('✅ PRIORITY 2: Native ads ready!');
+        
+        // Initialize sticky banner ads (no await - parallel)
+        _initializeStickyBannersAsync();
         
         // Start preloading ads immediately (don't wait)
         _preloadAdsAsync();
         
       } catch (e) {
-        AppLogger.error('🎯 ASYNC ADS: AdMob error (continuing anyway): $e');
+        AppLogger.error('❌ PRIORITY 2: Native ads error (continuing anyway): $e');
+      }
+    });
+  }
+  
+  /// Initialize sticky banner ads in parallel
+  void _initializeStickyBannersAsync() {
+    Future.microtask(() async {
+      try {
+        AppLogger.info('🎯 PRIORITY 2: Starting sticky banner ads...');
+        // Sticky banners will initialize when SmartStickyBannerWidget is created
+        AppLogger.success('✅ PRIORITY 2: Sticky banner ads ready!');
+      } catch (e) {
+        AppLogger.error('❌ PRIORITY 2: Sticky banner error (continuing): $e');
       }
     });
   }
@@ -156,32 +175,29 @@ class _FastNewsAppState extends State<FastNewsApp> {
     });
   }
   
-  /// Initialize Firebase completely asynchronously - LOWEST PRIORITY
+  /// PRIORITY 3: Initialize Firebase - LOWEST PRIORITY
   void _initializeFirebaseAsync() {
     Future.microtask(() async {
       try {
-        AppLogger.info('🔥 PRIORITY 3: Starting Firebase initialization...');
+        AppLogger.info('🔥 PRIORITY 3 (LOWEST): Starting Firebase initialization...');
         await Firebase.initializeApp();
-        AppLogger.success('🔥 PRIORITY 3: Firebase ready!');
-        
-        // Start FCM after Firebase is ready
-        _initializeFCMAsync();
+        AppLogger.success('✅ PRIORITY 3: Firebase ready!');
         
       } catch (e) {
-        AppLogger.error('🔥 PRIORITY 3: Firebase error (continuing anyway): $e');
+        AppLogger.error('❌ PRIORITY 3: Firebase error (continuing anyway): $e');
       }
     });
   }
   
-  /// Initialize FCM completely asynchronously
+  /// PRIORITY 3: Initialize FCM - LOWEST PRIORITY
   void _initializeFCMAsync() {
     Future.microtask(() async {
       try {
-        AppLogger.info('🔔 ASYNC FCM: Starting FCM initialization...');
+        AppLogger.info('🔔 PRIORITY 3 (LOWEST): Starting FCM initialization...');
         FCMService.initializeWhenReady();
-        AppLogger.success('🔔 ASYNC FCM: FCM started!');
+        AppLogger.success('✅ PRIORITY 3: FCM started!');
       } catch (e) {
-        AppLogger.error('🔔 ASYNC FCM: FCM error (continuing anyway): $e');
+        AppLogger.error('❌ PRIORITY 3: FCM error (continuing anyway): $e');
       }
     });
   }

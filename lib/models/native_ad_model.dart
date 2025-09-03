@@ -7,8 +7,10 @@ class NativeAdModel {
   final String imageUrl;
   final String advertiser;
   final String callToAction;
-  final NativeAd? nativeAd; // Make nullable for mock ads
+  final NativeAd? nativeAd; // Make nullable for fallback ads
+  final BannerAd? bannerAd; // Add banner ad for fallback
   final bool isLoaded;
+  final bool isBannerFallback; // Flag to indicate if this is a banner fallback
 
   const NativeAdModel({
     required this.id,
@@ -17,8 +19,10 @@ class NativeAdModel {
     required this.imageUrl,
     required this.advertiser,
     required this.callToAction,
-    this.nativeAd, // Make optional for mock ads
+    this.nativeAd, // Make optional for fallback ads
+    this.bannerAd, // Banner ad for fallback
     this.isLoaded = false,
+    this.isBannerFallback = false,
   });
 
   // Create a copy with updated loading state
@@ -30,7 +34,9 @@ class NativeAdModel {
     String? advertiser,
     String? callToAction,
     NativeAd? nativeAd,
+    BannerAd? bannerAd,
     bool? isLoaded,
+    bool? isBannerFallback,
   }) {
     return NativeAdModel(
       id: id ?? this.id,
@@ -40,7 +46,9 @@ class NativeAdModel {
       advertiser: advertiser ?? this.advertiser,
       callToAction: callToAction ?? this.callToAction,
       nativeAd: nativeAd ?? this.nativeAd,
+      bannerAd: bannerAd ?? this.bannerAd,
       isLoaded: isLoaded ?? this.isLoaded,
+      isBannerFallback: isBannerFallback ?? this.isBannerFallback,
     );
   }
 

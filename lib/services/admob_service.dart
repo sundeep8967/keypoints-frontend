@@ -188,15 +188,15 @@ class AdMobService {
     return positions;
   }
 
-  /// Create multiple native ads for a feed (following Google's best practices)
+  /// Create multiple native ads with smart limits (following Google's best practices)
   static Future<List<NativeAdModel>> createMultipleAds(int count) async {
     // Clear expired ads first
     clearExpiredAds();
     
     final ads = <NativeAdModel>[];
-    count = count.clamp(1, 5); // Google recommends max 5 ads per request
+    count = count.clamp(1, 3); // REDUCED: Max 3 ads per request for better performance
     
-    AppLogger.info(' Loading $count native ads...');
+    AppLogger.info('🧠 SMART LOADING: Loading $count native ads (conservative approach)...');
     
     // Load ads sequentially to avoid overwhelming the system
     // Following Google's guideline: "Don't call loadAd() until the first request finishes"
@@ -267,40 +267,115 @@ class AdMobService {
     }
   }
 
-  /// Create a mock ad for testing when real ads fail to load
+  /// Create a banner ad fallback when native ads fail to load
+  static Future<NativeAdModel?> createBannerFallback() async {
+    AppLogger.log('📱 Creating banner ad fallback for native ad failure');
+    
+    if (!_isInitialized) {
+      await initialize();
+    }
+
+    try {
+      final fallbackId = 'banner_fallback_${++_adCounter}_${DateTime.now().millisecondsSinceEpoch}';
+      
+      // Get banner ad unit ID (same logic as native ads)
+      final bannerAdUnitId = _getBannerAdUnitId();
+      
+      final completer = Completer<NativeAdModel?>();
+      bool isCompleted = false;
+      
+      // Create banner ad with medium rectangle size to match native ad dimensions
+      final bannerAd = BannerAd(
+        adUnitId: bannerAdUnitId,
+        size: AdSize.mediumRectangle, // 300x250 - good size for native ad replacement
+        request: const AdRequest(),
+        listener: BannerAdListener(
+          onAdLoaded: (ad) {
+            AppLogger.success('📱 Banner fallback ad loaded successfully: $fallbackId');
+            
+            if (!isCompleted) {
+              isCompleted = true;
+              final model = NativeAdModel(
+                id: fallbackId,
+                title: 'Sponsored Content',
+                description: 'Discover products and services tailored for you.',
+                imageUrl: '',
+                advertiser: 'Sponsored',
+                callToAction: 'Learn More',
+                nativeAd: null,
+                bannerAd: ad as BannerAd,
+                isLoaded: true,
+                isBannerFallback: true,
+              );
+              completer.complete(model);
+            }
+          },
+          onAdFailedToLoad: (ad, error) {
+            AppLogger.error('📱 Banner fallback ad failed to load: $error');
+            if (!isCompleted) {
+              isCompleted = true;
+              completer.complete(null);
+            }
+          },
+          onAdClicked: (ad) {
+            AppLogger.log('👆 Banner fallback ad clicked: $fallbackId');
+            RewardPointsService.instance.addPointsForAdClick(fallbackId);
+          },
+          onAdImpression: (ad) {
+            AppLogger.log('👁️ Banner fallback ad impression: $fallbackId');
+            RewardPointsService.instance.addPointsForAdImpression(fallbackId);
+          },
+        ),
+      );
+
+      // Load the banner ad
+      bannerAd.load();
+      
+      // Wait for the ad to load with timeout
+      final result = await completer.future.timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          AppLogger.log('⏰ Banner fallback ad loading timed out for $fallbackId');
+          bannerAd.dispose();
+          return null;
+        },
+      );
+      
+      return result;
+    } catch (e) {
+      AppLogger.error('📱 Error creating banner fallback ad: $e');
+      return null;
+    }
+  }
+
+  /// Get banner ad unit ID (same logic as native ads)
+  static String _getBannerAdUnitId() {
+    if (kDebugMode) {
+      return 'ca-app-pub-3940256099942544/6300978111'; // Test banner ad unit
+    }
+    
+    // Use your production banner ad unit ID
+    return 'ca-app-pub-1095663786072620/3038197387';
+  }
+
+  /// Create a mock ad for testing when real ads fail to load (DEPRECATED - use banner fallback instead)
+  @Deprecated('Use createBannerFallback() instead for better monetization')
   static NativeAdModel? createMockAd() {
-    AppLogger.log('🎭 Creating mock ad for testing purposes');
+    AppLogger.log('🎭 Creating mock ad for testing purposes (DEPRECATED)');
     
-    // ENABLED: Create placeholder ads when real ads fail
     final mockId = 'mock_ad_${++_adCounter}_${DateTime.now().millisecondsSinceEpoch}';
-    
-    final mockTitles = [
-      'Discover Amazing Products',
-      'Special Offer Just For You',
-      'Trending Now - Don\'t Miss Out',
-      'Limited Time Deal',
-      'Recommended For You',
-    ];
-    
-    final mockDescriptions = [
-      'Find the best deals and products tailored to your interests.',
-      'Exclusive offers available for a limited time only.',
-      'Join thousands of satisfied customers today.',
-      'Quality products at unbeatable prices.',
-      'Experience the difference with our premium selection.',
-    ];
-    
-    final randomIndex = DateTime.now().millisecondsSinceEpoch % mockTitles.length;
     
     return NativeAdModel(
       id: mockId,
-      title: mockTitles[randomIndex],
-      description: mockDescriptions[randomIndex],
-      imageUrl: 'https://via.placeholder.com/400x200/4285F4/FFFFFF?text=Sponsored+Content',
-      advertiser: 'Sponsored',
-      callToAction: 'Learn More',
-      nativeAd: null, // No real ad object for mock ads
-      isLoaded: false, // Mark as not loaded to show custom UI instead of AdWidget
+      title: 'Mock Ad - No Revenue',
+      description: 'This is a placeholder ad that generates no revenue.',
+      imageUrl: 'https://via.placeholder.com/400x200/FF6B6B/FFFFFF?text=Mock+Ad',
+      advertiser: 'Mock',
+      callToAction: 'No Action',
+      nativeAd: null,
+      bannerAd: null,
+      isLoaded: false,
+      isBannerFallback: false,
     );
   }
 

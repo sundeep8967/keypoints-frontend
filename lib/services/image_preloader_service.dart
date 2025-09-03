@@ -10,11 +10,11 @@ class ImagePreloaderService {
   static final Map<String, bool> _preloadedImages = {};
   static final Map<String, bool> _preloadingInProgress = {};
 
-  /// Preload images for the next few articles to improve user experience
+  /// PRIORITY 1: Preload current + next article images (HIGHEST PRIORITY)
   static Future<void> preloadNextArticleImages(
     List<NewsArticleEntity> articles,
     int currentIndex, {
-    int preloadCount = 15, // CRITICAL FIX: Increased from 3 to 15
+    int preloadCount = 3, // REDUCED: Focus on immediate next articles only
   }) async {
     if (articles.isEmpty || currentIndex >= articles.length) return;
 
@@ -48,9 +48,8 @@ class ImagePreloaderService {
           continue;
         }
 
-        // 🎯 HIGH PRIORITY: First 3 images get high priority, rest get normal priority
-        final isHighPriority = (i - startIndex) < 3;
-        preloadFutures.add(_preloadSingleImage(imageUrl, highPriority: isHighPriority));
+        // 🎯 PRIORITY 1: All immediate next images get HIGHEST priority
+        preloadFutures.add(_preloadSingleImage(imageUrl, highPriority: true));
       }
     }
 
@@ -122,8 +121,8 @@ class ImagePreloaderService {
       AppLogger.log('🖼️ VIEWING IMAGE: ${articles[viewedIndex].imageUrl.substring(0, 50)}...');
     }
     
-    // Preload next 15 images when user views an article (CRITICAL FIX)
-    await preloadNextArticleImages(articles, viewedIndex, preloadCount: 15);
+    // PRIORITY 1: Preload only next 2-3 images when user views an article
+    await preloadNextArticleImages(articles, viewedIndex, preloadCount: 2);
     
     // Also preload previous image if user might swipe back
     if (viewedIndex > 0) {
