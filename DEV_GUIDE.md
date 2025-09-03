@@ -8,23 +8,8 @@
 
 
 
-## 🚀 Quick Start
 
-### Prerequisites
-- Flutter SDK (latest stable)
-- Android Studio / VS Code
-- Physical device (recommended for ads testing)
 
-### Installation
-```bash
-# Clone and setup
-git clone <repository-url>
-cd keypoints
-flutter pub get
-
-# Run the app
-flutter run
-```
 
 ### Environment Setup
 1. **Supabase Configuration**
