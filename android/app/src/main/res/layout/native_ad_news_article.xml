@@ -4,103 +4,153 @@
     android:layout_height="match_parent"
     android:background="#000000">
 
-    <LinearLayout
+    <!-- Use FrameLayout to stack MediaView behind text -->
+    <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:orientation="vertical"
-        android:padding="16dp">
+        android:layout_height="match_parent">
 
-        <!-- Media View for ad image/video -->
+        <!-- Media View (Background Image) -->
         <com.google.android.gms.ads.nativead.MediaView
             android:id="@+id/ad_media"
             android:layout_width="match_parent"
-            android:layout_height="200dp"
-            android:layout_marginBottom="16dp"
-            android:background="#333333" />
+            android:layout_height="match_parent"
+            android:layout_gravity="center" />
 
-        <!-- Ad Headline (Title) -->
-        <TextView
-            android:id="@+id/ad_headline"
+        <!-- Gradient Overlay (Top) for status bar visibility -->
+        <View
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="8dp"
-            android:text="Ad Headline"
-            android:textColor="#FFFFFF"
-            android:textSize="18sp"
-            android:textStyle="bold"
-            android:maxLines="2"
-            android:ellipsize="end" />
+            android:layout_height="120dp"
+            android:layout_gravity="top"
+            android:background="@drawable/gradient_top" />
 
-        <!-- Ad Body (Description) -->
-        <TextView
-            android:id="@+id/ad_body"
+        <!-- Gradient Overlay (Bottom) for text readability -->
+        <View
             android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:layout_marginBottom="16dp"
-            android:text="Ad body text goes here..."
-            android:textColor="#CCCCCC"
-            android:textSize="16sp"
-            android:lineSpacingExtra="4dp" />
+            android:layout_height="400dp"
+            android:layout_gravity="bottom"
+            android:background="@drawable/gradient_bottom" />
 
-        <!-- Bottom section with advertiser and CTA -->
-        <LinearLayout
+        <!-- Content Overlay -->
+        <RelativeLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:background="#222222"
-            android:padding="12dp">
+            android:layout_height="match_parent"
+            android:padding="24dp">
 
-            <!-- Ad Icon -->
-            <ImageView
-                android:id="@+id/ad_icon"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:layout_marginEnd="12dp"
-                android:background="#444444"
-                android:scaleType="centerCrop" />
-
-            <!-- Advertiser info -->
-            <LinearLayout
-                android:layout_width="0dp"
+            <!-- Sponsored Badge (Top Left) -->
+            <TextView
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
+                android:layout_marginTop="60dp"
+                android:background="@drawable/badge_background"
+                android:paddingHorizontal="12dp"
+                android:paddingVertical="6dp"
+                android:text="SPONSORED"
+                android:textColor="#000000"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.1" />
+
+            <!-- Bottom Content Container -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_alignParentBottom="true"
                 android:orientation="vertical">
 
+                <!-- Ad Headline -->
                 <TextView
-                    android:id="@+id/ad_advertiser"
-                    android:layout_width="wrap_content"
+                    android:id="@+id/ad_headline"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Advertiser"
+                    android:layout_marginBottom="16dp"
+                    android:text="Ad Headline"
                     android:textColor="#FFFFFF"
-                    android:textSize="13sp"
-                    android:textStyle="bold" />
+                    android:textSize="28sp"
+                    android:textStyle="bold"
+                    android:maxLines="4"
+                    android:ellipsize="end"
+                    android:shadowColor="#40000000"
+                    android:shadowDx="0"
+                    android:shadowDy="2"
+                    android:shadowRadius="8" />
 
+                <!-- Ad Body -->
                 <TextView
-                    android:layout_width="wrap_content"
+                    android:id="@+id/ad_body"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Sponsored"
-                    android:textColor="#CCCCCC"
-                    android:textSize="10sp" />
+                    android:layout_marginBottom="24dp"
+                    android:text="Ad body text..."
+                    android:textColor="#F2FFFFFF"
+                    android:textSize="16sp"
+                    android:maxLines="3"
+                    android:ellipsize="end"
+                    android:lineSpacingExtra="4dp"
+                    android:shadowColor="#40000000"
+                    android:shadowDx="0"
+                    android:shadowDy="1"
+                    android:shadowRadius="4" />
+
+                <!-- Action Bar -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:background="@drawable/action_bar_background"
+                    android:padding="16dp"
+                    android:gravity="center_vertical">
+
+                    <!-- Icon & Advertiser -->
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+
+                        <!-- Ad Icon -->
+                        <ImageView
+                            android:id="@+id/ad_icon"
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:layout_marginEnd="8dp"
+                            android:scaleType="centerCrop" />
+
+                        <TextView
+                            android:id="@+id/ad_advertiser"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Advertiser"
+                            android:textColor="#FFFFFF"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+
+                    <!-- Call to Action Button -->
+                    <Button
+                        android:id="@+id/ad_call_to_action"
+                        android:layout_width="wrap_content"
+                        android:layout_height="36dp"
+                        android:backgroundTint="#33FFFFFF"
+                        android:text="Open"
+                        android:textColor="#FFFFFF"
+                        android:textSize="12sp"
+                        android:textStyle="bold"
+                        android:minWidth="80dp"
+                        android:insetTop="0dp"
+                        android:insetBottom="0dp" />
+
+                </LinearLayout>
+                
+                <!-- Bottom Safe Area Spacing -->
+                <Space
+                    android:layout_width="match_parent"
+                    android:layout_height="20dp" />
 
             </LinearLayout>
 
-            <!-- Call to Action Button -->
-            <Button
-                android:id="@+id/ad_call_to_action"
-                android:layout_width="wrap_content"
-                android:layout_height="36dp"
-                android:background="#FF6600"
-                android:text="Learn More"
-                android:textColor="#FFFFFF"
-                android:textSize="12sp"
-                android:textStyle="bold"
-                android:paddingHorizontal="16dp"
-                android:minWidth="80dp" />
+        </RelativeLayout>
 
-        </LinearLayout>
-
-    </LinearLayout>
+    </FrameLayout>
 
 </com.google.android.gms.ads.nativead.NativeAdView>

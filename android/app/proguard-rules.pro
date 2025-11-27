@@ -12,6 +12,7 @@
 
 # AdMob rules
 -keep class com.google.android.gms.ads.** { *; }
+-keep class com.google.android.gms.internal.ads.** { *; }
 
 # Supabase rules
 -keep class io.supabase.** { *; }

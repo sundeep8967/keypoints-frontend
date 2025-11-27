@@ -7,7 +7,6 @@ import 'advanced_ad_preloader_service.dart';
 import '../utils/app_logger.dart';
 /// Service to seamlessly integrate native ads into news feed
 class AdIntegrationService {
-  static const int _adFrequency = 5; // Show ad every 5th position
   static final Map<String, List<NativeAdModel>> _categoryAds = {};
   static bool _isInitialized = false;
 
@@ -331,12 +330,9 @@ class AdIntegrationService {
         if (bannerFallback != null) {
           ads.add(bannerFallback);
         } else {
-          // Only use mock ads as absolute last resort
-          AppLogger.warning(' ⚠️ Banner fallback failed, using mock ad as last resort');
-          final mockAd = AdMobService.createMockAd();
-          if (mockAd != null) {
-            ads.add(mockAd);
-          }
+          // Don't create mock ads - skip this ad position instead
+          AppLogger.warning(' ⚠️ Banner fallback failed, skipping this ad position instead of showing mock ad');
+          // Skip adding any ad - better user experience without fake ads
         }
       }
     }

@@ -2,8 +2,6 @@ import 'dart:async';
 import 'dart:math';
 import '../models/native_ad_model.dart';
 import 'admob_service.dart';
-import 'ad_debug_service.dart';
-
 import '../utils/app_logger.dart';
 /// Advanced ad preloading service that loads ads in background while user reads
 class AdvancedAdPreloaderService {
@@ -82,29 +80,20 @@ class AdvancedAdPreloaderService {
           if (bannerFallback != null) {
             _adPool.add(bannerFallback);
           } else {
-            // Only use mock as absolute last resort
-            final mockAd = AdMobService.createMockAd();
-            if (mockAd != null) {
-              _adPool.add(mockAd);
-            }
+            // No mock ads - wait for real ads only
+            AppLogger.log('📱 INITIAL BATCH: Banner fallback failed, will wait for real ads instead of showing mock');
           }
         }
         
-        AppLogger.log('🎭 INITIAL BATCH: Pool now has ${_adPool.length} ads (real + mock)');
+        AppLogger.log('📱 INITIAL BATCH: Pool now has ${_adPool.length} real ads only');
       }
       
     } catch (e) {
       AppLogger.error(' ADVANCED PRELOADER: Initial batch failed: $e');
       
-      // Emergency: Create all mock ads if real ads completely fail
-      AppLogger.log('🎭 EMERGENCY INIT: Creating all mock ads for initial batch');
-      for (int i = 0; i < _targetPoolSize; i++) {
-        final mockAd = AdMobService.createMockAd();
-        if (mockAd != null) {
-          _adPool.add(mockAd);
-        }
-      }
-      AppLogger.log('🎭 EMERGENCY INIT: Created ${_adPool.length} mock ads');
+      // Emergency: Don't create mock ads - better to wait for real ads
+      AppLogger.log('🚨 EMERGENCY INIT: Real ads failed, will wait and retry later instead of showing mock ads');
+      // Pool remains empty - will retry loading real ads when needed
     }
   }
 
@@ -343,36 +332,20 @@ class AdvancedAdPreloaderService {
       final emergencyAds = await AdMobService.createMultipleAds(count);
       AppLogger.log('🚨 EMERGENCY: Loaded ${emergencyAds.length} real emergency ads');
       
-      // If we got some ads but not enough, fill with mock ads
+      // Don't fill with mock ads - use only real ads we got
       if (emergencyAds.length < count) {
-        final mockAdsNeeded = count - emergencyAds.length;
-        AppLogger.log('🎭 EMERGENCY FALLBACK: Creating $mockAdsNeeded mock ads');
-        
-        for (int i = 0; i < mockAdsNeeded; i++) {
-          final mockAd = AdMobService.createMockAd();
-          if (mockAd != null) {
-            emergencyAds.add(mockAd);
-          }
-        }
+        final realAdsCount = emergencyAds.length;
+        AppLogger.log('🚨 EMERGENCY: Got only $realAdsCount real ads out of $count requested - will use these instead of adding mock ads');
       }
       
-      AppLogger.log('🚨 EMERGENCY COMPLETE: Returning ${emergencyAds.length} total ads (real + mock)');
+      AppLogger.log('🚨 EMERGENCY COMPLETE: Returning ${emergencyAds.length} real ads only');
       return emergencyAds;
     } catch (e) {
-      AppLogger.error(' EMERGENCY: Failed to load real ads: $e');
-      AppLogger.log('🎭 EMERGENCY FALLBACK: Creating $count mock ads');
+      AppLogger.error('🚨 EMERGENCY: Failed to load real ads: $e');
+      AppLogger.log('✅ No mock ads created - better user experience without fake ads');
       
-      // Create all mock ads as fallback
-      final mockAds = <NativeAdModel>[];
-      for (int i = 0; i < count; i++) {
-        final mockAd = AdMobService.createMockAd();
-        if (mockAd != null) {
-          mockAds.add(mockAd);
-        }
-      }
-      
-      AppLogger.log('🎭 EMERGENCY FALLBACK COMPLETE: Created ${mockAds.length} mock ads');
-      return mockAds;
+      // Return empty list instead of mock ads
+      return <NativeAdModel>[];
     }
   }
 }

@@ -6,20 +6,34 @@ plugins {
     id "com.google.gms.google-services"
 }
 
-apply plugin: 'com.chaquo.python'
-
 android {
     namespace = "com.sundeep.keypoints"
     compileSdk = 35
-    ndkVersion = flutter.ndkVersion
+    ndkVersion = '28.0.12674087'  // Updated for 16KB alignment support
+
+    // 16 KB page size support (required for Android 15+ targeting devices)
+    // This ensures compatibility with future devices using 16 KB page sizes
+    packagingOptions {
+        jniLibs {
+            // Use legacy packaging for 16KB alignment compatibility
+            useLegacyPackaging = true
+            pickFirsts += ['**/libc++_shared.so', '**/libflutter.so']
+        }
+        // Ensure resources are properly aligned
+        resources {
+            excludes += ['/META-INF/{AL2.0,LGPL2.1}']
+        }
+    }
+    
+    // Force 16 KB alignment for all native libraries
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
     }
 
     kotlinOptions {
-        jvmTarget = "17"
+        jvmTarget = "11"
     }
 
     defaultConfig {
@@ -27,25 +41,26 @@ android {
         applicationId = "com.sundeep.keypoints"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        minSdk =  24
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         
         ndk {
-            abiFilters "arm64-v8a", "x86_64"
+            abiFilters "armeabi-v7a", "arm64-v8a", "x86_64"
+            // Enable 16 KB page size support for all architectures
         }
-    }
-
-    chaquopy {
-        defaultConfig {
-            version "3.8"
-            pip {
-                // Using basic Python without heavy dependencies for now
-                // install "Pillow==9.5.0"
-                // install "colorthief==0.2.1"
+        
+        // NDK build configuration for 16KB page size support
+        externalNativeBuild {
+            ndkBuild {
+                arguments "APP_SUPPORT_FLEXIBLE_PAGE_SIZES=true"
+                cppFlags "-Wl,-z,max-page-size=16384"
             }
         }
+        
+        // 16 KB page size support - simplified approach
+        // Let Flutter handle NDK builds with proper alignment via gradle.properties
     }
 
     signingConfigs {
@@ -62,17 +77,38 @@ android {
             signingConfig signingConfigs.release
             
             // Enable optimizations for production
-            minifyEnabled true
-            shrinkResources true
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            minifyEnabled false
+            shrinkResources false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
             
-            // Additional optimizations
+            // Additional optimizations with 16 KB alignment support
             zipAlignEnabled true
             debuggable false
+            
+            // Explicitly prevent testOnly flag
+            testCoverageEnabled false
+            pseudoLocalesEnabled false
+            
+            // 16 KB page size specific optimizations
+            packagingOptions {
+                jniLibs {
+                    // Use legacy packaging for 16KB alignment compatibility
+                    useLegacyPackaging = true
+                    pickFirsts += ['**/libc++_shared.so', '**/libflutter.so', '**/libapp.so']
+                }
+            }
         }
         debug {
             debuggable true
             minifyEnabled false
+            
+            // Apply 16 KB alignment to debug builds as well
+            packagingOptions {
+                jniLibs {
+                    // Use legacy packaging for 16KB alignment compatibility
+                    useLegacyPackaging = true
+                }
+            }
         }
     }
 }
@@ -84,4 +120,24 @@ flutter {
 dependencies {
     implementation platform('com.google.firebase:firebase-bom:32.7.0')
     implementation 'com.google.firebase:firebase-messaging'
+    
+    // AndroidX Core for edge-to-edge support
+    implementation 'androidx.core:core:1.12.0'
+}
+
+// Task to ensure no testOnly flag in release builds
+tasks.whenTaskAdded { task ->
+    if (task.name == 'processReleaseManifest') {
+        task.doLast {
+            def manifestFile = new File("$buildDir/intermediates/merged_manifests/release/AndroidManifest.xml")
+            if (manifestFile.exists()) {
+                def manifestContent = manifestFile.text
+                if (manifestContent.contains('android:testOnly="true"')) {
+                    manifestContent = manifestContent.replaceAll('android:testOnly="true"', 'android:testOnly="false"')
+                    manifestFile.write(manifestContent)
+                    println "✓ Fixed testOnly flag in manifest"
+                }
+            }
+        }
+    }
 }

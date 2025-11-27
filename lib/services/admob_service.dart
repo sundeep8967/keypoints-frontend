@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import '../models/native_ad_model.dart';
-import 'reward_points_service.dart';
 
 import '../utils/app_logger.dart';
 class AdMobService {
@@ -18,9 +17,6 @@ class AdMobService {
   
   // Production Ad Unit IDs
   static String get _nativeAdUnitId {
-    // Use test ads during development
-    const bool isProduction = bool.fromEnvironment('dart.vm.product');
-    
     // For release builds, always use production ads
     if (kDebugMode) {
       return _testAdUnitId; // Use test ads only in debug mode
@@ -98,13 +94,9 @@ class AdMobService {
           },
           onAdClicked: (ad) {
             AppLogger.log('👆 Native ad clicked: $adId');
-            // Award points for ad click
-            RewardPointsService.instance.addPointsForAdClick(adId);
           },
           onAdImpression: (ad) {
             AppLogger.log('👁️ Native ad impression: $adId');
-            // Award points for ad impression
-            RewardPointsService.instance.addPointsForAdImpression(adId);
           },
         ),
         request: const AdRequest(),
@@ -319,11 +311,9 @@ class AdMobService {
           },
           onAdClicked: (ad) {
             AppLogger.log('👆 Banner fallback ad clicked: $fallbackId');
-            RewardPointsService.instance.addPointsForAdClick(fallbackId);
           },
           onAdImpression: (ad) {
             AppLogger.log('👁️ Banner fallback ad impression: $fallbackId');
-            RewardPointsService.instance.addPointsForAdImpression(fallbackId);
           },
         ),
       );
@@ -358,26 +348,8 @@ class AdMobService {
     return 'ca-app-pub-1095663786072620/3038197387';
   }
 
-  /// Create a mock ad for testing when real ads fail to load (DEPRECATED - use banner fallback instead)
-  @Deprecated('Use createBannerFallback() instead for better monetization')
-  static NativeAdModel? createMockAd() {
-    AppLogger.log('🎭 Creating mock ad for testing purposes (DEPRECATED)');
-    
-    final mockId = 'mock_ad_${++_adCounter}_${DateTime.now().millisecondsSinceEpoch}';
-    
-    return NativeAdModel(
-      id: mockId,
-      title: 'Mock Ad - No Revenue',
-      description: 'This is a placeholder ad that generates no revenue.',
-      imageUrl: 'https://via.placeholder.com/400x200/FF6B6B/FFFFFF?text=Mock+Ad',
-      advertiser: 'Mock',
-      callToAction: 'No Action',
-      nativeAd: null,
-      bannerAd: null,
-      isLoaded: false,
-      isBannerFallback: false,
-    );
-  }
+  /// REMOVED: Mock ad creation - we only show real ads that generate revenue
+  // Mock ads have been completely removed to prevent showing fake ads to users
 
   /// Get troubleshooting information for ad loading issues
   static Map<String, dynamic> getTroubleshootingInfo() {

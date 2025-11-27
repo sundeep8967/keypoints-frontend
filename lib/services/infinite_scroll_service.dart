@@ -1,13 +1,11 @@
 import '../domain/entities/news_article_entity.dart';
 import '../services/supabase_service.dart';
-import '../services/read_articles_service.dart';
 import '../utils/app_logger.dart';
 
 /// Enhanced infinite scrolling service that ensures users never run out of articles
 /// Designed to handle 11,500+ articles with smart preloading and fallback strategies
 class InfiniteScrollService {
   static const int _maxBufferSize = 1000; // Maximum articles to keep in memory
-  static const int _preloadThreshold = 50; // Start loading when this many articles remain
   static const int _batchSize = 300; // Articles to load per batch
   static const int _fallbackBatchSize = 500; // Larger batch for fallback scenarios
   
@@ -278,6 +276,32 @@ class InfiniteScrollService {
     }
     
     return shouldLoad;
+  }
+  
+  /// Enhanced loading detection with velocity awareness
+  static bool shouldLoadMoreWithVelocity(
+    {required int currentPosition, 
+     required int totalItems, 
+     required double scrollVelocity}) {
+    if (totalItems == 0) return false;
+    
+    // Adaptive threshold based on scroll velocity
+    int threshold = 15; // Default
+    if (scrollVelocity > 1000) {
+      threshold = 25; // Load earlier for fast scrolling
+    } else if (scrollVelocity > 500) {
+      threshold = 20; // Moderate adjustment
+    }
+    
+    final remainingItems = totalItems - currentPosition - 1;
+    return remainingItems <= threshold;
+  }
+  
+  /// Get optimal preload count based on current feed size
+  static int getOptimalPreloadCount(int feedSize) {
+    if (feedSize > 100) return 15; // Large feed
+    if (feedSize > 50) return 10;  // Medium feed  
+    return 5; // Small feed
   }
   
   /// Optimize article buffer by removing old articles if buffer gets too large

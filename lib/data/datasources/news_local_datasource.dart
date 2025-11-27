@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/news_article_model.dart';
+import '../../services/read_articles_service.dart';
 
 abstract class NewsLocalDataSource {
   Future<List<NewsArticleModel>> getCachedNews();
@@ -13,7 +14,8 @@ abstract class NewsLocalDataSource {
 
 class NewsLocalDataSourceImpl implements NewsLocalDataSource {
   static const String _articlesKey = 'cached_news_articles';
-  static const String _readArticlesKey = 'read_articles';
+  // Deprecated: use ReadArticlesService for read IDs storage to avoid key mismatch
+  // static const String _readArticlesKey = 'read_articles';
   static const String _lastFetchKey = 'last_fetch_timestamp';
 
   @override
@@ -47,13 +49,7 @@ class NewsLocalDataSourceImpl implements NewsLocalDataSource {
   @override
   Future<void> markArticleAsRead(String articleId) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final readIds = await getReadArticleIds();
-      
-      if (!readIds.contains(articleId)) {
-        readIds.add(articleId);
-        await prefs.setStringList(_readArticlesKey, readIds);
-      }
+      await ReadArticlesService.markAsRead(articleId);
     } catch (e) {
       throw Exception('Failed to mark article as read: $e');
     }
@@ -62,8 +58,7 @@ class NewsLocalDataSourceImpl implements NewsLocalDataSource {
   @override
   Future<bool> isArticleRead(String articleId) async {
     try {
-      final readIds = await getReadArticleIds();
-      return readIds.contains(articleId);
+      return await ReadArticlesService.isRead(articleId);
     } catch (e) {
       return false;
     }
@@ -72,8 +67,7 @@ class NewsLocalDataSourceImpl implements NewsLocalDataSource {
   @override
   Future<List<String>> getReadArticleIds() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      return prefs.getStringList(_readArticlesKey) ?? [];
+      return await ReadArticlesService.getReadArticleIds();
     } catch (e) {
       return [];
     }
@@ -90,16 +84,4 @@ class NewsLocalDataSourceImpl implements NewsLocalDataSource {
     }
   }
 
-  Future<bool> shouldFetchNewArticles() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final lastFetch = prefs.getInt(_lastFetchKey) ?? 0;
-      final now = DateTime.now().millisecondsSinceEpoch;
-      
-      // Fetch new articles if last fetch was more than 30 minutes ago
-      return (now - lastFetch) > (30 * 60 * 1000);
-    } catch (e) {
-      return true;
-    }
-  }
 }

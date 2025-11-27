@@ -1,16 +1,10 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'dart:ui';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import '../domain/entities/news_article_entity.dart';
-import '../screens/news_detail_screen.dart';
-import '../services/color_extraction_service.dart';
-import '../services/news_feed_helper.dart';
-import '../services/text_formatting_service.dart';
-import '../services/dynamic_text_service.dart';
 import '../services/url_launcher_service.dart';
-import '../services/consolidated/article_service.dart';
-import '../widgets/banner_ad_widgets.dart';
 
 import '../utils/app_logger.dart';
 class NewsFeedWidgets {
@@ -119,271 +113,439 @@ class NewsFeedWidgets {
   }
 
   static Widget buildLoadingPage() {
-    return const Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          CupertinoActivityIndicator(
-            radius: 20,
-            color: Colors.white,
-          ),
-          SizedBox(height: 16),
-          Text(
-            'Loading articles...',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.white,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  static Widget buildCardWithPalette(
-    BuildContext context,
-    NewsArticleEntity article, 
-    int index, 
-    ColorPalette palette
-  ) {
     return Container(
       width: double.infinity,
       height: double.infinity,
-      color: palette.primary,
+      color: CupertinoColors.black,
       child: Column(
         children: [
-          SizedBox(height: MediaQuery.of(context).padding.top + 54), // padding.top + 50 (header) + 4 (gap to match top gap)
-          Container(
-            height: MediaQuery.of(context).size.height * 0.3,
-            width: double.infinity,
-            padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
-            child: Stack(
-              children: [
-                Positioned.fill(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
+          // Top spacing for header
+          const SizedBox(height: 120),
+          
+          // Main loading content matching article card layout
+          Expanded(
+            child: Container(
+              margin: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(24),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Colors.white.withValues(alpha: 0.1),
+                    Colors.white.withValues(alpha: 0.05),
+                  ],
+                ),
+              ),
+              child: Column(
+                children: [
+                  // Image area shimmer
+                  Expanded(
+                    flex: 3,
                     child: Container(
+                      width: double.infinity,
+                      margin: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: palette.secondary,
                         borderRadius: BorderRadius.circular(16),
+                        color: Colors.white.withValues(alpha: 0.2),
                       ),
-                      child: Stack(
+                      child: const Center(
+                        child: Icon(
+                          CupertinoIcons.photo,
+                          size: 48,
+                          color: CupertinoColors.systemGrey,
+                        ),
+                      ),
+                    ),
+                  ),
+                  
+                  // Content area with loading indicator
+                  Expanded(
+                    flex: 2,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                      child: Column(
                         children: [
-                          Center(
-                            child: CupertinoActivityIndicator(
-                              color: palette.onPrimary,
+                          // Loading spinner and text
+                          const CupertinoActivityIndicator(
+                            radius: 16,
+                            color: Colors.white,
+                          ),
+                          const SizedBox(height: 16),
+                          const Text(
+                            'Loading latest news...',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
-                          CachedNetworkImage(
-                            imageUrl: article.imageUrl,
-                            fit: BoxFit.cover,
+                          const SizedBox(height: 16),
+                          
+                          // Shimmer lines for content preview
+                          Container(
                             width: double.infinity,
-                            height: double.infinity,
-                            // Optimized settings for main feed
-                            fadeInDuration: const Duration(milliseconds: 150),
-                            fadeOutDuration: const Duration(milliseconds: 100),
-                            memCacheWidth: 1600, // CRITICAL FIX: 4x larger memory cache
-                            memCacheHeight: 1200, // CRITICAL FIX: 4x larger memory cache
-                            placeholder: (context, url) => Container(
-                              color: palette.secondary,
-                              child: Center(
-                                child: CupertinoActivityIndicator(
-                                  color: palette.onPrimary,
-                                ),
-                              ),
+                            height: 16,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(8),
                             ),
-                            errorWidget: (context, url, error) => Container(
-                              decoration: BoxDecoration(
-                                color: palette.secondary,
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: Center(
-                                child: Icon(
-                                  CupertinoIcons.photo_fill,
-                                  size: 60,
-                                  color: palette.onPrimary.withOpacity(0.5),
-                                ),
-                              ),
+                          ),
+                          const SizedBox(height: 8),
+                          Container(
+                            width: double.infinity,
+                            height: 16,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Container(
+                            width: 200,
+                            height: 16,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.06),
+                              borderRadius: BorderRadius.circular(8),
                             ),
                           ),
                         ],
                       ),
                     ),
                   ),
-                ),
-                Positioned(
-                  top: 15,
-                  left: 15,
-                  right: 15,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.9),
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.2),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: Text(
-                          article.category.toUpperCase(),
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                            color: palette.primary,
-                            letterSpacing: 0.8,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
-          Expanded(
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: palette.primary,
+          
+          // Bottom spacing
+          const SizedBox(height: 40),
+        ],
+      ),
+    );
+  }
+
+  static Widget buildSimpleCard(
+    BuildContext context,
+    NewsArticleEntity article, 
+    int index
+  ) {
+    return SizedBox(
+      width: double.infinity,
+      height: double.infinity,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          // Full-screen background image
+          CachedNetworkImage(
+            imageUrl: article.imageUrl,
+            fit: BoxFit.cover,
+            width: double.infinity,
+            height: double.infinity,
+            fadeInDuration: const Duration(milliseconds: 200),
+            fadeOutDuration: const Duration(milliseconds: 150),
+            memCacheWidth: 1600,
+            memCacheHeight: 1200,
+            placeholder: (context, url) => Container(
+              color: Colors.black,
+              child: Center(
+                child: CupertinoActivityIndicator(
+                  color: Colors.white,
+                  radius: 20,
+                ),
               ),
+            ),
+            errorWidget: (context, url, error) => Container(
+              color: Colors.black,
+              child: Center(
+                child: Icon(
+                  CupertinoIcons.photo_fill,
+                  size: 80,
+                  color: Colors.white.withValues(alpha: 0.3),
+                ),
+              ),
+            ),
+          ),
+          
+          // Top gradient overlay for better readability
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: MediaQuery.of(context).size.height * 0.3,
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.black.withValues(alpha: 0.7),
+                    Colors.black.withValues(alpha: 0.3),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+            ),
+          ),
+          
+          // Bottom gradient overlay for content
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: MediaQuery.of(context).size.height * 0.5,
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.transparent,
+                    Colors.black.withValues(alpha: 0.4),
+                    Colors.black.withValues(alpha: 0.85),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          
+          // Content overlay
+          Positioned.fill(
+            child: SafeArea(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    article.title,
-                    style: TextStyle(
-                      fontSize: 18, // REDUCED from 22 to 18 for smaller title
-                      fontWeight: FontWeight.w700, // REDUCED from w800 to w700
-                      color: palette.onPrimary,
-                      height: 1.2, // REDUCED from 1.3 to 1.2 for tighter spacing
-                      letterSpacing: -0.2, // REDUCED from -0.3 to -0.2
+                  const SizedBox(height: 60), // Space for header
+                  
+                  // Category badge at top
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.95),
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.2),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 6,
+                            height: 6,
+                            decoration: BoxDecoration(
+                              color: CupertinoColors.systemBlue,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            article.category.toUpperCase(),
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.black87,
+                              letterSpacing: 1.5,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    // REMOVED maxLines and overflow to show full title without truncation
-                  ),
-                  const SizedBox(height: 12),
-                  // Intelligently fill available space with content
-                  DynamicTextService.buildAdaptiveContent(
-                    keypoints: article.description,
-                    description: article.description,
-                    baseStyle: TextStyle(
-                      fontSize: 16,
-                      color: palette.onPrimary.withOpacity(0.9),
-                      height: 1.4, // Compact line spacing for more content
-                      letterSpacing: 0.1,
-                    ),
-                    minLines: 4,
-                    maxLines: 20, // Allow more lines to fill space
                   ),
                   
-                  // Small gap before bottom content
-                  const SizedBox(height: 16),
-                  // Show banner ad for every 2nd article, otherwise show blurred box
-                  (index % 2 == 1) ? 
-                    // Banner ad for every 2nd article (index 1, 3, 5, etc.) - CENTERED
-                    Center(
-                      child: Container(
-                        width: double.infinity,
-                        child: StandardBannerAdWidget(
-                          palette: palette,
-                          margin: EdgeInsets.zero,
-                        ),
-                      ),
-                    )
-                    :
-                    // Normal blurred box for other articles
-                    GestureDetector(
-                      onTap: () {
-                        AppLogger.log('🔥 BLURRED BOX TAPPED!');
-                        AppLogger.log('🔗 Article sourceUrl: "${article.sourceUrl}"');
-                        AppLogger.log('📰 Article title: "${article.title}"');
-                        
-                        // Open article URL directly in internal browser
-                        if (article.sourceUrl != null && article.sourceUrl!.isNotEmpty) {
-                          AppLogger.success('✅ URL is available, opening directly in internal browser');
-                          UrlLauncherService.launchInternalBrowser(article.sourceUrl!);
-                        } else {
-                          AppLogger.error('❌ No URL available for this article');
-                        }
-                      },
-                      child: Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
-                          image: DecorationImage(
-                            image: CachedNetworkImageProvider(article.imageUrl),
-                            fit: BoxFit.cover,
-                          ),
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: BackdropFilter(
-                            filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-                            child: Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: Colors.black.withOpacity(0.3),
-                                borderRadius: BorderRadius.circular(12),
+                  const Spacer(),
+                  
+                  // Bottom content area
+                  Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Headline
+                        Text(
+                          article.title,
+                          style: const TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                            height: 1.2,
+                            letterSpacing: -0.5,
+                            shadows: [
+                              Shadow(
+                                color: Colors.black45,
+                                offset: Offset(0, 2),
+                                blurRadius: 8,
                               ),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      // Source display on the left
-                                      Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            article.source ?? 'Unknown',
-                                            style: TextStyle(
-                                              fontSize: 13,
-                                              color: palette.onPrimary,
-                                              fontWeight: FontWeight.w700,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 2),
-                                          Text(
-                                            'tap to read more!!',
-                                            style: TextStyle(
-                                              fontSize: 10,
-                                              color: palette.onPrimary.withOpacity(0.7),
-                                              fontWeight: FontWeight.w500,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      // Share button
-                                      buildActionButton(
-                                        CupertinoIcons.square_arrow_up,
-                                        palette.onPrimary,
-                                        () async {
-                                          try {
-                                            await ArticleService.shareArticle(article);
-                                          } catch (e) {
-                                            AppLogger.error('Share failed: $e');
-                                          }
-                                        },
+                            ],
+                          ),
+                          maxLines: 4,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        
+                        const SizedBox(height: 16),
+                        
+                        // Description
+                        Text(
+                          article.description,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.white.withValues(alpha: 0.95),
+                            height: 1.5,
+                            letterSpacing: 0.2,
+                            shadows: const [
+                              Shadow(
+                                color: Colors.black45,
+                                offset: Offset(0, 1),
+                                blurRadius: 4,
+                              ),
+                            ],
+                          ),
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        
+                        const SizedBox(height: 24),
+                        
+                        // Bottom action bar
+                        Row(
+                          children: [
+                            // Source info
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: () {
+                                  if (article.sourceUrl != null && article.sourceUrl!.isNotEmpty) {
+                                    UrlLauncherService.launchInternalBrowser(article.sourceUrl!);
+                                  }
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(
+                                      color: Colors.white.withValues(alpha: 0.3),
+                                      width: 1.5,
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: 0.2),
+                                        blurRadius: 12,
+                                        offset: const Offset(0, 4),
                                       ),
                                     ],
                                   ),
-                                ],
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Text(
+                                              article.source ?? 'Unknown Source',
+                                              style: const TextStyle(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w700,
+                                                color: Colors.white,
+                                                letterSpacing: 0.3,
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                            const SizedBox(height: 2),
+                                            const Text(
+                                              'Tap to read full article',
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w500,
+                                                color: Colors.white70,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Container(
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withValues(alpha: 0.2),
+                                          borderRadius: BorderRadius.circular(10),
+                                        ),
+                                        child: const Icon(
+                                          CupertinoIcons.arrow_up_right,
+                                          size: 18,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
                               ),
                             ),
-                          ),
+                            
+                            const SizedBox(width: 12),
+                            
+                            // Share button
+                            GestureDetector(
+                              onTap: () async {
+                                try {
+                                  final shareText = '''
+📰 ${article.title}
+
+${article.description}
+
+📱 Read more on Key Points News App
+${article.sourceUrl != null && article.sourceUrl!.isNotEmpty ? '\n🔗 Source: ${article.sourceUrl}' : ''}
+''';
+                                  await Share.share(
+                                    shareText,
+                                    subject: '📰 ${article.title} - Key Points News',
+                                  );
+                                } catch (e) {
+                                  AppLogger.error('Share failed: $e');
+                                }
+                              },
+                              child: Container(
+                                width: 56,
+                                height: 56,
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: Colors.white.withValues(alpha: 0.3),
+                                    width: 1.5,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withValues(alpha: 0.2),
+                                      blurRadius: 12,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ],
+                                ),
+                                child: const Icon(
+                                  CupertinoIcons.share,
+                                  size: 22,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
+                        
+                        SizedBox(height: MediaQuery.of(context).padding.bottom + 8),
+                      ],
                     ),
-                  SizedBox(height: MediaQuery.of(context).padding.bottom + 4),
+                  ),
                 ],
               ),
             ),
@@ -400,10 +562,10 @@ class NewsFeedWidgets {
         width: 44,
         height: 44,
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
+          color: color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(22),
           border: Border.all(
-            color: color.withOpacity(0.2),
+            color: color.withValues(alpha: 0.2),
             width: 1.5,
           ),
         ),
@@ -449,7 +611,7 @@ class NewsFeedWidgets {
                 decoration: BoxDecoration(
                   color: isSelected 
                     ? Colors.white 
-                    : Colors.white.withOpacity(0.2),
+                    : Colors.white.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Text(
@@ -464,6 +626,52 @@ class NewsFeedWidgets {
             ),
           );
         },
+      ),
+    );
+  }
+
+  static Widget buildAdCard(BuildContext context, dynamic adModel) {
+    // Cast to correct type if possible
+    if (adModel.nativeAd != null) {
+      return SizedBox(
+        width: double.infinity,
+        height: double.infinity,
+        child: AdWidget(ad: adModel.nativeAd!),
+      );
+    }
+
+    return Container(
+      width: double.infinity,
+      height: double.infinity,
+      color: const Color(0xFF2a2a2a),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              CupertinoIcons.rectangle_3_offgrid,
+              size: 80,
+              color: CupertinoColors.systemGrey,
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              'Advertisement',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Swipe up to continue reading',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.white.withValues(alpha: 0.7),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

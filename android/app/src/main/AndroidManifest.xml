@@ -4,10 +4,12 @@
     
     
     <application
-        android:label="keypoints"
+        android:extractNativeLibs="true"
+        android:label="Key Points"
         android:name="${applicationName}"
         android:icon="@mipmap/launcher_icon"
-        android:hardwareAccelerated="true">
+        android:hardwareAccelerated="true"
+        android:testOnly="false">
         <activity
             android:name=".MainActivity"
             android:exported="true"

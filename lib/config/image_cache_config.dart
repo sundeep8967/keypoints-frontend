@@ -7,7 +7,7 @@ class ImageCacheConfig {
     DefaultCacheManager().emptyCache(); // Clear any old cache
     
     // Set up optimized cache manager
-    final cacheManager = CacheManager(
+    CacheManager(
       Config(
         'optimized_image_cache',
         stalePeriod: const Duration(days: 7), // Keep images for 7 days

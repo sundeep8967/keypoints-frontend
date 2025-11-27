@@ -1,11 +1,11 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:intl/intl.dart';
 import '../domain/entities/news_article_entity.dart';
-import '../services/text_formatting_service.dart';
 import '../services/dynamic_text_service.dart';
 import '../services/url_launcher_service.dart';
+import '../services/read_articles_service.dart';
+import '../utils/app_logger.dart';
 
 class DynamicColorNewsCard extends StatefulWidget {
   final NewsArticleEntity article;
@@ -63,117 +63,184 @@ class _DynamicColorNewsCardState extends State<DynamicColorNewsCard> {
       margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       child: CupertinoButton(
         padding: EdgeInsets.zero,
-        onPressed: widget.onTap,
+        onPressed: () {
+          // Mark as read when user taps the card
+          ReadArticlesService.markAsRead(widget.article.id);
+          AppLogger.log('Card tap: marked as read ${widget.article.id}');
+          widget.onTap?.call();
+        },
         child: Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                _dominantColor.withValues(alpha: 0.08),
                 _dominantColor.withValues(alpha: 0.12),
+                _dominantColor.withValues(alpha: 0.18),
               ],
             ),
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(24),
             border: Border.all(
-              color: _dominantColor.withValues(alpha: 0.15),
-              width: 1,
+              color: _dominantColor.withValues(alpha: 0.25),
+              width: 1.5,
             ),
             boxShadow: [
               BoxShadow(
-                color: _dominantColor.withValues(alpha: 0.15),
-                blurRadius: 20,
-                offset: const Offset(0, 8),
-                spreadRadius: 0,
+                color: _dominantColor.withValues(alpha: 0.25),
+                blurRadius: 30,
+                offset: const Offset(0, 12),
+                spreadRadius: -4,
               ),
             ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Image Section
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: AspectRatio(
-                    aspectRatio: 1.6,
-                    child: CachedNetworkImage(
-                      imageUrl: widget.article.imageUrl,
-                      fit: BoxFit.cover,
-                      width: double.infinity,
-                      // Optimized settings for faster loading
-                      fadeInDuration: const Duration(milliseconds: 150),
-                      fadeOutDuration: const Duration(milliseconds: 100),
-                      memCacheWidth: 1600, // CRITICAL FIX: 4x larger memory cache
-                      memCacheHeight: 1200, // CRITICAL FIX: 4x larger memory cache
-                      placeholder: (context, url) => Container(
-                        color: CupertinoColors.systemGrey6.resolveFrom(context),
-                        child: const Center(
-                          child: SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CupertinoActivityIndicator(),
+              // Enhanced Image Section with overlay
+              Stack(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: AspectRatio(
+                        aspectRatio: 1.6,
+                        child: CachedNetworkImage(
+                          imageUrl: widget.article.imageUrl,
+                          fit: BoxFit.cover,
+                          width: double.infinity,
+                          fadeInDuration: const Duration(milliseconds: 200),
+                          fadeOutDuration: const Duration(milliseconds: 150),
+                          memCacheWidth: 1600,
+                          memCacheHeight: 1200,
+                          placeholder: (context, url) => Container(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [
+                                  _dominantColor.withValues(alpha: 0.2),
+                                  _dominantColor.withValues(alpha: 0.1),
+                                ],
+                              ),
+                            ),
+                            child: const Center(
+                              child: SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CupertinoActivityIndicator(),
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
-                      errorWidget: (context, url, error) => Container(
-                        color: CupertinoColors.systemGrey6.resolveFrom(context),
-                        child: Center(
-                          child: Icon(
-                            CupertinoIcons.photo,
-                            size: 40,
-                            color: CupertinoColors.systemGrey3.resolveFrom(context),
+                          errorWidget: (context, url, error) => Container(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [
+                                  _dominantColor.withValues(alpha: 0.2),
+                                  _dominantColor.withValues(alpha: 0.1),
+                                ],
+                              ),
+                            ),
+                            child: Center(
+                              child: Icon(
+                                CupertinoIcons.photo,
+                                size: 48,
+                                color: _dominantColor.withValues(alpha: 0.5),
+                              ),
+                            ),
                           ),
                         ),
                       ),
                     ),
                   ),
-                ),
+                  // Category badge overlay
+                  Positioned(
+                    top: 28,
+                    left: 28,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.95),
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.15),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 5,
+                            height: 5,
+                            decoration: BoxDecoration(
+                              color: _dominantColor,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            widget.article.category.toUpperCase(),
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              color: _dominantColor,
+                              letterSpacing: 1.0,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
               
-              // Content Section
+              // Enhanced Content Section
               Padding(
                 padding: const EdgeInsets.all(24),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Title (removed timestamp)
+                    // Enhanced Title
                     Text(
                       widget.article.title,
                       style: TextStyle(
-                        fontSize: 18, // REDUCED from 22 to 18 for smaller title
-                        fontWeight: FontWeight.w600, // REDUCED from w700 to w600
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
                         color: CupertinoColors.label.resolveFrom(context),
-                        height: 1.2, // REDUCED from 1.3 to 1.2 for tighter spacing
-                        letterSpacing: -0.2, // REDUCED from -0.5 to -0.2
-                      ),
-                      // REMOVED maxLines and overflow to show full title without truncation
-                    ),
-                    
-                    const SizedBox(height: 12),
-                    
-                    // Intelligently sized content based on available space
-                    Expanded(
-                      child: DynamicTextService.buildAdaptiveContent(
-                        keypoints: widget.article.description,
-                        description: widget.article.description,
-                        baseStyle: TextStyle(
-                          fontSize: 16,
-                          color: CupertinoColors.secondaryLabel.resolveFrom(context),
-                          height: 1.4, // Compact line spacing for more content
-                          letterSpacing: 0.1,
-                        ),
-                        minLines: 3,
-                        maxLines: 8, // Allow more content in available space
+                        height: 1.3,
+                        letterSpacing: -0.3,
                       ),
                     ),
                     
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 14),
                     
-                    // Read More Indicator with clickable area
+                    // Enhanced content
+                    DynamicTextService.buildAdaptiveContent(
+                      keypoints: widget.article.description,
+                      description: widget.article.description,
+                      baseStyle: TextStyle(
+                        fontSize: 15,
+                        color: CupertinoColors.secondaryLabel.resolveFrom(context),
+                        height: 1.5,
+                        letterSpacing: 0.15,
+                      ),
+                      minLines: 3,
+                      maxLines: 8,
+                    ),
+                    
+                    const SizedBox(height: 16),
+                    
+                    // Modern Read More Button
                     GestureDetector(
-                      onTap: () {
+                      onTap: () async {
+                        await ReadArticlesService.markAsRead(widget.article.id);
+                        AppLogger.log('Read Full Article: marked as read ${widget.article.id}');
                         if (widget.article.sourceUrl != null && widget.article.sourceUrl!.isNotEmpty) {
                           UrlLauncherService.showLaunchConfirmation(
                             context, 
@@ -183,31 +250,40 @@ class _DynamicColorNewsCardState extends State<DynamicColorNewsCard> {
                         }
                       },
                       child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 18),
                         decoration: BoxDecoration(
-                          color: _dominantColor.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: _dominantColor.withValues(alpha: 0.3),
-                            width: 1,
+                          gradient: LinearGradient(
+                            colors: [
+                              _dominantColor,
+                              Color.lerp(_dominantColor, Colors.black, 0.2)!,
+                            ],
                           ),
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: _dominantColor.withValues(alpha: 0.3),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text(
+                            const Text(
                               'Read Full Article',
                               style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: _dominantColor,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                                letterSpacing: 0.3,
                               ),
                             ),
-                            const SizedBox(width: 6),
-                            Icon(
-                              CupertinoIcons.square_arrow_up,
-                              size: 14,
-                              color: _dominantColor,
+                            const SizedBox(width: 8),
+                            const Icon(
+                              CupertinoIcons.arrow_up_right_circle_fill,
+                              size: 18,
+                              color: Colors.white,
                             ),
                           ],
                         ),
@@ -221,22 +297,5 @@ class _DynamicColorNewsCardState extends State<DynamicColorNewsCard> {
         ),
       ),
     );
-  }
-
-  String _formatTimestamp(DateTime timestamp) {
-    final now = DateTime.now();
-    final difference = now.difference(timestamp);
-
-    if (difference.inMinutes < 1) {
-      return 'Just now';
-    } else if (difference.inHours < 1) {
-      return '${difference.inMinutes}m ago';
-    } else if (difference.inDays < 1) {
-      return '${difference.inHours}h ago';
-    } else if (difference.inDays < 7) {
-      return '${difference.inDays}d ago';
-    } else {
-      return DateFormat('MMM dd, yyyy').format(timestamp);
-    }
   }
 }

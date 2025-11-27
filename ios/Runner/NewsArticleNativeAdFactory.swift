@@ -5,140 +5,207 @@ class NewsArticleNativeAdFactory: FLTNativeAdFactory {
     
     func createNativeAd(_ nativeAd: GADNativeAd, customOptions: [AnyHashable : Any]? = nil) -> GADNativeAdView? {
         
-        // Create the native ad view programmatically to match your news article design
+        // Create the native ad view programmatically to match the immersive news article design
         let adView = GADNativeAdView()
         adView.translatesAutoresizingMaskIntoConstraints = false
         adView.backgroundColor = UIColor.black
         
-        // Create main container
-        let containerView = UIView()
-        containerView.translatesAutoresizingMaskIntoConstraints = false
-        adView.addSubview(containerView)
-        
-        // Create media view for ad image/video
+        // 1. Media View (Background Image - Full Screen)
         let mediaView = GADMediaView()
         mediaView.translatesAutoresizingMaskIntoConstraints = false
-        mediaView.backgroundColor = UIColor.darkGray
-        mediaView.layer.cornerRadius = 12
+        mediaView.contentMode = .scaleAspectFill
         mediaView.clipsToBounds = true
-        containerView.addSubview(mediaView)
+        adView.addSubview(mediaView)
         
-        // Create headline label (title)
+        // 2. Gradient Overlays (Top & Bottom)
+        
+        // Top Gradient
+        let topGradientLayer = CAGradientLayer()
+        topGradientLayer.colors = [
+            UIColor.black.withAlphaComponent(0.7).cgColor,
+            UIColor.clear.cgColor
+        ]
+        topGradientLayer.locations = [0.0, 1.0]
+        let topGradientView = UIView()
+        topGradientView.translatesAutoresizingMaskIntoConstraints = false
+        topGradientView.isUserInteractionEnabled = false
+        topGradientView.layer.addSublayer(topGradientLayer)
+        adView.addSubview(topGradientView)
+        
+        // Bottom Gradient
+        let bottomGradientLayer = CAGradientLayer()
+        bottomGradientLayer.colors = [
+            UIColor.clear.cgColor,
+            UIColor.black.withAlphaComponent(0.4).cgColor,
+            UIColor.black.withAlphaComponent(0.85).cgColor
+        ]
+        bottomGradientLayer.locations = [0.0, 0.4, 1.0]
+        let bottomGradientView = UIView()
+        bottomGradientView.translatesAutoresizingMaskIntoConstraints = false
+        bottomGradientView.isUserInteractionEnabled = false
+        bottomGradientView.layer.addSublayer(bottomGradientLayer)
+        adView.addSubview(bottomGradientView)
+        
+        // 3. Content Container (Overlay)
+        let contentContainer = UIView()
+        contentContainer.translatesAutoresizingMaskIntoConstraints = false
+        adView.addSubview(contentContainer)
+        
+        // Sponsored Badge (Top Left)
+        let badgeContainer = UIView()
+        badgeContainer.translatesAutoresizingMaskIntoConstraints = false
+        badgeContainer.backgroundColor = UIColor(white: 1.0, alpha: 0.95)
+        badgeContainer.layer.cornerRadius = 20
+        contentContainer.addSubview(badgeContainer)
+        
+        let sponsoredLabel = UILabel()
+        sponsoredLabel.translatesAutoresizingMaskIntoConstraints = false
+        sponsoredLabel.font = UIFont.systemFont(ofSize: 11, weight: .black)
+        sponsoredLabel.textColor = UIColor.black
+        sponsoredLabel.text = "SPONSORED"
+        sponsoredLabel.letterSpacing = 1.5
+        badgeContainer.addSubview(sponsoredLabel)
+        
+        // Headline Label
         let headlineLabel = UILabel()
         headlineLabel.translatesAutoresizingMaskIntoConstraints = false
-        headlineLabel.font = UIFont.boldSystemFont(ofSize: 18)
+        headlineLabel.font = UIFont.systemFont(ofSize: 28, weight: .heavy)
         headlineLabel.textColor = UIColor.white
-        headlineLabel.numberOfLines = 2
+        headlineLabel.numberOfLines = 4
         headlineLabel.text = nativeAd.headline
-        containerView.addSubview(headlineLabel)
+        // Add shadow
+        headlineLabel.layer.shadowColor = UIColor.black.cgColor
+        headlineLabel.layer.shadowOffset = CGSize(width: 0, height: 2)
+        headlineLabel.layer.shadowOpacity = 0.5
+        headlineLabel.layer.shadowRadius = 4
+        contentContainer.addSubview(headlineLabel)
         
-        // Create body label (description)
+        // Body Label
         let bodyLabel = UILabel()
         bodyLabel.translatesAutoresizingMaskIntoConstraints = false
-        bodyLabel.font = UIFont.systemFont(ofSize: 16)
-        bodyLabel.textColor = UIColor.lightGray
-        bodyLabel.numberOfLines = 0
+        bodyLabel.font = UIFont.systemFont(ofSize: 16, weight: .medium)
+        bodyLabel.textColor = UIColor(white: 1.0, alpha: 0.95)
+        bodyLabel.numberOfLines = 3
         bodyLabel.text = nativeAd.body
-        containerView.addSubview(bodyLabel)
+        bodyLabel.layer.shadowColor = UIColor.black.cgColor
+        bodyLabel.layer.shadowOffset = CGSize(width: 0, height: 1)
+        bodyLabel.layer.shadowOpacity = 0.5
+        bodyLabel.layer.shadowRadius = 2
+        contentContainer.addSubview(bodyLabel)
         
-        // Create bottom container
-        let bottomContainer = UIView()
-        bottomContainer.translatesAutoresizingMaskIntoConstraints = false
-        bottomContainer.backgroundColor = UIColor(white: 0.1, alpha: 1.0)
-        bottomContainer.layer.cornerRadius = 12
-        containerView.addSubview(bottomContainer)
+        // Action Bar (Bottom)
+        let actionBar = UIView()
+        actionBar.translatesAutoresizingMaskIntoConstraints = false
+        actionBar.backgroundColor = UIColor(white: 1.0, alpha: 0.15)
+        actionBar.layer.cornerRadius = 16
+        actionBar.layer.borderWidth = 1.5
+        actionBar.layer.borderColor = UIColor(white: 1.0, alpha: 0.3).cgColor
+        contentContainer.addSubview(actionBar)
         
-        // Create icon image view
+        // Icon View
         let iconView = UIImageView()
         iconView.translatesAutoresizingMaskIntoConstraints = false
-        iconView.backgroundColor = UIColor.darkGray
-        iconView.layer.cornerRadius = 20
-        iconView.clipsToBounds = true
-        iconView.contentMode = .scaleAspectFill
+        iconView.backgroundColor = UIColor.clear
+        iconView.contentMode = .scaleAspectFit
         if let icon = nativeAd.icon {
             iconView.image = icon.image
         }
-        bottomContainer.addSubview(iconView)
+        actionBar.addSubview(iconView)
         
-        // Create advertiser label
+        // Advertiser Label
         let advertiserLabel = UILabel()
         advertiserLabel.translatesAutoresizingMaskIntoConstraints = false
-        advertiserLabel.font = UIFont.boldSystemFont(ofSize: 13)
+        advertiserLabel.font = UIFont.systemFont(ofSize: 14, weight: .bold)
         advertiserLabel.textColor = UIColor.white
-        advertiserLabel.text = nativeAd.advertiser ?? "Advertiser"
-        bottomContainer.addSubview(advertiserLabel)
+        advertiserLabel.text = nativeAd.advertiser ?? "Sponsored"
+        actionBar.addSubview(advertiserLabel)
         
-        // Create sponsored label
-        let sponsoredLabel = UILabel()
-        sponsoredLabel.translatesAutoresizingMaskIntoConstraints = false
-        sponsoredLabel.font = UIFont.systemFont(ofSize: 10)
-        sponsoredLabel.textColor = UIColor.lightGray
-        sponsoredLabel.text = "Sponsored"
-        bottomContainer.addSubview(sponsoredLabel)
-        
-        // Create call to action button
-        let ctaButton = UIButton(type: .system)
+        // CTA Button (Visual only, acts as part of ad view tap)
+        let ctaButton = UIButton(type: .custom)
         ctaButton.translatesAutoresizingMaskIntoConstraints = false
-        ctaButton.backgroundColor = UIColor.orange
+        ctaButton.backgroundColor = UIColor(white: 1.0, alpha: 0.2)
+        ctaButton.layer.cornerRadius = 10
+        ctaButton.setTitle(nativeAd.callToAction ?? "Open", for: .normal)
         ctaButton.setTitleColor(UIColor.white, for: .normal)
-        ctaButton.titleLabel?.font = UIFont.boldSystemFont(ofSize: 12)
-        ctaButton.layer.cornerRadius = 18
-        ctaButton.setTitle(nativeAd.callToAction ?? "Learn More", for: .normal)
-        bottomContainer.addSubview(ctaButton)
+        ctaButton.titleLabel?.font = UIFont.systemFont(ofSize: 12, weight: .bold)
+        ctaButton.isUserInteractionEnabled = false // Let the whole ad view handle clicks
+        actionBar.addSubview(ctaButton)
         
-        // Set up constraints
+        // --- Constraints ---
         NSLayoutConstraint.activate([
-            // Container constraints
-            containerView.topAnchor.constraint(equalTo: adView.safeAreaLayoutGuide.topAnchor, constant: 70),
-            containerView.leadingAnchor.constraint(equalTo: adView.leadingAnchor, constant: 20),
-            containerView.trailingAnchor.constraint(equalTo: adView.trailingAnchor, constant: -20),
-            containerView.bottomAnchor.constraint(equalTo: adView.safeAreaLayoutGuide.bottomAnchor, constant: -20),
+            // Media View (Fill Screen)
+            mediaView.topAnchor.constraint(equalTo: adView.topAnchor),
+            mediaView.leadingAnchor.constraint(equalTo: adView.leadingAnchor),
+            mediaView.trailingAnchor.constraint(equalTo: adView.trailingAnchor),
+            mediaView.bottomAnchor.constraint(equalTo: adView.bottomAnchor),
             
-            // Media view constraints
-            mediaView.topAnchor.constraint(equalTo: containerView.topAnchor),
-            mediaView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
-            mediaView.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
-            mediaView.heightAnchor.constraint(equalTo: containerView.heightAnchor, multiplier: 0.3),
+            // Gradients
+            topGradientView.topAnchor.constraint(equalTo: adView.topAnchor),
+            topGradientView.leadingAnchor.constraint(equalTo: adView.leadingAnchor),
+            topGradientView.trailingAnchor.constraint(equalTo: adView.trailingAnchor),
+            topGradientView.heightAnchor.constraint(equalTo: adView.heightAnchor, multiplier: 0.3),
             
-            // Headline constraints
-            headlineLabel.topAnchor.constraint(equalTo: mediaView.bottomAnchor, constant: 16),
-            headlineLabel.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
-            headlineLabel.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
+            bottomGradientView.bottomAnchor.constraint(equalTo: adView.bottomAnchor),
+            bottomGradientView.leadingAnchor.constraint(equalTo: adView.leadingAnchor),
+            bottomGradientView.trailingAnchor.constraint(equalTo: adView.trailingAnchor),
+            bottomGradientView.heightAnchor.constraint(equalTo: adView.heightAnchor, multiplier: 0.5),
             
-            // Body constraints
-            bodyLabel.topAnchor.constraint(equalTo: headlineLabel.bottomAnchor, constant: 12),
-            bodyLabel.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
-            bodyLabel.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
+            // Content Container (SafeArea)
+            contentContainer.topAnchor.constraint(equalTo: adView.safeAreaLayoutGuide.topAnchor),
+            contentContainer.leadingAnchor.constraint(equalTo: adView.leadingAnchor, constant: 20),
+            contentContainer.trailingAnchor.constraint(equalTo: adView.trailingAnchor, constant: -20),
+            contentContainer.bottomAnchor.constraint(equalTo: adView.safeAreaLayoutGuide.bottomAnchor, constant: -20),
             
-            // Bottom container constraints
-            bottomContainer.topAnchor.constraint(greaterThanOrEqualTo: bodyLabel.bottomAnchor, constant: 16),
-            bottomContainer.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
-            bottomContainer.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
-            bottomContainer.bottomAnchor.constraint(equalTo: containerView.bottomAnchor),
-            bottomContainer.heightAnchor.constraint(equalToConstant: 60),
+            // Badge
+            badgeContainer.topAnchor.constraint(equalTo: contentContainer.topAnchor, constant: 20),
+            badgeContainer.leadingAnchor.constraint(equalTo: contentContainer.leadingAnchor),
+            badgeContainer.heightAnchor.constraint(equalToConstant: 30),
             
-            // Icon constraints
-            iconView.leadingAnchor.constraint(equalTo: bottomContainer.leadingAnchor, constant: 16),
-            iconView.centerYAnchor.constraint(equalTo: bottomContainer.centerYAnchor),
-            iconView.widthAnchor.constraint(equalToConstant: 40),
-            iconView.heightAnchor.constraint(equalToConstant: 40),
+            sponsoredLabel.centerXAnchor.constraint(equalTo: badgeContainer.centerXAnchor),
+            sponsoredLabel.centerYAnchor.constraint(equalTo: badgeContainer.centerYAnchor),
+            sponsoredLabel.leadingAnchor.constraint(equalTo: badgeContainer.leadingAnchor, constant: 12),
+            sponsoredLabel.trailingAnchor.constraint(equalTo: badgeContainer.trailingAnchor, constant: -12),
             
-            // Advertiser label constraints
+            // Action Bar (Bottom)
+            actionBar.bottomAnchor.constraint(equalTo: contentContainer.bottomAnchor, constant: -8),
+            actionBar.leadingAnchor.constraint(equalTo: contentContainer.leadingAnchor),
+            actionBar.trailingAnchor.constraint(equalTo: contentContainer.trailingAnchor),
+            actionBar.heightAnchor.constraint(equalToConstant: 56),
+            
+            // Body (Above Action Bar)
+            bodyLabel.bottomAnchor.constraint(equalTo: actionBar.topAnchor, constant: -24),
+            bodyLabel.leadingAnchor.constraint(equalTo: contentContainer.leadingAnchor),
+            bodyLabel.trailingAnchor.constraint(equalTo: contentContainer.trailingAnchor),
+            
+            // Headline (Above Body)
+            headlineLabel.bottomAnchor.constraint(equalTo: bodyLabel.topAnchor, constant: -16),
+            headlineLabel.leadingAnchor.constraint(equalTo: contentContainer.leadingAnchor),
+            headlineLabel.trailingAnchor.constraint(equalTo: contentContainer.trailingAnchor),
+            
+            // Icon in Action Bar
+            iconView.leadingAnchor.constraint(equalTo: actionBar.leadingAnchor, constant: 16),
+            iconView.centerYAnchor.constraint(equalTo: actionBar.centerYAnchor),
+            iconView.widthAnchor.constraint(equalToConstant: 24),
+            iconView.heightAnchor.constraint(equalToConstant: 24),
+            
+            // Advertiser Label
             advertiserLabel.leadingAnchor.constraint(equalTo: iconView.trailingAnchor, constant: 12),
-            advertiserLabel.topAnchor.constraint(equalTo: bottomContainer.topAnchor, constant: 12),
+            advertiserLabel.centerYAnchor.constraint(equalTo: actionBar.centerYAnchor),
+            advertiserLabel.trailingAnchor.constraint(lessThanOrEqualTo: ctaButton.leadingAnchor, constant: -8),
             
-            // Sponsored label constraints
-            sponsoredLabel.leadingAnchor.constraint(equalTo: iconView.trailingAnchor, constant: 12),
-            sponsoredLabel.topAnchor.constraint(equalTo: advertiserLabel.bottomAnchor, constant: 2),
-            
-            // CTA button constraints
-            ctaButton.trailingAnchor.constraint(equalTo: bottomContainer.trailingAnchor, constant: -16),
-            ctaButton.centerYAnchor.constraint(equalTo: bottomContainer.centerYAnchor),
+            // CTA Button
+            ctaButton.trailingAnchor.constraint(equalTo: actionBar.trailingAnchor, constant: -12),
+            ctaButton.centerYAnchor.constraint(equalTo: actionBar.centerYAnchor),
             ctaButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 80),
-            ctaButton.heightAnchor.constraint(equalToConstant: 36),
+            ctaButton.heightAnchor.constraint(equalToConstant: 36)
         ])
         
-        // Register views with the native ad
+        // Handle layout changes for gradient layers
+        adView.layoutSubviews() // Force layout to get frames
+        topGradientLayer.frame = topGradientView.bounds
+        bottomGradientLayer.frame = bottomGradientView.bounds
+        
+        // Register views
         adView.mediaView = mediaView
         adView.headlineView = headlineLabel
         adView.bodyView = bodyLabel
@@ -146,9 +213,37 @@ class NewsArticleNativeAdFactory: FLTNativeAdFactory {
         adView.advertiserView = advertiserLabel
         adView.callToActionView = ctaButton
         
-        // Set the native ad
         adView.nativeAd = nativeAd
         
         return adView
+    }
+}
+
+extension UILabel {
+    var letterSpacing: CGFloat {
+        get {
+            return 0
+        }
+        set {
+            let attributedString: NSMutableAttributedString
+            if let currentAttrString = attributedText {
+                attributedString = NSMutableAttributedString(attributedString: currentAttrString)
+            } else {
+                attributedString = NSMutableAttributedString(string: text ?? "")
+                setTitleAttributes(attributedString)
+            }
+            
+            attributedString.addAttribute(
+                NSAttributedString.Key.kern,
+                value: newValue,
+                range: NSRange(location: 0, length: attributedString.length)
+            )
+            attributedText = attributedString
+        }
+    }
+    
+    private func setTitleAttributes(_ attributedString: NSMutableAttributedString) {
+        attributedString.addAttribute(NSAttributedString.Key.font, value: font, range: NSRange(location: 0, length: attributedString.length))
+        attributedString.addAttribute(NSAttributedString.Key.foregroundColor, value: textColor, range: NSRange(location: 0, length: attributedString.length))
     }
 }

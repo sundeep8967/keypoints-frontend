@@ -10,7 +10,7 @@ class ContactUsScreen extends StatelessWidget {
       scheme: 'mailto',
       path: 'keypointsnews@gmail.com',
       queryParameters: {
-        'subject': 'KeyPoints App Feedback',
+        'subject': 'Key Points App Feedback',
       },
     );
 

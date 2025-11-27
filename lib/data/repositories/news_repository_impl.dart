@@ -27,9 +27,9 @@ class NewsRepositoryImpl implements NewsRepository {
           final remoteArticles = await remoteDataSource.getNews(limit: limit);
           await localDataSource.cacheNews(remoteArticles);
           
-          // Mark read status for each article
-          final articlesWithReadStatus = await _addReadStatusToArticles(remoteArticles);
-          return Right(articlesWithReadStatus);
+          // Prepare unread-only list
+          final unread = await _unreadOnly(remoteArticles);
+          return Right(unread);
         } catch (e) {
           // If remote fails, fallback to cache
           return await _getCachedNews();
@@ -55,31 +55,14 @@ class NewsRepositoryImpl implements NewsRepository {
           final mergedArticles = _mergeArticles(existingCache, remoteArticles);
           await localDataSource.cacheNews(mergedArticles);
           
-          final articlesWithReadStatus = await _addReadStatusToArticles(remoteArticles);
-          return Right(articlesWithReadStatus);
+          final unread = await _unreadOnly(remoteArticles);
+          return Right(unread);
         } catch (e) {
           return await _getCachedNewsByCategory(category, limit);
         }
       } else {
         return await _getCachedNewsByCategory(category, limit);
       }
-    } catch (e) {
-      return Left(ServerFailure(e.toString()));
-    }
-  }
-
-  @override
-  Future<Either<Failure, List<NewsArticleEntity>>> getUnreadNews({int limit = 20}) async {
-    try {
-      final result = await getNews(limit: limit * 2); // Get more to filter unread
-      
-      return result.fold(
-        (failure) => Left(failure),
-        (articles) {
-          final unreadArticles = articles.where((article) => !article.isRead).take(limit).toList();
-          return Right(unreadArticles);
-        },
-      );
     } catch (e) {
       return Left(ServerFailure(e.toString()));
     }
@@ -110,8 +93,8 @@ class NewsRepositoryImpl implements NewsRepository {
     try {
       if (await networkInfo.isConnected) {
         final remoteArticles = await remoteDataSource.searchNews(query, limit: limit);
-        final articlesWithReadStatus = await _addReadStatusToArticles(remoteArticles);
-        return Right(articlesWithReadStatus);
+        final unread = await _unreadOnly(remoteArticles);
+        return Right(unread);
       } else {
         // Search in cache
         final cachedArticles = await localDataSource.getCachedNews();
@@ -120,8 +103,8 @@ class NewsRepositoryImpl implements NewsRepository {
           article.description.toLowerCase().contains(query.toLowerCase())
         ).take(limit).toList();
         
-        final articlesWithReadStatus = await _addReadStatusToArticles(filteredArticles);
-        return Right(articlesWithReadStatus);
+        final unread = await _unreadOnly(filteredArticles);
+        return Right(unread);
       }
     } catch (e) {
       return Left(ServerFailure(e.toString()));
@@ -148,8 +131,8 @@ class NewsRepositoryImpl implements NewsRepository {
   Stream<Either<Failure, List<NewsArticleEntity>>> getNewsStream({int limit = 20}) {
     try {
       return remoteDataSource.getNewsStream(limit: limit).asyncMap((articles) async {
-        final articlesWithReadStatus = await _addReadStatusToArticles(articles);
-        return Right<Failure, List<NewsArticleEntity>>(articlesWithReadStatus);
+        final unread = await _unreadOnly(articles);
+        return Right<Failure, List<NewsArticleEntity>>(unread);
       }).handleError((error) {
         return Left<Failure, List<NewsArticleEntity>>(ServerFailure(error.toString()));
       });
@@ -162,8 +145,8 @@ class NewsRepositoryImpl implements NewsRepository {
   Future<Either<Failure, List<NewsArticleEntity>>> _getCachedNews() async {
     try {
       final cachedArticles = await localDataSource.getCachedNews();
-      final articlesWithReadStatus = await _addReadStatusToArticles(cachedArticles);
-      return Right(articlesWithReadStatus);
+      final unread = await _unreadOnly(cachedArticles);
+      return Right(unread);
     } catch (e) {
       return Left(CacheFailure(e.toString()));
     }
@@ -177,8 +160,8 @@ class NewsRepositoryImpl implements NewsRepository {
           .take(limit)
           .toList();
       
-      final articlesWithReadStatus = await _addReadStatusToArticles(filteredArticles);
-      return Right(articlesWithReadStatus);
+      final unread = await _unreadOnly(filteredArticles);
+      return Right(unread);
     } catch (e) {
       return Left(CacheFailure(e.toString()));
     }
@@ -186,13 +169,16 @@ class NewsRepositoryImpl implements NewsRepository {
 
   Future<List<NewsArticleEntity>> _addReadStatusToArticles(List<NewsArticleModel> articles) async {
     final List<NewsArticleEntity> result = [];
-    
     for (final article in articles) {
       final isRead = await localDataSource.isArticleRead(article.id);
       result.add(article.copyWith(isRead: isRead));
     }
-    
     return result;
+  }
+
+  Future<List<NewsArticleEntity>> _unreadOnly(List<NewsArticleModel> articles) async {
+    final withStatus = await _addReadStatusToArticles(articles);
+    return withStatus.where((a) => !a.isRead).toList();
   }
 
   List<NewsArticleModel> _mergeArticles(List<NewsArticleModel> existing, List<NewsArticleModel> newArticles) {

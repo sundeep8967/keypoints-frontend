@@ -1,8 +1,8 @@
 import 'package:flutter/cupertino.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
+import 'package:share_plus/share_plus.dart';
 import '../domain/entities/news_article_entity.dart';
-import '../services/consolidated/article_service.dart';
 import '../utils/app_logger.dart';
 
 class NewsDetailScreen extends StatelessWidget {
@@ -17,7 +17,7 @@ class NewsDetailScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
-        backgroundColor: CupertinoColors.systemBackground.withOpacity(0.9),
+        backgroundColor: CupertinoColors.systemBackground.withValues(alpha: 0.9),
         border: null,
         leading: CupertinoButton(
           padding: EdgeInsets.zero,
@@ -29,13 +29,7 @@ class NewsDetailScreen extends StatelessWidget {
         ),
         trailing: CupertinoButton(
           padding: EdgeInsets.zero,
-          onPressed: () async {
-            try {
-              await ArticleService.shareArticle(article);
-            } catch (e) {
-              AppLogger.error('Share failed: $e');
-            }
-          },
+          onPressed: () => _shareArticle(article),
           child: const Icon(
             CupertinoIcons.share,
             color: CupertinoColors.systemBlue,
@@ -122,13 +116,7 @@ class NewsDetailScreen extends StatelessWidget {
                         Expanded(
                           child: CupertinoButton.filled(
                             child: const Text('Share'),
-                            onPressed: () async {
-                              try {
-                                await ArticleService.shareArticle(article);
-                              } catch (e) {
-                                AppLogger.error('Share failed: $e');
-                              }
-                            },
+                            onPressed: () => _shareArticle(article),
                           ),
                         ),
                       ],
@@ -141,6 +129,26 @@ class NewsDetailScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _shareArticle(NewsArticleEntity article) async {
+    try {
+      final shareText = '''
+📰 ${article.title}
+
+${article.description}
+
+📱 Read more on Key Points News App
+${article.sourceUrl != null && article.sourceUrl!.isNotEmpty ? '\n🔗 Source: ${article.sourceUrl}' : ''}
+''';
+      
+      await Share.share(
+        shareText,
+        subject: '📰 ${article.title} - Key Points News',
+      );
+    } catch (e) {
+      AppLogger.error('Share failed: $e');
+    }
   }
 
   String _formatTimestamp(DateTime timestamp) {

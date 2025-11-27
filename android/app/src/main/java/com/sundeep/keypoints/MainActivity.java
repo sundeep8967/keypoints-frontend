@@ -2,16 +2,48 @@ package com.sundeep.keypoints;
 
 import io.flutter.embedding.android.FlutterActivity;
 import io.flutter.embedding.engine.FlutterEngine;
-import io.flutter.plugin.common.MethodChannel;
-import com.chaquo.python.Python;
-import com.chaquo.python.android.AndroidPlatform;
-import com.chaquo.python.PyObject;
-import java.util.List;
-import java.util.ArrayList;
 import io.flutter.plugins.googlemobileads.GoogleMobileAdsPlugin;
+import android.os.Bundle;
+import android.os.Build;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
+import android.view.Window;
+import android.graphics.Color;
 
 public class MainActivity extends FlutterActivity {
-    private static final String CHANNEL = "color_extraction";
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        
+        // Modern edge-to-edge implementation for Android 15+ compatibility
+        Window window = getWindow();
+        
+        // Enable edge-to-edge display using modern APIs
+        WindowCompat.setDecorFitsSystemWindows(window, false);
+        
+        // Use modern WindowInsetsController instead of deprecated window methods
+        WindowInsetsControllerCompat windowInsetsController = 
+            WindowCompat.getInsetsController(window, window.getDecorView());
+        
+        if (windowInsetsController != null) {
+            // Set light status bar (dark icons on light background)
+            windowInsetsController.setAppearanceLightStatusBars(true);
+            // Set light navigation bar (dark icons on light background)
+            windowInsetsController.setAppearanceLightNavigationBars(true);
+        }
+        
+        // Set transparent system bars using modern approach
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            window.setStatusBarColor(Color.TRANSPARENT);
+            window.setNavigationBarColor(Color.TRANSPARENT);
+            
+            // Remove navigation bar divider for modern look
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                window.setNavigationBarDividerColor(Color.TRANSPARENT);
+            }
+        }
+    }
 
     @Override
     public void configureFlutterEngine(FlutterEngine flutterEngine) {
@@ -23,46 +55,6 @@ public class MainActivity extends FlutterActivity {
             "newsArticleNativeAd", 
             new NewsArticleNativeAdFactory(getLayoutInflater())
         );
-        
-        // Initialize Python
-        if (!Python.isStarted()) {
-            Python.start(new AndroidPlatform(this));
-        }
-
-        new MethodChannel(flutterEngine.getDartExecutor().getBinaryMessenger(), CHANNEL)
-                .setMethodCallHandler((call, result) -> {
-                    try {
-                        Python py = Python.getInstance();
-                        PyObject module = py.getModule("color_extraction");
-
-                        switch (call.method) {
-                            case "extractDominantColor":
-                                String imagePath = call.argument("imagePath");
-                                PyObject dominantColor = module.callAttr("extract_dominant_color", imagePath);
-                                result.success(dominantColor.toString());
-                                break;
-
-                            case "extractColorPalette":
-                                String paletteImagePath = call.argument("imagePath");
-                                Integer colorCount = call.argument("colorCount");
-                                if (colorCount == null) colorCount = 5;
-                                
-                                PyObject palette = module.callAttr("extract_color_palette", paletteImagePath, colorCount);
-                                List<String> colorList = new ArrayList<>();
-                                for (PyObject color : palette.asList()) {
-                                    colorList.add(color.toString());
-                                }
-                                result.success(colorList);
-                                break;
-
-                            default:
-                                result.notImplemented();
-                                break;
-                        }
-                    } catch (Exception e) {
-                        result.error("PYTHON_ERROR", "Error executing Python code: " + e.getMessage(), null);
-                    }
-                });
     }
     
     @Override

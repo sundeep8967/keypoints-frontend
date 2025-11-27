@@ -2,11 +2,9 @@ buildscript {
     repositories {
         google()
         mavenCentral()
-        maven { url "https://chaquo.com/maven" }
     }
     dependencies {
         classpath "com.android.tools.build:gradle:8.7.2"
-        classpath "com.chaquo.python:gradle:15.0.1"
         classpath 'com.google.gms:google-services:4.4.0'
     }
 }
@@ -15,7 +13,6 @@ allprojects {
     repositories {
         google()
         mavenCentral()
-        maven { url "https://chaquo.com/maven" }
     }
 }
 
@@ -25,6 +22,13 @@ subprojects {
 }
 subprojects {
     project.evaluationDependsOn(":app")
+}
+
+// Just suppress the Java 8 obsolete warnings without changing compatibility
+allprojects {
+    tasks.withType(JavaCompile).configureEach {
+        options.compilerArgs += ["-Xlint:-options"]
+    }
 }
 
 tasks.register("clean", Delete) {

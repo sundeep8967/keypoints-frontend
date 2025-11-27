@@ -114,7 +114,7 @@ class LocalStorageService {
       
       // Keep only latest 500 articles to prevent storage bloat
       final finalArticles = uniqueArticles.values.toList()
-        ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+        ..sort((a, b) => b.id.compareTo(a.id));
       
       final limitedArticles = finalArticles.take(500).toList();
       
@@ -151,19 +151,6 @@ class LocalStorageService {
       AppLogger.error(' Error getting last article ID: $e');
       return null;
     }
-  }
-
-  /// Check if we should fetch new articles (every 30 minutes)
-  static Future<bool> shouldFetchNewArticles() async {
-    final lastFetch = await getLastFetchTime();
-    
-    if (lastFetch == null) return true; // First time
-    
-    final now = DateTime.now();
-    final difference = now.difference(lastFetch);
-    
-    // Fetch new articles every 30 minutes
-    return difference.inMinutes >= 30;
   }
 
   /// Clear all cached data

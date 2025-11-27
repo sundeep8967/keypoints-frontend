@@ -71,7 +71,7 @@ class SupabaseService {
       final response = await client
           .from('news_articles')
           .select()
-          .order('published', ascending: false)
+          .order('id', ascending: false)
           .limit(limit);
 
       if (response.isEmpty) {
@@ -79,6 +79,14 @@ class SupabaseService {
       }
 
       final articles = response.map<NewsArticleEntity>((json) => NewsArticleEntity.fromSupabase(json)).toList();
+      
+      // LOG RAW SUPABASE ARTICLE IDS (first 5)
+      if (articles.isNotEmpty) {
+        AppLogger.log('🗄️ RAW SUPABASE IDs (latest ${articles.length > 5 ? 5 : articles.length} from DB):');
+        for (int i = 0; i < articles.length && i < 5; i++) {
+          AppLogger.log('  ${i+1}. ${articles[i].id}');
+        }
+      }
       
       return articles;
     } on PostgrestException catch (e) {
@@ -95,7 +103,7 @@ class SupabaseService {
     return client
         .from('news_articles')
         .stream(primaryKey: ['id'])
-        .order('published', ascending: false)
+        .order('id', ascending: false)
         .limit(limit)
         .map((data) {
           final articles = data.map<NewsArticleEntity>((json) => NewsArticleEntity.fromSupabase(json)).toList();
@@ -166,7 +174,7 @@ class SupabaseService {
           .from('news_articles')
           .select()
           .ilike('category', category)
-          .order('published', ascending: false)
+          .order('id', ascending: false)
           .limit(limit);
 
       final articles = response.map<NewsArticleEntity>((json) => NewsArticleEntity.fromSupabase(json)).toList();
@@ -206,7 +214,7 @@ class SupabaseService {
         // Increase fetch size to account for filtering and offset - use much larger multiplier
         final fetchLimit = (limit * 10) + offset;
         final response = await query
-            .order('published', ascending: false)
+            .order('id', ascending: false)
             .limit(fetchLimit);
             
         final allArticles = response.map<NewsArticleEntity>((json) => NewsArticleEntity.fromSupabase(json)).toList();
@@ -221,7 +229,7 @@ class SupabaseService {
         return paginatedArticles;
       } else {
         final response = await query
-            .order('published', ascending: false)
+            .order('id', ascending: false)
             .range(offset, offset + limit - 1); // Use Supabase range for pagination
             
         final articles = response.map<NewsArticleEntity>((json) => NewsArticleEntity.fromSupabase(json)).toList();
@@ -245,7 +253,7 @@ class SupabaseService {
           .from('news_articles')
           .select()
           .or('title.ilike.%$query%,summary.ilike.%$query%')
-          .order('published', ascending: false)
+          .order('id', ascending: false)
           .limit(limit);
 
       final articles = response.map<NewsArticleEntity>((json) => NewsArticleEntity.fromSupabase(json)).toList();

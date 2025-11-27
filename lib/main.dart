@@ -4,13 +4,13 @@ import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'utils/app_logger.dart';
 import 'screens/news_feed_screen.dart';
-import 'screens/language_selection_screen.dart';
 import 'services/supabase_service.dart';
-import 'services/local_storage_service.dart';
 import 'services/ad_integration_service.dart';
 import 'services/fcm_service.dart';
+import 'services/streaks_service.dart';
 import 'config/image_cache_config.dart';
 import 'config/memory_config.dart';
+import 'injection_container.dart' as di;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -66,14 +66,53 @@ class FastNewsApp extends StatefulWidget {
   State<FastNewsApp> createState() => _FastNewsAppState();
 }
 
-class _FastNewsAppState extends State<FastNewsApp> {
+class _FastNewsAppState extends State<FastNewsApp> with WidgetsBindingObserver {
   bool _isInitialized = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     // Initialize critical services first, then show UI
     _initializeCriticalServices();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    // Stop usage session when app is disposed
+    StreaksService.instance.stopUsageSession();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    
+    switch (state) {
+      case AppLifecycleState.resumed:
+        AppLogger.log('📱 App resumed');
+        StreaksService.instance.startUsageSession();
+        // Check if we need to update streak after 7 minutes
+        Future.delayed(const Duration(minutes: 7, seconds: 30), () {
+          StreaksService.instance.checkLiveUsageAndUpdateStreak();
+        });
+        break;
+      case AppLifecycleState.paused:
+        AppLogger.log('📱 App paused');
+        StreaksService.instance.stopUsageSession();
+        break;
+      case AppLifecycleState.inactive:
+        AppLogger.log('📱 App inactive');
+        break;
+      case AppLifecycleState.detached:
+        AppLogger.log('📱 App detached');
+        StreaksService.instance.stopUsageSession();
+        break;
+      case AppLifecycleState.hidden:
+        AppLogger.log('📱 App hidden');
+        break;
+    }
   }
 
   /// Initialize ONLY critical services (Supabase) before showing UI
@@ -82,6 +121,14 @@ class _FastNewsAppState extends State<FastNewsApp> {
       // 🎯 PRIORITY 1: Initialize Supabase ONLY - CRITICAL for data loading
       await SupabaseService.initialize();
       AppLogger.success('🎯 PRIORITY 1: Supabase initialized successfully');
+
+      // Initialize dependency injection (ServiceCoordinator and services)
+      await di.init();
+      AppLogger.success('🧩 DI initialized (ServiceCoordinator ready)');
+      
+      // Start usage tracking session
+      await StreaksService.instance.startUsageSession();
+      AppLogger.success('⏱️ Usage: Tracking session started');
       
       // Mark as initialized so UI can start loading data immediately
       setState(() {
@@ -202,32 +249,8 @@ class _FastNewsAppState extends State<FastNewsApp> {
     });
   }
   
-  /// Initialize image preloading asynchronously
-  void _initializeImagePreloadingAsync() {
-    Future.microtask(() async {
-      try {
-        AppLogger.info('🖼️ ASYNC IMAGES: Starting image preloading...');
-        // Image preloading will start when articles are available
-        AppLogger.success('🖼️ ASYNC IMAGES: Image preloader ready!');
-      } catch (e) {
-        AppLogger.error('🖼️ ASYNC IMAGES: Image preload error (continuing): $e');
-      }
-    });
-  }
+  // Unused async preloading methods removed
   
-  /// Initialize color extraction asynchronously
-  void _initializeColorExtractionAsync() {
-    Future.microtask(() async {
-      try {
-        AppLogger.info('🎨 ASYNC COLORS: Starting color extraction...');
-        // Color extraction will start when articles are available
-        AppLogger.success('🎨 ASYNC COLORS: Color extractor ready!');
-      } catch (e) {
-        AppLogger.error('🎨 ASYNC COLORS: Color extraction error (continuing): $e');
-      }
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     // 🚀 ULTRA FAST: Show news feed immediately, let it handle loading

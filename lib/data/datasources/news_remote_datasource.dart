@@ -19,7 +19,7 @@ class NewsRemoteDataSourceImpl implements NewsRemoteDataSource {
       final response = await supabaseClient
           .from('news_articles')
           .select()
-          .order('published', ascending: false)
+          .order('id', ascending: false)
           .limit(limit);
 
       final articles = response.map<NewsArticleModel>((json) => NewsArticleModel.fromSupabase(json)).toList();
@@ -37,7 +37,7 @@ class NewsRemoteDataSourceImpl implements NewsRemoteDataSource {
           .from('news_articles')
           .select()
           .ilike('category', category)
-          .order('published', ascending: false)
+          .order('id', ascending: false)
           .limit(limit);
 
       final articles = response.map<NewsArticleModel>((json) => NewsArticleModel.fromSupabase(json)).toList();
@@ -55,7 +55,7 @@ class NewsRemoteDataSourceImpl implements NewsRemoteDataSource {
           .from('news_articles')
           .select()
           .or('title.ilike.%$query%,summary.ilike.%$query%')
-          .order('published', ascending: false)
+          .order('id', ascending: false)
           .limit(limit);
 
       final articles = response.map<NewsArticleModel>((json) => NewsArticleModel.fromSupabase(json)).toList();
@@ -71,7 +71,7 @@ class NewsRemoteDataSourceImpl implements NewsRemoteDataSource {
     return supabaseClient
         .from('news_articles')
         .stream(primaryKey: ['id'])
-        .order('published', ascending: false)
+        .order('id', ascending: false)
         .limit(limit)
         .map((data) {
           final articles = data.map<NewsArticleModel>((json) => NewsArticleModel.fromSupabase(json)).toList();

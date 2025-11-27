@@ -123,6 +123,92 @@ class NewsLoaderService implements INewsLoader {
     }
   }
 
+  /// Load articles progressively - yields updates as content becomes available
+  Stream<List<NewsArticleEntity>> loadArticlesProgressively() async* {
+    final List<NewsArticleEntity> allProgressiveArticles = [];
+    List<NewsArticleEntity> firstBatchArticles = [];
+    bool hasShownFirstBatch = false;
+    
+    // Define categories to load from
+    final categories = [
+      'Technology', 'Business', 'Sports', 'Health', 'Science', 
+      'Entertainment', 'World', 'Top', 'Travel', 'Politics'
+    ];
+    
+    AppLogger.info('🚀 PROGRESSIVE: Starting progressive load from ${categories.length} categories');
+    
+    final readIds = await _articleStateManager.getReadArticleIds();
+    
+    // Load categories one by one
+    for (int i = 0; i < categories.length; i++) {
+      final category = categories[i];
+      
+      try {
+        final categoryArticles = await SupabaseService.getUnreadNewsByCategory(
+          category, readIds.toList(), limit: 100
+        );
+        
+        if (categoryArticles.isNotEmpty) {
+          allProgressiveArticles.addAll(categoryArticles);
+          
+          // Remove duplicates but MAINTAIN ORDER
+          final uniqueArticles = <String, NewsArticleEntity>{};
+          final stableOrderedArticles = <NewsArticleEntity>[];
+          
+          for (final article in allProgressiveArticles) {
+            if (!uniqueArticles.containsKey(article.id)) {
+              uniqueArticles[article.id] = article;
+              stableOrderedArticles.add(article);
+            }
+          }
+          
+          // Emit first batch immediately
+          if (!hasShownFirstBatch && (stableOrderedArticles.length >= 5 || i >= 2)) {
+            AppLogger.success('🚀 PROGRESSIVE: Yielding FIRST BATCH - ${stableOrderedArticles.length} articles');
+            firstBatchArticles = List.from(stableOrderedArticles);
+            hasShownFirstBatch = true;
+            yield stableOrderedArticles;
+          }
+        }
+        
+        // Small delay to prevent overwhelming DB
+        if (i < categories.length - 1) {
+          await Future.delayed(const Duration(milliseconds: 100));
+        }
+        
+      } catch (e) {
+        AppLogger.error('🚀 PROGRESSIVE: Error loading $category: $e');
+      }
+    }
+    
+    // Final Mix
+    if (allProgressiveArticles.isNotEmpty) {
+      final uniqueArticles = <String, NewsArticleEntity>{};
+      for (final article in allProgressiveArticles) {
+        uniqueArticles[article.id] = article;
+      }
+      final finalArticles = uniqueArticles.values.toList();
+      
+      List<NewsArticleEntity> mixedFeed;
+      
+      if (firstBatchArticles.isNotEmpty) {
+        // Preserve first batch order
+        final firstBatchIds = firstBatchArticles.map((a) => a.id).toSet();
+        final restArticles = finalArticles.where((a) => !firstBatchIds.contains(a.id)).toList();
+        
+        // Mix the rest
+        restArticles.shuffle(); // Simple shuffle for now, or use balanced mix if needed
+        
+        mixedFeed = [...firstBatchArticles, ...restArticles];
+      } else {
+        mixedFeed = List.from(finalArticles)..shuffle();
+      }
+      
+      AppLogger.success('🚀 PROGRESSIVE: Yielding FINAL MIXED FEED - ${mixedFeed.length} articles');
+      yield mixedFeed;
+    }
+  }
+
   /// Internal method to process and filter articles
   Future<List<NewsArticleEntity>> _processAndFilterArticles(
     List<NewsArticleEntity> articles, 

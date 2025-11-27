@@ -42,7 +42,7 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
               
               // Welcome header
               const Text(
-                'Welcome to KeyPoints',
+                'Welcome to Key Points',
                 style: TextStyle(
                   fontSize: 32,
                   fontWeight: FontWeight.bold,

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../services/news_feed_helper.dart';
+import '../services/refactored/service_coordinator.dart';
 
 import '../utils/app_logger.dart';
 class CategoryScrollService {
@@ -31,12 +31,12 @@ class CategoryScrollService {
         // Calculate cumulative position by measuring each category
         double itemPosition = padding;
         for (int i = 0; i < categoryIndex; i++) {
-          final double itemWidth = NewsFeedHelper.estimateCategoryWidth(categories[i]);
+          final double itemWidth = ServiceCoordinator().newsProcessor.estimateCategoryWidth(categories[i]);
           itemPosition += itemWidth + spacing;
         }
         
         // Get current category width
-        final double currentItemWidth = NewsFeedHelper.estimateCategoryWidth(categories[categoryIndex]);
+        final double currentItemWidth = ServiceCoordinator().newsProcessor.estimateCategoryWidth(categories[categoryIndex]);
         
         final double currentScroll = categoryScrollController.position.pixels;
         final double maxScroll = categoryScrollController.position.maxScrollExtent;

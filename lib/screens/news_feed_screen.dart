@@ -4,22 +4,20 @@ import '../domain/entities/news_article_entity.dart';
 import '../services/supabase_service.dart';
 import '../services/local_storage_service.dart';
 import '../utils/app_logger.dart';
-import '../services/color_extraction_service.dart';
 import '../services/read_articles_service.dart';
 import '../services/category_scroll_service.dart';
-import '../services/news_ui_service.dart';
-import '../services/article_management_service.dart';
 import '../services/category_loading_service.dart';
-import '../services/category_management_service.dart';
 import '../services/dynamic_category_discovery_service.dart';
 import '../widgets/news_feed_page_builder.dart';
 import '../services/optimized_image_service.dart';
-import '../services/parallel_color_service.dart';
-import '../services/instant_preloader_service.dart';
 import '../services/error_message_service.dart';
 import '../services/scroll_state_service.dart';
 import '../services/infinite_scroll_service.dart';
 import 'settings_screen.dart';
+import '../widgets/news_feed_widgets.dart';
+import '../injection_container.dart';
+import '../services/refactored/service_coordinator.dart';
+import '../services/refactored/category_manager_service.dart';
 
 class NewsFeedScreen extends StatefulWidget {
   const NewsFeedScreen({super.key});
@@ -29,18 +27,31 @@ class NewsFeedScreen extends StatefulWidget {
 }
 
 class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStateMixin {
-  List<NewsArticleEntity> _articles = [];
+  void _logArticleOrder(String label, List<dynamic> list, {int maxItems = 100}) {
+    try {
+      AppLogger.info('ORDER [$label]: count=${list.length}');
+      for (int i = 0; i < list.length && i < maxItems; i++) {
+        final item = list[i];
+        if (item is NewsArticleEntity) {
+          final title = item.title.length > 80 ? item.title.substring(0, 80) + '…' : item.title;
+          AppLogger.info('${i + 1}. ${item.id} | ' + title);
+        } else {
+          AppLogger.info('${i + 1}. [AD ITEM]');
+        }
+      }
+    } catch (e) {
+      AppLogger.log('Order logging failed: $e');
+    }
+  }
+  List<dynamic> _feedItems = [];
   bool _isLoading = true;
   String _error = '';
   int _currentIndex = 0;
   String _selectedCategory = 'All'; // Track selected category
   bool _isInitialLoad = true; // Track if this is the first load
   
-  // Cache for preloaded color palettes
-  final Map<String, ColorPalette> _colorCache = {};
-  
-  // Cache for category articles - pre-load all categories
-  final Map<String, List<NewsArticleEntity>> _categoryArticles = {};
+  // Cache for category articles (dynamic to support ads)
+  final Map<String, List<dynamic>> _categoryArticles = {};
   final Map<String, bool> _categoryLoading = {};
   
   // Dynamic categories discovered from backend
@@ -99,7 +110,8 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
         final articlesToShow = cachedArticles.take(10).toList(); // Show first 10 for instant display
         
         setState(() {
-          _articles = articlesToShow;
+          _feedItems = articlesToShow;
+          _logArticleOrder('QuickLoad cache->UI', _feedItems);
           _isLoading = false; // Stop loading immediately
           _isInitialLoad = false;
         });
@@ -150,8 +162,6 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
         // Initialize optimized image cache
         OptimizedImageService.initializeCache();
         
-        // Initialize parallel color extraction
-        ParallelColorService.initializeParallelColorExtraction();
         
         AppLogger.success('Background services initialized');
       }
@@ -180,87 +190,18 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
     super.dispose();
   }
 
-  Future<void> _loadNewsArticleEntitys() async {
-    try {
-      setState(() {
-        _isLoading = true;
-        _error = '';
-      });
-
-      // CRITICAL FIX: Always get fresh read IDs at the start
-      final readIds = await ReadArticlesService.getReadArticleIds();
-      AppLogger.debug('LOAD: Starting with ${readIds.length} read articles');
-      
-      // For "All" category, load random mix from all categories
-      
-      // Define all available categories to fetch from
-      final allCategories = [
-        'Technology', 'Business', 'Sports', 'Health', 'Science', 
-        'Entertainment', 'World', 'Top', 'Travel', 'Politics', 
-        'National', 'India', 'Education'
-      ];
-      
-      final List<NewsArticleEntity> allCombinedArticles = [];
-      
-      // Fetch articles from each category in parallel for faster loading
-      final futures = allCategories.map((cat) async {
-        try {
-          final categoryArticles = await SupabaseService.getUnreadNewsByCategory(cat, readIds, limit: 200);
-          return categoryArticles;
-        } catch (e) {
-          // Log error but continue with other categories
-          return <NewsArticleEntity>[];
-        }
-      });
-      
-      final results = await Future.wait(futures);
-      for (final articles in results) {
-        allCombinedArticles.addAll(articles);
-      }
-      
-      // Remove duplicates based on article ID
-      final uniqueArticles = <String, NewsArticleEntity>{};
-      for (final article in allCombinedArticles) {
-        uniqueArticles[article.id] = article;
-      }
-      final validArticles = uniqueArticles.values.toList();
-      
-      // 🎯 STABILIZED: Don't shuffle during initial load - maintain stable order
-      // validArticles.shuffle(); // REMOVED: No shuffling during initial load
-      
-      setState(() {
-        _articles = validArticles;
-        _isLoading = false;
-        _isInitialLoad = false;
-        _error = validArticles.isEmpty ? 'All articles have been read! You have caught up with all the news. Check back later for new articles.' : '';
-      });
-      
-      if (validArticles.isNotEmpty) {
-        _preloadColors();
-        // CRITICAL FIX: INSTANT preloading - start immediately, don't wait
-        AppLogger.info(' INSTANT PRELOAD: Starting aggressive preloading of first 25 images');
-        
-        // Start preloading first 25 images immediately in background
-        OptimizedImageService.preloadImagesAggressively(validArticles, 0, preloadCount: 25);
-      }
-    } catch (e) {
-      setState(() {
-        _error = ErrorMessageService.getUserFriendlyMessage(e.toString());
-        _isLoading = false;
-      });
-    }
-  }
+  // _loadNewsArticleEntitys removed as unused
 
 
   @override
   Widget build(BuildContext context) {
-    // Show loading shimmer during initial load
-    if (_isInitialLoad && _isLoading && _articles.isEmpty) {
+    // Show loading screen during initial load
+    if (_isInitialLoad && _isLoading && _feedItems.isEmpty) {
       return CupertinoPageScaffold(
         backgroundColor: CupertinoColors.black,
         child: Stack(
           children: [
-            _buildLoadingShimmer(),
+            NewsFeedWidgets.buildLoadingPage(),
             _buildCleanHeader(),
           ],
         ),
@@ -268,7 +209,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
     }
 
     // Show error if no articles and not loading
-    if (_articles.isEmpty && !_isLoading && _error.isNotEmpty) {
+    if (_feedItems.isEmpty && !_isLoading && _error.isNotEmpty) {
       return CupertinoPageScaffold(
         backgroundColor: CupertinoColors.black,
         child: Stack(
@@ -344,11 +285,11 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
           // Special handling for "All" category - check cache first
           if (newCategory == 'All') {
             if (_categoryArticles['All']?.isNotEmpty == true) {
-              // Use cached articles immediately
-              _articles = _categoryArticles['All']!;
+              // Use cached articles immediately (with ads if present)
+              _feedItems = _categoryArticles['All']!;
               _isLoading = false;
               _error = '';
-              AppLogger.info(' SWIPE TO ALL: Using cached articles (${_articles.length} articles)');
+              AppLogger.info(' SWIPE TO ALL: Using cached articles (${_feedItems.length} items)');
             } else {
               // No cache, load fresh
               AppLogger.info(' SWIPE TO ALL: No cache, loading fresh');
@@ -357,7 +298,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
           } else if (_categoryArticles[newCategory]?.isNotEmpty == true) {
             // CRITICAL FIX: Only update if not actively scrolling
             if (!ScrollStateService.isActivelyScrolling) {
-              _articles = _categoryArticles[newCategory]!;
+              _feedItems = _categoryArticles[newCategory]!;
               _isLoading = false;
               AppLogger.success('📖 CATEGORY SWITCH: Updated UI for $newCategory (user not scrolling)');
             }
@@ -386,7 +327,6 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
       (index) => setState(() => _currentIndex = index),
       _loadMoreArticlesForCategory,  // Use the new load more function for infinite scrolling
       _loadAllCategorySimple,  // Use simple load for "All" category
-      _colorCache,
       _articlePageControllers, // Pass PageControllers for bidirectional scrolling
     ),
         ),
@@ -503,11 +443,11 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
       if (_categoryArticles['All']?.isNotEmpty == true) {
         // Use cached articles immediately to avoid "no articles" flash
         setState(() {
-          _articles = _categoryArticles['All']!;
+          _feedItems = _categoryArticles['All']!;
           _isLoading = false;
           _error = '';
         });
-        AppLogger.info(' QUICK SWITCH: Using cached All articles (${_articles.length} articles)');
+        AppLogger.info(' QUICK SWITCH: Using cached All articles (${_feedItems.length} articles)');
       } else {
         // No cache available, load fresh
         AppLogger.info(' FRESH LOAD: No All cache available, loading fresh');
@@ -519,25 +459,37 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
   }
 
   void _preloadCategoryIfNeeded(String category) {
-    CategoryManagementService.preloadCategoryIfNeeded(
-      category, 
-      _categoryArticles, 
-      _categoryLoading, 
-      _loadArticlesByCategoryForCache,
-      () => _loadNewsArticlesForCategory(category),
-    );
+    final coordinator = sl<ServiceCoordinator>();
+    
+    // Check if already loaded or loading
+    if (_categoryArticles[category]?.isEmpty == true && !_categoryLoading.containsKey(category)) {
+      _categoryLoading[category] = true;
+      
+      if (category == 'All') {
+        _loadNewsArticlesForCategory(category);
+      } else {
+        // Use coordinator but keep local state update callback
+        coordinator.loadCategoryFeed(category).then((articles) {
+          if (mounted) {
+            setState(() {
+              _categoryArticles[category] = articles;
+              _categoryLoading[category] = false;
+            });
+          }
+        });
+      }
+    }
   }
 
   void _preloadAllCategories() {
-    final categories = NewsUIService.getPreloadCategories();
-    
-    CategoryManagementService.preloadAllCategories(
-      categories,
-      _categoryArticles,
-      _categoryLoading,
-      _loadArticlesByCategoryForCache,
-      () => _loadNewsArticlesForCategory('All'),
-    );
+    final coordinator = sl<ServiceCoordinator>();
+    // Trigger background preload via coordinator
+    // This mimics the fire-and-forget behavior of the legacy method
+    Future.microtask(() async {
+      if (coordinator.categoryManager is CategoryManagerService) {
+        await (coordinator.categoryManager as CategoryManagerService).preloadPopularCategories();
+      }
+    });
   }
 
   Future<void> _loadNewsArticlesForCategory(String category) async {
@@ -551,7 +503,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
       // CRITICAL FIX: Only update UI if user is not actively scrolling
       if (category == _selectedCategory && !ScrollStateService.isActivelyScrolling) {
         setState(() {
-          _articles = unreadArticles;
+          _feedItems = unreadArticles;
           _isLoading = false;
         });
         AppLogger.success('📖 CATEGORY LOAD: Updated UI for $category (user not scrolling)');
@@ -601,76 +553,13 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
       final readIds = await ReadArticlesService.getReadArticleIds();
       final currentArticles = _categoryArticles[category] ?? [];
       
-      // Get IDs of articles we already have to avoid duplicates
-      final existingIds = currentArticles.map((a) => a.id).toSet();
-      
-      List<NewsArticleEntity> newArticles = [];
-      
-      if (category == 'All') {
-        // For "All" category, fetch from all categories
-        final allCategories = [
-          'Technology', 'Business', 'Sports', 'Health', 'Science', 
-          'Entertainment', 'World', 'Top', 'Travel', 'Politics', 
-          'National', 'India', 'Education'
-        ];
-        
-        final List<NewsArticleEntity> allCombinedArticles = [];
-        
-        // Fetch more articles from each category
-        final futures = allCategories.map((cat) async {
-          try {
-            // Fetch with higher limit and offset to get different articles
-            final categoryArticles = await SupabaseService.getUnreadNewsByCategory(cat, readIds, limit: 200, offset: currentArticles.length ~/ allCategories.length);
-            return categoryArticles;
-          } catch (e) {
-            return <NewsArticleEntity>[];
-          }
-        });
-        
-        final results = await Future.wait(futures);
-        for (final articles in results) {
-          allCombinedArticles.addAll(articles);
-        }
-        
-        // Remove duplicates and articles we already have
-        final uniqueArticles = <String, NewsArticleEntity>{};
-        for (final article in allCombinedArticles) {
-          if (!existingIds.contains(article.id)) {
-            uniqueArticles[article.id] = article;
-          }
-        }
-        
-        newArticles = uniqueArticles.values.where((article) => 
-          article.title.trim().isNotEmpty && 
-          article.description.trim().isNotEmpty
-        ).toList();
-        
-        // 🎯 STABILIZED: Don't shuffle new articles to prevent order changes
-        // newArticles.shuffle(); // REMOVED: No shuffling during load more
-      } else {
-        // For specific categories
-        String dbCategory = _mapUIToDatabaseCategory(category);
-        
-        // Fetch more articles with offset
-        final moreArticles = await SupabaseService.getUnreadNewsByCategory(
-          dbCategory, 
-          readIds, 
-          limit: 200, 
-          offset: currentArticles.length
-        );
-        
-        // Filter out articles we already have
-        newArticles = moreArticles.where((article) => 
-          !existingIds.contains(article.id) &&
-          article.title.trim().isNotEmpty && 
-          article.description.trim().isNotEmpty
-        ).toList();
-      }
+      // Filter out ads for logic that requires entities
+      final currentEntities = currentArticles.whereType<NewsArticleEntity>().toList();
       
       // ENHANCED: Use the new infinite scroll service for better article loading
       final enhancedNewArticles = await InfiniteScrollService.loadMoreArticlesEnhanced(
         category: category,
-        currentArticles: currentArticles,
+        currentArticles: currentEntities,
         readIds: readIds,
       );
       
@@ -679,7 +568,19 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
         final updatedArticles = [...currentArticles, ...enhancedNewArticles];
         
         // Optimize buffer if it gets too large
-        final optimizedArticles = InfiniteScrollService.optimizeBuffer(updatedArticles, _currentIndex);
+        List<dynamic> optimizedArticles;
+        if (category == 'All') {
+           // Simple slicing for dynamic list (All category)
+           if (updatedArticles.length > 1000) {
+              optimizedArticles = updatedArticles.sublist(updatedArticles.length - 1000);
+           } else {
+              optimizedArticles = updatedArticles;
+           }
+        } else {
+           // Use service for entity lists
+           optimizedArticles = InfiniteScrollService.optimizeBuffer(updatedArticles.cast<NewsArticleEntity>(), _currentIndex);
+        }
+
         _categoryArticles[category] = optimizedArticles;
         
         AppLogger.info(' ENHANCED LOAD MORE: Added ${enhancedNewArticles.length} new articles to $category (total: ${optimizedArticles.length})');
@@ -687,7 +588,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
         // CRITICAL FIX: DON'T update UI during active scrolling to prevent article changes
         if (category == _selectedCategory && !ScrollStateService.isActivelyScrolling) {
           setState(() {
-            _articles = optimizedArticles;
+            _feedItems = optimizedArticles;
           });
           AppLogger.success('📖 ENHANCED LOAD MORE: Updated UI with ${optimizedArticles.length} articles (user not scrolling)');
         } else if (category == _selectedCategory) {
@@ -697,7 +598,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
         AppLogger.info(' ENHANCED LOAD MORE: No new articles found for $category');
         
         // IMPROVED: Try alternative strategies when no new articles are found
-        await _handleNoMoreArticles(category, currentArticles);
+        await _handleNoMoreArticles(category, currentEntities);
       }
       
       _categoryLoading[category] = false;
@@ -707,30 +608,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
     }
   }
 
-  String _mapUIToDatabaseCategory(String category) {
-    // Map UI category names to database category names
-    switch (category) {
-      case 'Tech': return 'Technology';
-      case 'Entertainment': return 'Entertainment';
-      case 'Business': return 'Business';
-      case 'Health': return 'Health';
-      case 'Sports': return 'Sports';
-      case 'Science': return 'Science';
-      case 'World': return 'World';
-      case 'Top': return 'Top';
-      case 'Travel': return 'Travel';
-      case 'Startups': return 'Startups';
-      case 'Politics': return 'Politics';
-      case 'National': return 'National';
-      case 'India': return 'India';
-      case 'Education': return 'Education';
-      case 'Celebrity': return 'Celebrity';
-      case 'Scandal': return 'Scandal';
-      case 'Viral': return 'Viral';
-      case 'State': return 'State';
-      default: return category;
-    }
-  }
+  // _mapUIToDatabaseCategory removed as unused (logic handled in service)
 
   Future<void> _loadArticlesByCategoryForCache(String category) async {
     try {
@@ -804,7 +682,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
         // Always update the main articles if this is for the current category
         if (category == _selectedCategory) {
           setState(() {
-            _articles = validArticles;
+            _feedItems = validArticles;
             _isLoading = false;
             _isInitialLoad = false;
             // Only show error if we have no articles AND this is not the initial load
@@ -814,7 +692,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
           
           // Preload colors for immediate display
           if (validArticles.isNotEmpty) {
-            _preloadColors();
+            // Color preloading removed
           }
         }
         
@@ -904,7 +782,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
       // Always update the main articles if this is for the current category
       if (category == _selectedCategory) {
         setState(() {
-          _articles = validCategoryArticles;
+          _feedItems = validCategoryArticles;
           _isLoading = false;
         });
         AppLogger.log('Updated UI for $category: ${validCategoryArticles.length} articles displayed');
@@ -929,42 +807,20 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
   }
 
 
-  Future<void> _preloadColors() async {
-    await ArticleManagementService.preloadColors(_articles, _currentIndex, _colorCache);
-  }
+  // Color preloading functionality removed
 
-  Future<void> _loadAllOtherUnreadArticles() async {
-    try {
-      await ArticleManagementService.loadAllOtherUnreadArticles(
-        (category) => setState(() => _selectedCategory = category),
-        _loadNewsArticleEntitys,
-      );
-    } catch (e) {
-      setState(() {
-        _error = e.toString();
-        _isLoading = false;
-      });
-    }
-  }
+  // Article loading functionality simplified
 
-  void _showToast(String message) {
-    NewsUIService.showToast(context, message, onDismiss: () {
-      // If we're showing a "no articles" message and not on "All" category,
-      // automatically switch back to "All"
-      if (_selectedCategory != 'All' && _articles.isEmpty) {
-        _selectCategory('All');
-      }
-    });
-  }
+  // void _showToast(String message) removed as unused
 
   void _preloadPopularCategories() {
-    final popularCategories = NewsUIService.getPopularCategories();
-    
-    CategoryManagementService.preloadPopularCategories(
-      popularCategories,
-      _categoryArticles,
-      _loadArticlesByCategoryForCache,
-    );
+    final coordinator = sl<ServiceCoordinator>();
+    // Delegate to coordinator's background preload
+     Future.microtask(() async {
+      if (coordinator.categoryManager is CategoryManagerService) {
+        await (coordinator.categoryManager as CategoryManagerService).preloadPopularCategories();
+      }
+    });
   }
 
 
@@ -975,7 +831,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
     setState(() {
       _isLoading = true;
       _error = '';
-      _articles = []; // Clear any existing articles
+      _feedItems = []; // Clear any existing articles
     });
 
     try {
@@ -997,138 +853,75 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
   }
 
   /// Load articles progressively - show first batch immediately, then load more in background
-  /// STABILIZED: No shuffling during progressive loading to prevent article order changes
   Future<void> _loadArticlesProgressively(List<String> readIds) async {
-    final List<NewsArticleEntity> allProgressiveArticles = [];
-    bool hasShownFirstBatch = false;
-    
-    // Define categories to load from
-    final categories = [
-      'Technology', 'Business', 'Sports', 'Health', 'Science', 
-      'Entertainment', 'World', 'Top', 'Travel', 'Politics'
-    ];
-    
-    AppLogger.info('🚀 PROGRESSIVE STABLE: Loading from ${categories.length} categories with stable order');
-    
-    // Load categories one by one and show articles as they arrive
-    for (int i = 0; i < categories.length; i++) {
-      final category = categories[i];
+    try {
+      AppLogger.info('🚀 PROGRESSIVE STABLE: Starting progressive load via Coordinator');
       
-      try {
-        // Load articles from this category
-        final categoryArticles = await SupabaseService.getUnreadNewsByCategory(
-          category, readIds, limit: 100 // Larger batch size for more articles
-        );
+      final stream = ServiceCoordinator().loadFeedProgressivelyWithAds();
+      bool hasShownFirstBatch = false;
+      
+      await for (final feed in stream) {
+        if (!mounted) break;
         
-        if (categoryArticles.isNotEmpty) {
-          // Add to our progressive collection
-          allProgressiveArticles.addAll(categoryArticles);
+        if (!hasShownFirstBatch) {
+          // First batch - show immediately
+          setState(() {
+            _feedItems = feed;
+            _logArticleOrder('Progressive first batch -> UI', _feedItems);
+            _isLoading = false;
+            _isInitialLoad = false;
+            _error = '';
+          });
           
-          // Remove duplicates but MAINTAIN ORDER - no shuffling during progressive loading
-          final uniqueArticles = <String, NewsArticleEntity>{};
-          final stableOrderedArticles = <NewsArticleEntity>[];
+          // Cache FULL feed including ads
+          _categoryArticles['All'] = feed;
+          _categoryLoading['All'] = false;
+          hasShownFirstBatch = true;
           
-          for (final article in allProgressiveArticles) {
-            if (!uniqueArticles.containsKey(article.id)) {
-              uniqueArticles[article.id] = article;
-              stableOrderedArticles.add(article); // Maintain insertion order
-            }
+          // Extract articles for preloading/tracking
+          final articlesOnly = feed.whereType<NewsArticleEntity>().toList();
+          
+          // Async preloading
+          _startAsyncPreloading(articlesOnly);
+          
+          // Mark first article as read
+          if (articlesOnly.isNotEmpty) {
+            ReadArticlesService.markAsRead(articlesOnly.first.id);
           }
           
-          AppLogger.info('🚀 PROGRESSIVE STABLE: Got ${categoryArticles.length} from $category (total: ${stableOrderedArticles.length})');
+          AppLogger.success('🚀 PROGRESSIVE STABLE: UI updated with first batch (${feed.length} items)');
+        } else {
+          // Subsequent updates (Mixed Feed)
+          _categoryArticles['All'] = feed;
           
-          // Show articles immediately after first successful category OR if we have enough articles
-          if (!hasShownFirstBatch && (stableOrderedArticles.length >= 5 || i >= 2)) {
-            AppLogger.success('🚀 PROGRESSIVE STABLE: SHOWING FIRST BATCH - ${stableOrderedArticles.length} articles (NO SHUFFLE)');
-            
-            // Update UI immediately with first batch - NO SHUFFLING
-            setState(() {
-              _articles = stableOrderedArticles;
-              _isLoading = false; // Stop loading spinner
+          if (_feedItems.isEmpty || _error.isNotEmpty) {
+             setState(() {
+              _feedItems = feed;
+              _isLoading = false;
               _isInitialLoad = false;
-              _error = '';
+              _error = feed.isEmpty ? 'All articles have been read!' : '';
             });
-            
-            // Cache for "All" category
-            _categoryArticles['All'] = stableOrderedArticles;
-            _categoryLoading['All'] = false;
-            
-            hasShownFirstBatch = true;
-            
-            // 🚀 ASYNC: Start all preloading asynchronously - don't wait!
-            _startAsyncPreloading(stableOrderedArticles);
-            
-            // CRITICAL FIX: Mark first article as read immediately when showing first batch
-            if (stableOrderedArticles.isNotEmpty) {
-              ReadArticlesService.markAsRead(stableOrderedArticles.first.id);
-              AppLogger.success('📖 FIRST BATCH MARKED: "${stableOrderedArticles.first.title}" (ID: ${stableOrderedArticles.first.id}) - user viewing first article');
-            }
-            
-            AppLogger.success('🚀 PROGRESSIVE STABLE: UI updated with first ${stableOrderedArticles.length} articles (STABLE ORDER)');
-          } else if (hasShownFirstBatch) {
-            // CRITICAL FIX: DON'T update UI during background loading - only update cache
-            _categoryArticles['All'] = stableOrderedArticles;
-            
-            AppLogger.info('🚀 PROGRESSIVE STABLE: Background cache update - now ${stableOrderedArticles.length} articles (UI NOT CHANGED)');
           }
+          
+          AppLogger.info('🚀 PROGRESSIVE STABLE: Background cache update - ${feed.length} items');
+          
+          // Async preloading for full list
+          final articlesOnly = feed.whereType<NewsArticleEntity>().toList();
+          _startAsyncPreloading(articlesOnly);
+          _startBackgroundPreloading();
         }
-        
-        // Small delay between categories to prevent overwhelming the database
-        if (i < categories.length - 1) {
-          await Future.delayed(const Duration(milliseconds: 100));
-        }
-        
-      } catch (e) {
-        AppLogger.error('🚀 PROGRESSIVE STABLE: Error loading $category: $e');
-        // Continue with next category
       }
-    }
-    
-    // Final update - ONLY NOW do we shuffle for variety
-    if (allProgressiveArticles.isNotEmpty) {
-      final uniqueArticles = <String, NewsArticleEntity>{};
-      for (final article in allProgressiveArticles) {
-        uniqueArticles[article.id] = article;
-      }
-      final finalArticles = uniqueArticles.values.toList();
-      
-      // 🎯 CRITICAL FIX: Only shuffle ONCE at the very end
-      finalArticles.shuffle();
-      
-      AppLogger.success('🚀 PROGRESSIVE STABLE: FINAL SHUFFLE - Shuffling ${finalArticles.length} articles ONCE at completion');
-      
-      // CRITICAL FIX: DON'T update UI if user is already viewing articles - only update cache
-      if (!hasShownFirstBatch) {
-        // Only update UI if we haven't shown anything yet
+    } catch (e) {
+      if (mounted) {
         setState(() {
-          _articles = finalArticles;
           _isLoading = false;
           _isInitialLoad = false;
-          _error = finalArticles.isEmpty ? 'All articles have been read!' : '';
+          if (_feedItems.isEmpty) {
+            _error = 'Unable to load articles. Please check your connection.';
+          }
         });
-        AppLogger.success('🚀 PROGRESSIVE STABLE: Final UI update with ${finalArticles.length} articles');
-      } else {
-        // User is already viewing articles - just update cache silently
-        AppLogger.info('🚀 PROGRESSIVE STABLE: Final cache update - user continues viewing current articles');
       }
-      
-      _categoryArticles['All'] = finalArticles;
-      _categoryLoading['All'] = false;
-      
-      AppLogger.success('🚀 PROGRESSIVE STABLE: COMPLETE - Final count: ${finalArticles.length} articles (SHUFFLED ONCE)');
-      
-      // 🚀 ASYNC: Start all background services asynchronously
-      _startAsyncPreloading(finalArticles);
-      _startBackgroundPreloading();
-      
-    } else if (!hasShownFirstBatch) {
-      // No articles found at all
-      setState(() {
-        _isLoading = false;
-        _isInitialLoad = false;
-        _error = 'No articles available';
-      });
-      AppLogger.info('🚀 PROGRESSIVE STABLE: No articles found in any category');
+      AppLogger.error('🚀 PROGRESSIVE STABLE: Error: $e');
     }
   }
 
@@ -1162,7 +955,8 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
   }
 
   /// 🚀 ASYNC: Start all preloading asynchronously - NEVER BLOCKS UI
-  void _startAsyncPreloading(List<NewsArticleEntity> articles) {
+  void _startAsyncPreloading(List<dynamic> items) {
+    final articles = items.whereType<NewsArticleEntity>().toList();
     if (articles.isEmpty) return;
     
     AppLogger.info('🚀 ASYNC PRELOAD: Starting all preloading for ${articles.length} articles');
@@ -1189,7 +983,6 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
         
         // Start multiple image preloading strategies simultaneously
         Future.microtask(() => OptimizedImageService.preloadImagesAggressively(articles, 0, preloadCount: 25));
-        Future.microtask(() => InstantPreloaderService.startInstantPreloading(articles));
         
         AppLogger.success('🖼️ ASYNC IMAGES: Image preloading started!');
       } catch (e) {
@@ -1202,11 +995,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
   void _preloadColorsAsync(List<NewsArticleEntity> articles) {
     Future.microtask(() async {
       try {
-        AppLogger.info('🎨 ASYNC COLORS: Starting color extraction for ${articles.length} articles...');
         
-        // Start color preloading for first batch
-        Future.microtask(() => _preloadColors());
-        Future.microtask(() => ParallelColorService.preloadColorsParallel(articles, 0, colorPreloadCount: 15));
         
         AppLogger.success('🎨 ASYNC COLORS: Color extraction started!');
       } catch (e) {
@@ -1220,7 +1009,6 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
     Future.microtask(() async {
       try {
         AppLogger.info('⚡ ASYNC INSTANT: Starting instant preloader...');
-        InstantPreloaderService.startInstantPreloading(articles);
         AppLogger.success('⚡ ASYNC INSTANT: Instant preloader started!');
       } catch (e) {
         AppLogger.error('⚡ ASYNC INSTANT: Instant preloader error (continuing): $e');
@@ -1291,7 +1079,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
           
           if (category == _selectedCategory) {
             setState(() {
-              _articles = updatedArticles;
+              _feedItems = updatedArticles;
             });
           }
           
@@ -1351,7 +1139,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
           
           if (_selectedCategory == 'All') {
             setState(() {
-              _articles = unreadArticles;
+              _feedItems = unreadArticles;
               _error = '';
             });
           }
@@ -1365,6 +1153,9 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
   }
 
   /// Load fresh articles in background without disrupting user's current reading
+  /// Create a balanced mixed feed from all categories for "All" section
+  // _createBalancedMixedFeed removed as unused (moved to ServiceCoordinator/NewsLoader)
+
   /// SMART STRATEGY: Only update cache, don't change what user is currently viewing
   Future<void> _loadFreshArticlesInBackground() async {
     try {
@@ -1433,7 +1224,6 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
       _categoryLoading.remove(_selectedCategory);
       
       // Clear color cache to ensure fresh colors
-      _colorCache.clear();
       
       // Reset current index
       setState(() {
@@ -1487,80 +1277,5 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
     );
   }
 
-  Widget _buildLoadingShimmer() {
-    return Container(
-      color: CupertinoColors.black,
-      child: Column(
-        children: [
-          const SizedBox(height: 100), // Space for header
-          Expanded(
-            child: Container(
-              margin: const EdgeInsets.symmetric(horizontal: 20),
-              child: Column(
-                children: [
-                  const SizedBox(height: 40),
-                  // Image placeholder
-                  Container(
-                    width: double.infinity,
-                    height: 200,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF2C2C2E),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  // Title placeholders
-                  Container(
-                    width: double.infinity,
-                    height: 20,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF2C2C2E),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Container(
-                    width: double.infinity,
-                    height: 20,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF2C2C2E),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Container(
-                    width: 200,
-                    height: 20,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF2C2C2E),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ),
-                  const SizedBox(height: 40),
-                  // Loading indicator
-                  const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      CupertinoActivityIndicator(
-                        radius: 15,
-                        color: CupertinoColors.white,
-                      ),
-                      SizedBox(width: 16),
-                      Text(
-                        'Loading latest news...',
-                        style: TextStyle(
-                          color: CupertinoColors.white,
-                          fontSize: 16,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  // _buildLoadingShimmer removed as unused
 }

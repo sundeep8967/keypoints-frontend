@@ -1,12 +1,14 @@
 import '../../core/interfaces/article_interface.dart';
 import '../../core/interfaces/news_interface.dart';
 import '../../core/interfaces/category_interface.dart';
+import '../../core/interfaces/ad_manager_interface.dart';
 import '../../domain/entities/news_article_entity.dart';
 import 'article_validator_service.dart';
 import 'article_state_manager.dart';
 import 'news_loader_service.dart';
 import 'news_processor_service.dart';
 import 'category_manager_service.dart';
+import 'ad_manager_service.dart';
 import '../../utils/app_logger.dart';
 
 /// Service coordinator that manages all refactored services and provides a unified interface
@@ -22,6 +24,7 @@ class ServiceCoordinator {
   late final INewsLoader _newsLoader;
   late final INewsProcessor _newsProcessor;
   late final ICategoryManager _categoryManager;
+  late final IAdManager _adManager;
 
   bool _initialized = false;
 
@@ -35,6 +38,10 @@ class ServiceCoordinator {
       _newsLoader = NewsLoaderService();
       _newsProcessor = NewsProcessorService();
       _categoryManager = CategoryManagerService();
+      _adManager = AdManagerService();
+
+      // Initialize ad manager
+      await _adManager.initialize();
 
       // Initialize category system
       await (_categoryManager as CategoryManagerService).initializeCategories();
@@ -80,6 +87,12 @@ class ServiceCoordinator {
     return _categoryManager;
   }
 
+  /// Get ad manager service
+  IAdManager get adManager {
+    _ensureInitialized();
+    return _adManager;
+  }
+
   /// Load main news feed with proper coordination
   Future<List<NewsArticleEntity>> loadMainFeed({bool forceRefresh = false}) async {
     _ensureInitialized();
@@ -109,7 +122,7 @@ class ServiceCoordinator {
       if (forceRefresh) {
         // Clear cache and reload
         if (_categoryManager is CategoryManagerService) {
-          _categoryManager.clearCategoryCache(category);
+          (_categoryManager as CategoryManagerService).clearCategoryCache(category);
         }
       }
       
@@ -119,6 +132,23 @@ class ServiceCoordinator {
     } catch (e) {
       AppLogger.log('ServiceCoordinator.loadCategoryFeed error for $category: $e');
       return [];
+    }
+  }
+
+  /// Check if a category is currently loading
+  bool isCategoryLoading(String category) {
+    _ensureInitialized();
+    if (_categoryManager is CategoryManagerService) {
+      return (_categoryManager as CategoryManagerService).isCategoryLoading(category);
+    }
+    return false;
+  }
+
+  /// Clear cache for a specific category
+  void clearCategoryCache(String category) {
+    _ensureInitialized();
+    if (_categoryManager is CategoryManagerService) {
+      (_categoryManager as CategoryManagerService).clearCategoryCache(category);
     }
   }
 
@@ -172,6 +202,22 @@ class ServiceCoordinator {
     }
   }
 
+  /// Load main feed progressively with ads
+  Stream<List<dynamic>> loadFeedProgressivelyWithAds() async* {
+    _ensureInitialized();
+    
+    final articleStream = _newsLoader.loadArticlesProgressively();
+    
+    await for (final articles in articleStream) {
+      // Integrate ads
+      final feed = await _adManager.integrateAdsIntoFeed(
+        articles: articles,
+        category: 'All', // Main feed
+      );
+      yield feed;
+    }
+  }
+
   /// Reset all services (useful for testing or complete refresh)
   Future<void> reset() async {
     try {
@@ -179,6 +225,7 @@ class ServiceCoordinator {
         _categoryManager.clearAllCaches();
       }
       
+      _adManager.dispose();
       _initialized = false;
       await initialize();
       

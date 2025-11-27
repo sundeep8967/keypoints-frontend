@@ -1,4 +1,4 @@
-# 📱 KeyPoints News App
+# 📱 Key Points News App
 
 A beautiful iOS-themed news aggregation app built with Flutter, featuring dynamic color extraction and clean architecture.
 
@@ -60,7 +60,6 @@ lib/
 - **Dart** - Programming language
 - **BLoC** - State management
 - **Supabase** - Backend as a Service
-- **Chaquopy** - Python integration for color extraction
 - **Clean Architecture** - Scalable code organization
 
 ## 🎯 Current Status

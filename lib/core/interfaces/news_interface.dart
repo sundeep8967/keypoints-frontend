@@ -6,6 +6,7 @@ abstract class INewsLoader {
   Future<List<NewsArticleEntity>> loadArticlesByCategory(String category, {bool isRightSwipe});
   Future<List<NewsArticleEntity>> refreshNews();
   Future<List<NewsArticleEntity>> loadRandomMixArticles();
+  Stream<List<NewsArticleEntity>> loadArticlesProgressively();
 }
 
 /// Interface for news data source operations
@@ -23,4 +24,5 @@ abstract class INewsProcessor {
   );
   String detectArticleCategory(NewsArticleEntity article, String selectedCategory);
   String formatTimestamp(DateTime timestamp);
+  double estimateCategoryWidth(String categoryName);
 }

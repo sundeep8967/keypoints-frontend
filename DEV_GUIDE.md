@@ -1,4 +1,4 @@
-# 📱 KeyPoints News App - Complete Developer Guide
+# 📱 Key Points News App - Complete Developer Guide
 
 > **⚠️ IMPORTANT DEVELOPMENT RULES**
 > 

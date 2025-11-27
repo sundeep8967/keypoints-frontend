@@ -1,6 +1,6 @@
 import '../domain/entities/news_article_entity.dart';
 import '../services/local_storage_service.dart';
-import '../services/news_feed_helper.dart';
+import '../services/refactored/service_coordinator.dart';
 
 import '../utils/app_logger.dart';
 class CategoryPreferenceService {
@@ -29,7 +29,7 @@ class CategoryPreferenceService {
 
   static void trackArticleRead(NewsArticleEntity article, String selectedCategory) {
     // Determine article category (could be from title/content analysis or database category)
-    String articleCategory = NewsFeedHelper.detectArticleCategory(article, selectedCategory);
+    String articleCategory = ServiceCoordinator().newsProcessor.detectArticleCategory(article, selectedCategory);
     
     _categoryArticlesRead[articleCategory] = (_categoryArticlesRead[articleCategory] ?? 0) + 1;
     _categoryArticlesRead[selectedCategory] = (_categoryArticlesRead[selectedCategory] ?? 0) + 1;
