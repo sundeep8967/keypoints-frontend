@@ -14,6 +14,7 @@ class NewsFeedPageBuilder {
     List<dynamic> items,
     int currentIndex,
     PageController pageController,
+    void Function(String category, int afterIndex) onDemandAdAtIndex,
   ) {
     // Filter for articles to preload images
     final articles = items.whereType<NewsArticleEntity>().toList();
@@ -26,7 +27,7 @@ class NewsFeedPageBuilder {
       scrollDirection: Axis.vertical,
       itemCount: items.length,
       onPageChanged: (index) {
-        _handlePageChange(context, index, items, category);
+        _handlePageChange(context, index, items, category, onDemandAdAtIndex);
       },
       itemBuilder: (context, index) {
         final item = items[index];
@@ -48,7 +49,7 @@ class NewsFeedPageBuilder {
     int index,
   ) {
     try {
-      return NewsFeedWidgets.buildSimpleCard(context, article, index);
+      return NewsFeedWidgets.buildTinderStyleCard(context, article, index);
     } catch (e) {
       AppLogger.error('Error building news card for article $index: $e');
       return const SizedBox();
@@ -69,13 +70,16 @@ class NewsFeedPageBuilder {
     int index,
     List<dynamic> items,
     String category,
+    void Function(String category, int afterIndex) onDemandAdAtIndex,
   ) {
     final item = items[index];
     
     if (item is NewsArticleEntity) {
       // Mark article as read when user swipes to it
       ReadArticlesService.markAsRead(item.id);
-      AppLogger.log('📖 Viewing article: ${item.title.substring(0, 50)}...');
+      final t = item.title;
+      final preview = t.length > 50 ? t.substring(0, 50) + '…' : t;
+      AppLogger.log('📖 Viewing article: $preview');
       
       // Preload upcoming articles
       final articlesOnly = items.whereType<NewsArticleEntity>().toList();
@@ -83,6 +87,16 @@ class NewsFeedPageBuilder {
       
       if (articleIndex != -1) {
         _preloadImagesForUpcomingArticles(articlesOnly, articleIndex);
+        
+        // On-demand ad trigger: after every 5 articles
+        if (((articleIndex + 1) % 5 == 0)) {
+          final nextIndexInItems = index + 1;
+          final nextExists = nextIndexInItems < items.length;
+          final nextIsAd = nextExists ? items[nextIndexInItems] is NativeAdModel : false;
+          if (!nextIsAd) {
+            onDemandAdAtIndex(category, index); // request ad after this index
+          }
+        }
       }
     }
   }
@@ -120,6 +134,7 @@ class NewsFeedPageBuilder {
     Function(String) onLoadMore,
     Function() onLoadAll,
     Map<String, PageController> articlePageControllers,
+    void Function(String category, int afterIndex) onDemandAdAtIndex,
   ) {
     return PageView.builder(
       controller: categoryPageController,
@@ -161,6 +176,7 @@ class NewsFeedPageBuilder {
           items,
           currentIndex,
           pageController,
+          onDemandAdAtIndex,
         );
       },
     );

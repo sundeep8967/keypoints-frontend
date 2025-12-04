@@ -123,6 +123,95 @@ class NewsLoaderService implements INewsLoader {
     }
   }
 
+  List<NewsArticleEntity> _balancedInterleave(List<NewsArticleEntity> articles, {int maxConsecutive = 1, int maxCategoryPercent = 40}) {
+    if (articles.isEmpty) return [];
+
+    // Group by category and sort each bucket by recency
+    final byCategory = <String, List<NewsArticleEntity>>{};
+    for (final a in articles) {
+      byCategory.putIfAbsent(a.category, () => []).add(a);
+    }
+    for (final list in byCategory.values) {
+      list.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    }
+
+    final total = articles.length;
+    final capPerCategory = (total * (maxCategoryPercent / 100)).ceil();
+    final pickedCount = <String, int>{};
+    final result = <NewsArticleEntity>[];
+    String? lastCategory;
+    int consecutive = 0;
+
+    // Active category order – rotate to achieve round-robin
+    final active = byCategory.keys.toList();
+    int idx = 0;
+
+    while (true) {
+      // Remove exhausted categories
+      active.removeWhere((c) => (byCategory[c]?.isEmpty ?? true));
+      if (active.isEmpty) break;
+
+      bool picked = false;
+      final tried = <String>{};
+      int attempts = 0;
+
+      // Try to pick respecting diversity constraints
+      while (attempts < active.length) {
+        final c = active[(idx + attempts) % active.length];
+        final list = byCategory[c]!;
+        final count = pickedCount[c] ?? 0;
+        final wouldExceedCap = count >= capPerCategory && byCategory.length > 1;
+        final violatesConsecutive = (lastCategory == c && consecutive >= maxConsecutive);
+
+        if (!wouldExceedCap && !violatesConsecutive && list.isNotEmpty) {
+          final next = list.removeAt(0);
+          result.add(next);
+          pickedCount[c] = count + 1;
+          if (lastCategory == c) {
+            consecutive += 1;
+          } else {
+            lastCategory = c;
+            consecutive = 1;
+          }
+          idx = (idx + attempts + 1) % active.length; // rotate start
+          picked = true;
+          break;
+        }
+        tried.add(c);
+        attempts++;
+      }
+
+      if (!picked) {
+        // Relax constraints: pick from the category with most remaining
+        String? bestC;
+        int bestLen = -1;
+        for (final c in active) {
+          final len = byCategory[c]!.length;
+          if (len > bestLen) {
+            bestLen = len;
+            bestC = c;
+          }
+        }
+        if (bestC != null && bestLen > 0) {
+          final next = byCategory[bestC]!.removeAt(0);
+          result.add(next);
+          pickedCount[bestC] = (pickedCount[bestC] ?? 0) + 1;
+          if (lastCategory == bestC) {
+            consecutive += 1;
+          } else {
+            lastCategory = bestC;
+            consecutive = 1;
+          }
+          // keep idx as is; continue
+        } else {
+          break; // nothing left
+        }
+      }
+    }
+
+    return result;
+  }
+
   /// Load articles progressively - yields updates as content becomes available
   Stream<List<NewsArticleEntity>> loadArticlesProgressively() async* {
     final List<NewsArticleEntity> allProgressiveArticles = [];
@@ -192,16 +281,17 @@ class NewsLoaderService implements INewsLoader {
       List<NewsArticleEntity> mixedFeed;
       
       if (firstBatchArticles.isNotEmpty) {
-        // Preserve first batch order
+        // Preserve first batch order, then diversity-mix the rest
         final firstBatchIds = firstBatchArticles.map((a) => a.id).toSet();
         final restArticles = finalArticles.where((a) => !firstBatchIds.contains(a.id)).toList();
         
-        // Mix the rest
-        restArticles.shuffle(); // Simple shuffle for now, or use balanced mix if needed
+        // Balanced, diversity-preserving interleave for the remaining items
+        final balancedRest = _balancedInterleave(restArticles, maxConsecutive: 2, maxCategoryPercent: 40);
         
-        mixedFeed = [...firstBatchArticles, ...restArticles];
+        mixedFeed = [...firstBatchArticles, ...balancedRest];
       } else {
-        mixedFeed = List.from(finalArticles)..shuffle();
+        // Fully balanced mix
+        mixedFeed = _balancedInterleave(finalArticles, maxConsecutive: 2, maxCategoryPercent: 40);
       }
       
       AppLogger.success('🚀 PROGRESSIVE: Yielding FINAL MIXED FEED - ${mixedFeed.length} articles');

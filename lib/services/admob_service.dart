@@ -104,7 +104,8 @@ class AdMobService {
         nativeAdOptions: NativeAdOptions(
           // Customize native ad options following Google's recommendations
           adChoicesPlacement: AdChoicesPlacement.topRightCorner,
-          mediaAspectRatio: MediaAspectRatio.landscape,
+          // Allow both image and video native media for broader inventory
+          mediaAspectRatio: MediaAspectRatio.any,
           // Enable video controls for better user experience
           videoOptions: VideoOptions(
             startMuted: true, // Start videos muted for better UX

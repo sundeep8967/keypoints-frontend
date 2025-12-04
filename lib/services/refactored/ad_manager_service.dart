@@ -234,14 +234,14 @@ class AdManagerService implements IAdManager {
     if (articleCount <= 5) return [];
     
     final positions = <int>[];
-    final limit = articleCount > 50 ? 30 : articleCount;
-    
+    // Place first ad after 4th article, then every 5 articles across the whole feed
     int nextAdPosition = 4;
-    while (nextAdPosition < limit - 1) {
+    while (nextAdPosition < articleCount - 1) {
       positions.add(nextAdPosition);
       nextAdPosition += 5;
     }
     
-    return positions.take(6).toList();
+    // No hard cap: let the UI decide how many to request via maxAds or batching
+    return positions;
   }
 }

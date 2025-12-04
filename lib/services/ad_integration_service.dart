@@ -346,25 +346,15 @@ class AdIntegrationService {
     
     final positions = <int>[];
     
-    // SMART APPROACH: Only prepare ads for articles user will likely read
-    // Most users read 10-30 articles, so prepare ads accordingly
-    final realisticReadingLimit = articleCount > 50 ? 30 : articleCount;
-    
-    AppLogger.info('🧠 SMART AD CALCULATION: Preparing ads for $realisticReadingLimit articles (out of $articleCount total)');
-    
-    // Place first ad after 4th article, then every 5 articles
+    // Place first ad after 4th article, then every 5 articles across the whole feed
     int nextAdPosition = 4;
-    
-    while (nextAdPosition < realisticReadingLimit - 1) {
+    while (nextAdPosition < articleCount - 1) {
       positions.add(nextAdPosition);
       nextAdPosition += 5; // Every 5 articles
     }
     
-    // Limit to maximum 6 ads initially (enough for 30 articles)
-    final smartPositions = positions.take(6).toList();
-    
-    AppLogger.debug('🧠 SMART AD POSITIONS: For realistic reading of $realisticReadingLimit articles, placing ${smartPositions.length} ads at: $smartPositions');
-    return smartPositions;
+    AppLogger.debug('🧠 AD POSITIONS: Placing ads at: $positions');
+    return positions;
   }
 
   /// Get comprehensive ad statistics including preloader stats

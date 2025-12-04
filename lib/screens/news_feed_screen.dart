@@ -9,6 +9,8 @@ import '../services/category_scroll_service.dart';
 import '../services/category_loading_service.dart';
 import '../services/dynamic_category_discovery_service.dart';
 import '../widgets/news_feed_page_builder.dart';
+import '../services/admob_service.dart';
+import '../models/native_ad_model.dart';
 import '../services/optimized_image_service.dart';
 import '../services/error_message_service.dart';
 import '../services/scroll_state_service.dart';
@@ -27,6 +29,8 @@ class NewsFeedScreen extends StatefulWidget {
 }
 
 class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStateMixin {
+  // Track on-demand ad requests to avoid duplicate loads for the same slot
+  final Set<String> _pendingOnDemandAds = {};
   void _logArticleOrder(String label, List<dynamic> list, {int maxItems = 100}) {
     try {
       AppLogger.info('ORDER [$label]: count=${list.length}');
@@ -245,14 +249,14 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
       backgroundColor: CupertinoColors.black,
       child: Stack(
         children: [
-          _buildCategoryPageView(),
+          _buildCategoryPageViewWithOnDemandAds(),
           _buildCleanHeader(),
         ],
       ),
     );
   }
 
-  Widget _buildCategoryPageView() {
+  Widget _buildCategoryPageViewWithOnDemandAds() {
     final categories = _discoveredCategories.toList();
     
     return CustomScrollView(
@@ -328,6 +332,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
       _loadMoreArticlesForCategory,  // Use the new load more function for infinite scrolling
       _loadAllCategorySimple,  // Use simple load for "All" category
       _articlePageControllers, // Pass PageControllers for bidirectional scrolling
+      _onDemandAdAtIndex,
     ),
         ),
       ],
@@ -365,7 +370,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
     final categories = _discoveredCategories.toList();
 
     return SizedBox(
-      height: 44,
+      height: 40, // Slightly taller
       child: ListView.builder(
         controller: _categoryScrollController,
         scrollDirection: Axis.horizontal,
@@ -375,7 +380,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
           final isSelected = category == _selectedCategory;
           
           return Padding(
-            padding: const EdgeInsets.only(right: 8),
+            padding: const EdgeInsets.only(right: 10), // More spacing
             child: Container(
               key: index < _categoryKeys.length ? _categoryKeys[index] : null,
               child: CupertinoButton(
@@ -395,20 +400,37 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
                     }
                   });
                 },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   decoration: BoxDecoration(
                     color: isSelected 
                       ? Colors.white 
-                      : Colors.white.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(16),
+                      : Colors.white.withValues(alpha: 0.15), // slightly more visible unselected
+                    borderRadius: BorderRadius.circular(20), // Rounder
+                    border: Border.all(
+                      color: isSelected 
+                        ? Colors.white 
+                        : Colors.white.withValues(alpha: 0.2),
+                      width: 1,
+                    ),
+                    boxShadow: isSelected 
+                      ? [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.1),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ] 
+                      : null,
                   ),
                   child: Text(
                     category,
                     style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                      fontSize: 13,
+                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                       color: isSelected ? Colors.black : Colors.white,
+                      letterSpacing: 0.5,
                     ),
                   ),
                 ),
@@ -478,6 +500,47 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
           }
         });
       }
+    }
+  }
+
+  // On-demand ad creator: image-first preference
+  Future<void> _onDemandAdAtIndex(String category, int afterIndex) async {
+    try {
+      final slotKey = '$category|$afterIndex';
+      if (_pendingOnDemandAds.contains(slotKey)) return; // already loading for this slot
+      _pendingOnDemandAds.add(slotKey);
+
+      // Prefer a quick-loading banner fallback if native not immediately available
+      NativeAdModel? adModel;
+
+      // 1) Try banner fallback first (image/static) for speed
+      adModel = await AdMobService.createBannerFallback();
+
+      // 2) If banner not available, try native ad (can be image or video; we already allow image via mediaAspectRatio.any)
+      adModel ??= await AdMobService.createNativeAd();
+
+      if (adModel != null) {
+        // Insert ad into the current category list right after afterIndex
+        final items = _categoryArticles[category] ?? [];
+        final insertIndex = (afterIndex + 1).clamp(0, items.length);
+        items.insert(insertIndex, adModel);
+        _categoryArticles[category] = items;
+
+        // If user is on this category, update feed immediately (only if not actively scrolling to avoid jank)
+        if (category == _selectedCategory && !ScrollStateService.isActivelyScrolling) {
+          setState(() {
+            _feedItems = List<dynamic>.from(items);
+          });
+        }
+
+        AppLogger.success('📣 ON-DEMAND AD: Inserted ad after index $afterIndex in $category');
+      } else {
+        AppLogger.warning('⚠️ ON-DEMAND AD: No ad available immediately for $category at $afterIndex');
+      }
+    } catch (e) {
+      AppLogger.error('❌ ON-DEMAND AD ERROR: $e');
+    } finally {
+      _pendingOnDemandAds.remove('$category|$afterIndex');
     }
   }
 
@@ -1262,11 +1325,15 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
         );
       },
       child: Container(
-        width: 36,
-        height: 36,
+        width: 40, // Match category height
+        height: 40,
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.2),
-          borderRadius: BorderRadius.circular(18),
+          color: Colors.white.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.2),
+            width: 1,
+          ),
         ),
         child: const Icon(
           CupertinoIcons.settings,
