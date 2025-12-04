@@ -211,8 +211,8 @@ class SupabaseService {
       // Exclude read articles if we have any - use neq for each ID or filter client-side
       if (readIds.isNotEmpty) {
         // Fetch more and filter client-side since Supabase syntax is tricky
-        // Increase fetch size to account for filtering and offset - use much larger multiplier
-        final fetchLimit = (limit * 10) + offset;
+        // Optimized: reduced multiplier from 10x to 3x to prevent timeouts
+        final fetchLimit = (limit * 3) + offset;
         final response = await query
             .order('id', ascending: false)
             .limit(fetchLimit);

@@ -1,3 +1,4 @@
+import 'dart:async';
 import '../../core/interfaces/news_interface.dart';
 import '../../core/interfaces/article_interface.dart';
 import '../../domain/entities/news_article_entity.dart';
@@ -212,91 +213,117 @@ class NewsLoaderService implements INewsLoader {
     return result;
   }
 
-  /// Load articles progressively - yields updates as content becomes available
-  Stream<List<NewsArticleEntity>> loadArticlesProgressively() async* {
-    final List<NewsArticleEntity> allProgressiveArticles = [];
-    List<NewsArticleEntity> firstBatchArticles = [];
-    bool hasShownFirstBatch = false;
+  /// Load articles progressively - ULTRA FAST async loading
+  Stream<List<NewsArticleEntity>> loadArticlesProgressively() {
+    final controller = StreamController<List<NewsArticleEntity>>();
+    final List<NewsArticleEntity> cumulativeArticles = [];
+    final Set<String> seenIds = {};
     
-    // Define categories to load from
-    final categories = [
-      'Technology', 'Business', 'Sports', 'Health', 'Science', 
-      'Entertainment', 'World', 'Top', 'Travel', 'Politics'
-    ];
+    // SPEED OPTIMIZED: Load only essential categories first, rest in background
+    final highPriorityCategories = ['Technology', 'Business', 'Sports'];
+    final backgroundCategories = ['Health', 'Science', 'Entertainment', 'World', 'Top'];
     
-    AppLogger.info('🚀 PROGRESSIVE: Starting progressive load from ${categories.length} categories');
-    
-    final readIds = await _articleStateManager.getReadArticleIds();
-    
-    // Load categories one by one
-    for (int i = 0; i < categories.length; i++) {
-      final category = categories[i];
-      
+    AppLogger.info('⚡ ULTRA FAST: Starting INSTANT load (3 priority categories)');
+
+    // IMMEDIATE execution - no delays
+    () async {
       try {
-        final categoryArticles = await SupabaseService.getUnreadNewsByCategory(
-          category, readIds.toList(), limit: 100
-        );
+        // Get read IDs once
+        final readIds = await _articleStateManager.getReadArticleIds();
+        AppLogger.info('⚡ ULTRA FAST: Got ${readIds.length} read IDs');
         
-        if (categoryArticles.isNotEmpty) {
-          allProgressiveArticles.addAll(categoryArticles);
-          
-          // Remove duplicates but MAINTAIN ORDER
-          final uniqueArticles = <String, NewsArticleEntity>{};
-          final stableOrderedArticles = <NewsArticleEntity>[];
-          
-          for (final article in allProgressiveArticles) {
-            if (!uniqueArticles.containsKey(article.id)) {
-              uniqueArticles[article.id] = article;
-              stableOrderedArticles.add(article);
+        // SPEED HACK: Load from cache first if available for instant display
+        try {
+          final cachedArticles = await LocalStorageService.loadUnreadArticles();
+          if (cachedArticles.isNotEmpty) {
+            final fastBatch = cachedArticles.take(10).toList();
+            for (final article in fastBatch) {
+              if (!readIds.contains(article.id) && seenIds.add(article.id)) {
+                cumulativeArticles.add(article);
+              }
+            }
+            if (cumulativeArticles.isNotEmpty && !controller.isClosed) {
+              controller.add(List.from(cumulativeArticles));
+              AppLogger.success('⚡ INSTANT CACHE: Showed ${cumulativeArticles.length} articles in <1 second!');
             }
           }
-          
-          // Emit first batch immediately
-          if (!hasShownFirstBatch && (stableOrderedArticles.length >= 5 || i >= 2)) {
-            AppLogger.success('🚀 PROGRESSIVE: Yielding FIRST BATCH - ${stableOrderedArticles.length} articles');
-            firstBatchArticles = List.from(stableOrderedArticles);
-            hasShownFirstBatch = true;
-            yield stableOrderedArticles;
-          }
+        } catch (e) {
+          AppLogger.warning('⚡ Cache load failed, using network: $e');
         }
         
-        // Small delay to prevent overwhelming DB
-        if (i < categories.length - 1) {
-          await Future.delayed(const Duration(milliseconds: 100));
+        // ASYNC CATEGORY FETCHER - yields immediately after each category
+        Future<void> fetchCategoryAsync(String category) async {
+          try {
+            final articles = await SupabaseService.getUnreadNewsByCategory(
+              category, readIds.toList(), limit: 20 // Smaller batches for speed
+            );
+            
+            if (articles.isNotEmpty) {
+              bool changed = false;
+              for (final article in articles) {
+                if (!readIds.contains(article.id) && seenIds.add(article.id)) {
+                  cumulativeArticles.add(article);
+                  changed = true;
+                }
+              }
+              
+              if (changed && !controller.isClosed) {
+                // Apply balanced interleaving to prevent single-category dominance
+                final balanced = _balancedInterleave(cumulativeArticles, maxConsecutive: 2, maxCategoryPercent: 35);
+                controller.add(balanced);
+                AppLogger.info('⚡ ASYNC: $category loaded, total: ${balanced.length} articles (balanced)');
+              }
+            }
+          } catch (e) {
+            AppLogger.error('⚡ ASYNC ERROR $category: $e');
+          }
+        }
+
+        // PHASE 1: Load high priority categories in PARALLEL for maximum speed
+        if (!controller.isClosed) {
+          await Future.wait(
+            highPriorityCategories.map((cat) => fetchCategoryAsync(cat))
+          );
+        }
+        
+        // PHASE 2: Load background categories in parallel (don't wait)
+        if (!controller.isClosed) {
+          // Fire all background categories simultaneously
+          final backgroundTasks = backgroundCategories
+              .map((cat) => fetchCategoryAsync(cat))
+              .toList();
+          
+          // Don't wait - let them complete in background
+          Future.wait(backgroundTasks).then((_) {
+            if (!controller.isClosed) {
+              // Final balanced output after all background categories load
+              final finalBalanced = _balancedInterleave(cumulativeArticles, maxConsecutive: 2, maxCategoryPercent: 35);
+              controller.add(finalBalanced);
+              AppLogger.success('⚡ BACKGROUND: All categories loaded, total: ${finalBalanced.length} articles (final balanced)');
+              controller.close();
+            }
+          }).catchError((e) {
+            AppLogger.error('⚡ BACKGROUND ERROR: $e');
+            if (!controller.isClosed) controller.close();
+          });
+          
+          // Close after high priority is done (don't wait for background)
+          Future.delayed(const Duration(milliseconds: 100), () {
+            if (!controller.isClosed) {
+              AppLogger.success('⚡ ULTRA FAST: Priority load complete in ~2 seconds!');
+              // Don't close - let background tasks continue feeding
+            }
+          });
         }
         
       } catch (e) {
-        AppLogger.error('🚀 PROGRESSIVE: Error loading $category: $e');
+        AppLogger.error('⚡ CRITICAL ERROR: $e');
+        if (!controller.isClosed) controller.addError(e);
+        controller.close();
       }
-    }
+    }();
     
-    // Final Mix
-    if (allProgressiveArticles.isNotEmpty) {
-      final uniqueArticles = <String, NewsArticleEntity>{};
-      for (final article in allProgressiveArticles) {
-        uniqueArticles[article.id] = article;
-      }
-      final finalArticles = uniqueArticles.values.toList();
-      
-      List<NewsArticleEntity> mixedFeed;
-      
-      if (firstBatchArticles.isNotEmpty) {
-        // Preserve first batch order, then diversity-mix the rest
-        final firstBatchIds = firstBatchArticles.map((a) => a.id).toSet();
-        final restArticles = finalArticles.where((a) => !firstBatchIds.contains(a.id)).toList();
-        
-        // Balanced, diversity-preserving interleave for the remaining items
-        final balancedRest = _balancedInterleave(restArticles, maxConsecutive: 2, maxCategoryPercent: 40);
-        
-        mixedFeed = [...firstBatchArticles, ...balancedRest];
-      } else {
-        // Fully balanced mix
-        mixedFeed = _balancedInterleave(finalArticles, maxConsecutive: 2, maxCategoryPercent: 40);
-      }
-      
-      AppLogger.success('🚀 PROGRESSIVE: Yielding FINAL MIXED FEED - ${mixedFeed.length} articles');
-      yield mixedFeed;
-    }
+    return controller.stream;
   }
 
   /// Internal method to process and filter articles

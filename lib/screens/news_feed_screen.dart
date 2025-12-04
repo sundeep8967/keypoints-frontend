@@ -97,65 +97,57 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
     });
   }
 
-  /// Quick initial content load - minimal operations to get app showing content fast
+  /// ULTRA FAST initial content load - show content in <2 seconds
   Future<void> _quickLoadInitialContent() async {
+    AppLogger.info('⚡ ULTRA FAST LOAD: Starting immediate content display');
+    
     try {
-      // Show loading immediately
+      // PHASE 1: Show loading initially but for short time
       setState(() {
         _isLoading = true;
         _error = '';
       });
-
-      // Try to load cached articles first (fastest)
-      final cachedArticles = await LocalStorageService.loadUnreadArticles();
       
-      if (cachedArticles.isNotEmpty) {
-        // Show cached content immediately - even just 1 article is better than loading screen
-        final articlesToShow = cachedArticles.take(10).toList(); // Show first 10 for instant display
-        
+      // PHASE 2: Try instant cache load first
+      final cachedArticles = await LocalStorageService.loadUnreadArticles();
+      if (cachedArticles.isNotEmpty && mounted) {
+        final instant = cachedArticles.take(5).toList();
         setState(() {
-          _feedItems = articlesToShow;
-          _logArticleOrder('QuickLoad cache->UI', _feedItems);
-          _isLoading = false; // Stop loading immediately
+          _feedItems = instant;
+          _isLoading = false;
           _isInitialLoad = false;
         });
+        _categoryArticles['All'] = instant;
+        AppLogger.success('⚡ INSTANT CACHE: ${instant.length} articles shown immediately');
         
-        // Cache for "All" category
-        _categoryArticles['All'] = articlesToShow;
-        _categoryLoading['All'] = false;
-        
-        AppLogger.success('⚡ INSTANT CACHE: Showing ${articlesToShow.length} cached articles IMMEDIATELY');
-        
-        // CRITICAL FIX: Mark first article as read immediately when app starts
-        if (articlesToShow.isNotEmpty) {
-          ReadArticlesService.markAsRead(articlesToShow.first.id);
-          AppLogger.success('📖 FIRST ARTICLE MARKED: "${articlesToShow.first.title}" (ID: ${articlesToShow.first.id}) - user viewing first article');
+        // Mark first as read
+        if (instant.isNotEmpty) {
+          ReadArticlesService.markAsRead(instant.first.id);
         }
         
-        // 🚀 ASYNC: Start all preloading asynchronously for cached articles
-        _startAsyncPreloading(articlesToShow);
+        // Start async preloading
+        _startAsyncPreloading(instant);
         
-        // Start background initialization after showing cached content
-        _initializeBackgroundServices();
-        
-        // Load fresh content in background to update cache - but don't disrupt user's reading
-        Future.delayed(const Duration(milliseconds: 500), () {
-          if (mounted) {
-            AppLogger.info('⚡ SMART BACKGROUND REFRESH: Loading fresh articles without disrupting user');
-            _loadFreshArticlesInBackground();
-          }
-        });
+        // Load fresh content in background (don't wait)
+        Future.microtask(() => _loadAllCategorySimple());
       } else {
-        // No cache available, use progressive loading
-        AppLogger.info('⚡ NO CACHE: Starting progressive loading immediately');
-        _loadAllCategorySimple();
-        _initializeBackgroundServices();
+        // No cache - load fresh content immediately
+        AppLogger.info('⚡ NO CACHE: Loading fresh content');
+        await _loadAllCategorySimple();
       }
+      
+      // Start background services
+      _initializeBackgroundServices();
+      
     } catch (e) {
       AppLogger.error('⚡ QUICK LOAD ERROR: $e');
-      // Fallback to progressive loading
-      _loadAllCategorySimple();
-      _initializeBackgroundServices();
+      if (mounted) {
+        setState(() {
+          _error = 'Unable to load articles. Please check your connection.';
+          _isLoading = false;
+          _isInitialLoad = false;
+        });
+      }
     }
   }
 
@@ -888,30 +880,33 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
 
 
   Future<void> _loadAllCategorySimple() async {
-    AppLogger.info('🚀 PROGRESSIVE LOAD: Starting progressive article loading');
+    AppLogger.info('⚡ FAST PROGRESSIVE: Starting progressive loading');
     
-    // Show loading immediately
-    setState(() {
-      _isLoading = true;
-      _error = '';
-      _feedItems = []; // Clear any existing articles
-    });
+    // Show loading only if no content exists
+    if (_feedItems.isEmpty) {
+      setState(() {
+        _isLoading = true;
+        _error = '';
+      });
+    }
 
     try {
-      // Get fresh read IDs first
+      // Get read IDs
       final freshReadIds = await ReadArticlesService.getReadArticleIds();
-      AppLogger.info('🚀 PROGRESSIVE LOAD: Got ${freshReadIds.length} read article IDs');
+      AppLogger.info('⚡ PROGRESSIVE: Got ${freshReadIds.length} read IDs');
       
-      // Start progressive loading - load articles in small batches and show immediately
+      // Start progressive loading
       await _loadArticlesProgressively(freshReadIds);
       
     } catch (e) {
-      AppLogger.error('🚀 PROGRESSIVE LOAD ERROR: $e');
-      setState(() {
-        _error = ErrorMessageService.getUserFriendlyMessage(e.toString());
-        _isLoading = false;
-        _isInitialLoad = false;
-      });
+      AppLogger.error('⚡ PROGRESSIVE ERROR: $e');
+      if (mounted) {
+        setState(() {
+          _error = 'Unable to load articles. Please check connection.';
+          _isLoading = false;
+          _isInitialLoad = false;
+        });
+      }
     }
   }
 

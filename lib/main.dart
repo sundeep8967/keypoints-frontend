@@ -4,10 +4,12 @@ import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'utils/app_logger.dart';
 import 'screens/news_feed_screen.dart';
+import 'widgets/news_feed_widgets.dart';
 import 'services/supabase_service.dart';
 import 'services/ad_integration_service.dart';
 import 'services/fcm_service.dart';
 import 'services/streaks_service.dart';
+import 'services/read_articles_service.dart';
 import 'config/image_cache_config.dart';
 import 'config/memory_config.dart';
 import 'injection_container.dart' as di;
@@ -36,6 +38,9 @@ void main() async {
   
   // Initialize memory optimizations (lightweight)
   MemoryConfig.initialize();
+  
+  // ⚡ PRELOAD: Start loading read IDs cache in background (non-blocking)
+  ReadArticlesService.preloadCache();
   
   // Start the app immediately - no blocking operations
   runApp(const NewsApp());
@@ -115,32 +120,35 @@ class _FastNewsAppState extends State<FastNewsApp> with WidgetsBindingObserver {
     }
   }
 
-  /// Initialize ONLY critical services (Supabase) before showing UI
+  /// Initialize critical services with proper error handling
   Future<void> _initializeCriticalServices() async {
     try {
-      // 🎯 PRIORITY 1: Initialize Supabase ONLY - CRITICAL for data loading
+      AppLogger.info('⚡ FAST INIT: Starting initialization...');
+      
+      // Initialize Supabase first (required for data loading)
       await SupabaseService.initialize();
-      AppLogger.success('🎯 PRIORITY 1: Supabase initialized successfully');
+      AppLogger.success('⚡ SUPABASE: Initialized successfully');
 
-      // Initialize dependency injection (ServiceCoordinator and services)
+      // Initialize DI
       await di.init();
-      AppLogger.success('🧩 DI initialized (ServiceCoordinator ready)');
+      AppLogger.success('⚡ DI: Initialized');
       
-      // Start usage tracking session
+      // Start usage tracking
       await StreaksService.instance.startUsageSession();
-      AppLogger.success('⏱️ Usage: Tracking session started');
+      AppLogger.success('⚡ STREAKS: Started');
       
-      // Mark as initialized so UI can start loading data immediately
+      // Mark as initialized
       setState(() {
         _isInitialized = true;
       });
+      AppLogger.success('⚡ INIT COMPLETE: UI ready');
       
-      // Initialize other services in background by priority
+      // Start background services (non-blocking)
       _initializeOtherServicesInBackground();
       
     } catch (e) {
-      AppLogger.error('Critical Supabase initialization error: $e');
-      // Still show UI but with error state
+      AppLogger.error('⚡ INIT ERROR: $e');
+      // Still show UI even if some services fail
       setState(() {
         _isInitialized = true;
       });
@@ -253,31 +261,11 @@ class _FastNewsAppState extends State<FastNewsApp> with WidgetsBindingObserver {
   
   @override
   Widget build(BuildContext context) {
-    // 🚀 ULTRA FAST: Show news feed immediately, let it handle loading
-    // No more splash screen blocking - news feed shows its own smart loading
+    // Show lazy loading screen (card layout) during initialization
     if (!_isInitialized) {
-      // Show minimal splash for critical services only (~500ms max)
-      return const CupertinoPageScaffold(
+      return CupertinoPageScaffold(
         backgroundColor: CupertinoColors.black,
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              CupertinoActivityIndicator(
-                color: CupertinoColors.white,
-                radius: 20,
-              ),
-              SizedBox(height: 16),
-              Text(
-                'Loading...',
-                style: TextStyle(
-                  color: CupertinoColors.white,
-                  fontSize: 16,
-                ),
-              ),
-            ],
-          ),
-        ),
+        child: NewsFeedWidgets.buildLoadingPage(),
       );
     }
     

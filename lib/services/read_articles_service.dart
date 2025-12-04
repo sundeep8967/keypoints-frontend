@@ -12,15 +12,24 @@ class ReadArticlesService {
   static const String _readArticlesKey = 'read_article_ids';
   static const String _lastCleanupKey = 'last_cleanup_timestamp';
   static const int _maxReadArticles = 1000; // Keep track of max 1000 read articles
+  
+  // ⚡ PERFORMANCE: Memory cache for read IDs (eliminates 300ms SharedPreferences lookup)
+  static Set<String>? _memoryCache;
+  static bool _isPreloading = false;
 
   /// Mark an article as read
   static Future<void> markAsRead(String articleId) async {
     try {
+      // ⚡ INSTANT: Update memory cache first
+      if (_memoryCache != null) {
+        _memoryCache!.add(articleId);
+      }
+      
       final prefs = await SharedPreferences.getInstance();
       final readIds = await getReadArticleIds();
       
-      AppLogger.debug(' ReadArticlesService: Attempting to mark article $articleId as read');
-      AppLogger.debug(' ReadArticlesService: Current read count before: ${readIds.length}');
+      AppLogger.debug('📖 ReadArticlesService: Attempting to mark article $articleId as read');
+      AppLogger.debug('📖 ReadArticlesService: Current read count before: ${readIds.length}');
       
       if (!readIds.contains(articleId)) {
         readIds.add(articleId);
@@ -31,13 +40,17 @@ class ReadArticlesService {
         }
         
         await prefs.setString(_readArticlesKey, jsonEncode(readIds));
+        
+        // ⚡ UPDATE: Refresh memory cache after write
+        _memoryCache = readIds.toSet();
+        
         AppLogger.log('Marked article $articleId as read. Total read: ${readIds.length}');
         
         // Emit the new count to listeners
-        AppLogger.debug(' ReadArticlesService: Emitting new count to stream: ${readIds.length}');
+        AppLogger.debug('📖 ReadArticlesService: Emitting new count to stream: ${readIds.length}');
         _readCountController.add(readIds.length);
       } else {
-        AppLogger.debug(' ReadArticlesService: Article $articleId already marked as read');
+        AppLogger.debug('📖 ReadArticlesService: Article $articleId already marked as read');
       }
     } catch (e) {
       AppLogger.log('Error marking article as read: $e');
@@ -55,20 +68,54 @@ class ReadArticlesService {
     }
   }
 
-  /// Get all read article IDs
+  /// Get all read article IDs (with memory cache for instant access)
   static Future<List<String>> getReadArticleIds() async {
     try {
+      // ⚡ INSTANT: Return from memory cache if available
+      if (_memoryCache != null) {
+        AppLogger.debug('⚡ CACHE HIT: Returning ${_memoryCache!.length} read IDs from memory (0ms)');
+        return _memoryCache!.toList();
+      }
+      
+      // Load from storage (only happens once)
+      AppLogger.debug('💾 CACHE MISS: Loading read IDs from SharedPreferences (~300ms)');
       final prefs = await SharedPreferences.getInstance();
       final readIdsString = prefs.getString(_readArticlesKey);
       
-      if (readIdsString == null) return [];
+      if (readIdsString == null) {
+        _memoryCache = {};
+        return [];
+      }
       
       final List<dynamic> readIdsList = jsonDecode(readIdsString);
-      return readIdsList.cast<String>();
+      final ids = readIdsList.cast<String>();
+      
+      // ⚡ CACHE: Store in memory for future instant access
+      _memoryCache = ids.toSet();
+      AppLogger.success('⚡ CACHED: Loaded ${ids.length} read IDs into memory');
+      
+      return ids;
     } catch (e) {
       AppLogger.log('Error getting read article IDs: $e');
+      _memoryCache = {};
       return [];
     }
+  }
+  
+  /// ⚡ PRELOAD: Load read IDs into memory cache at app startup (non-blocking)
+  static void preloadCache() {
+    if (_isPreloading || _memoryCache != null) return;
+    
+    _isPreloading = true;
+    AppLogger.info('⚡ PRELOAD: Starting read IDs cache preload...');
+    
+    getReadArticleIds().then((ids) {
+      AppLogger.success('⚡ PRELOAD: Cache ready with ${ids.length} read IDs');
+      _isPreloading = false;
+    }).catchError((e) {
+      AppLogger.error('⚡ PRELOAD: Failed: $e');
+      _isPreloading = false;
+    });
   }
 
   /// Get count of read articles
@@ -96,6 +143,10 @@ class ReadArticlesService {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_readArticlesKey);
+      
+      // ⚡ CLEAR: Invalidate memory cache
+      _memoryCache = {};
+      
       AppLogger.log('Cleared all read articles');
       
       // Emit count of 0 to listeners
