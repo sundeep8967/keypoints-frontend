@@ -33,6 +33,7 @@ class ServiceCoordinator {
     if (_initialized) return;
 
     try {
+      // Create service instances IMMEDIATELY (no blocking!)
       _articleValidator = ArticleValidatorService();
       _articleStateManager = ArticleStateManager();
       _newsLoader = NewsLoaderService();
@@ -40,17 +41,27 @@ class ServiceCoordinator {
       _categoryManager = CategoryManagerService();
       _adManager = AdManagerService();
 
-      // Initialize ad manager
-      await _adManager.initialize();
-
-      // Initialize category system
-      await (_categoryManager as CategoryManagerService).initializeCategories();
-      
-      // Preload popular categories in background
-      _preloadPopularCategoriesInBackground();
-
+      // Mark as initialized FIRST so UI can start using services!
       _initialized = true;
-      AppLogger.log('ServiceCoordinator: All services initialized successfully');
+      AppLogger.log('ServiceCoordinator: Services created - ready for use!');
+
+      // Initialize heavy services in BACKGROUND (don't block UI!)
+      Future.microtask(() async {
+        try {
+          // Ad manager (background)
+          _adManager.initialize();
+          
+          // Category system (background)
+          await (_categoryManager as CategoryManagerService).initializeCategories();
+          
+          // Preload categories
+          _preloadPopularCategoriesInBackground();
+          
+          AppLogger.log('ServiceCoordinator: Background init complete');
+        } catch (e) {
+          AppLogger.log('ServiceCoordinator background init error: $e');
+        }
+      });
     } catch (e) {
       AppLogger.log('ServiceCoordinator.initialize error: $e');
       rethrow;

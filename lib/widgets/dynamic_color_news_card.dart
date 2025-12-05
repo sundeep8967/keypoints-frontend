@@ -185,7 +185,7 @@ class _DynamicColorNewsCardState extends State<DynamicColorNewsCard> {
                           ),
                           const SizedBox(width: 6),
                           Text(
-                            widget.article.category.toUpperCase(),
+                            widget.article.effectiveCategory.toUpperCase(),
                             style: TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.w800,

@@ -8,6 +8,7 @@ class NewsArticleEntity {
   final bool isRead;
   final String? sourceUrl;
   final String? source;
+  final String? displayCategory; // Override for UI display (tracks source endpoint)
 
   const NewsArticleEntity({
     required this.id,
@@ -19,7 +20,11 @@ class NewsArticleEntity {
     this.isRead = false,
     this.sourceUrl,
     this.source,
+    this.displayCategory,
   });
+
+  /// Get the category to display in UI (prioritizes source-tracked category)
+  String get effectiveCategory => displayCategory ?? category;
 
   NewsArticleEntity copyWith({
     String? id,
@@ -31,6 +36,7 @@ class NewsArticleEntity {
     bool? isRead,
     String? sourceUrl,
     String? source,
+    String? displayCategory,
   }) {
     return NewsArticleEntity(
       id: id ?? this.id,
@@ -42,6 +48,7 @@ class NewsArticleEntity {
       isRead: isRead ?? this.isRead,
       sourceUrl: sourceUrl ?? this.sourceUrl,
       source: source ?? this.source,
+      displayCategory: displayCategory ?? this.displayCategory,
     );
   }
 

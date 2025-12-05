@@ -132,7 +132,7 @@ class TinderStyleNewsCard extends StatelessWidget {
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Text(
-                                article.category.toUpperCase(),
+                                article.effectiveCategory.toUpperCase(),
                                 style: const TextStyle(
                                   fontSize: 10,
                                   fontWeight: FontWeight.w700,

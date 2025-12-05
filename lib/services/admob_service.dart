@@ -208,9 +208,10 @@ class AdMobService {
           }
         }
         
-        // Small delay between ad requests to avoid rate limiting
+        // Small delay between ad requests to prevent overwhelming UI thread
+        // Reduced from 500ms to 200ms for faster loading
         if (i < count - 1) {
-          await Future.delayed(const Duration(milliseconds: 500));
+          await Future.delayed(const Duration(milliseconds: 200));
         }
       } catch (e) {
         AppLogger.error(' Error loading ad ${i + 1}/$count: $e');

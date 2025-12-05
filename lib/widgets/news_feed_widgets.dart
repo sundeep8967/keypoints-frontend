@@ -385,7 +385,7 @@ class NewsFeedWidgets {
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            article.category.toUpperCase(),
+                            article.effectiveCategory.toUpperCase(),
                             style: const TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w700,

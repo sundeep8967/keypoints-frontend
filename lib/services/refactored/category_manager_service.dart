@@ -34,7 +34,72 @@ class CategoryManagerService implements ICategoryManager, ICategoryLoader, ICate
 
   @override
   List<String> getPopularCategories() {
+    // Return cached categories if available (synchronous for performance)
+    // Background sync will update them periodically
     return List.from(_popularCategories);
+  }
+
+  /// Get popular categories with caching and background sync
+  Future<List<String>> getPopularCategoriesAsync() async {
+    try {
+      // 1. Try loading from local cache first (instant!)
+      final cachedCategories = await LocalStorageService.getAvailableCategories();
+      final lastSync = await LocalStorageService.getCategoriesLastSync();
+      
+      // 2. Check if cache is valid (less than 24 hours old)
+      final now = DateTime.now();
+      final cacheValid = lastSync != null && 
+                        now.difference(lastSync).inHours < 24;
+      
+      if (cachedCategories != null && cacheValid) {
+        AppLogger.success('📦 Using cached categories (${cachedCategories.length} categories, synced ${now.difference(lastSync).inHours}h ago)');
+        return cachedCategories;
+      }
+      
+      // 3. Cache expired or doesn't exist - fetch from backend
+      AppLogger.info('🔄 Fetching fresh categories from backend...');
+      
+      // For now, return popular categories
+      // TODO: If you have a Supabase endpoint to fetch available categories, use it here
+      final freshCategories = List<String>.from(_popularCategories);
+      
+      // 4. Save to cache for next time
+      await LocalStorageService.setAvailableCategories(freshCategories);
+      
+      return freshCategories;
+    } catch (e) {
+      AppLogger.error('❌ Error fetching categories: $e');
+      // Fallback to default popular categories
+      return List.from(_popularCategories);
+    }
+  }
+
+  /// Background sync: Check for new categories without blocking UI
+  Future<void> syncCategoriesInBackground() async {
+    try {
+      final lastSync = await LocalStorageService.getCategoriesLastSync();
+      final now = DateTime.now();
+      
+      // Only sync if last sync was > 24 hours ago
+      if (lastSync != null && now.difference(lastSync).inHours < 24) {
+        AppLogger.info('📦 Categories sync skipped (last synced ${now.difference(lastSync).inHours}h ago)');
+        return;
+      }
+      
+      AppLogger.info('🔄 Background sync: Checking for new categories...');
+      
+      // Fetch from backend (non-blocking)
+      // TODO: Replace with actual Supabase category fetch if available
+      final freshCategories = List<String>.from(_popularCategories);
+      
+      // Update cache
+      await LocalStorageService.setAvailableCategories(freshCategories);
+      
+      AppLogger.success('✅ Categories synced successfully');
+    } catch (e) {
+      AppLogger.warning('⚠️ Background category sync failed: $e');
+      // Don't throw - it's background work
+    }
   }
 
   @override
@@ -160,6 +225,21 @@ class CategoryManagerService implements ICategoryManager, ICategoryLoader, ICate
         _categoryCache[category] = [];
         _categoryLoading[category] = false;
       }
+      
+      // Load cached available categories (instant!)
+      final cachedCategories = await LocalStorageService.getAvailableCategories();
+      if (cachedCategories != null && cachedCategories.isNotEmpty) {
+        AppLogger.success('📦 Loaded ${cachedCategories.length} cached categories');
+      } else {
+        // First time - cache default categories
+        await LocalStorageService.setAvailableCategories(_popularCategories);
+        AppLogger.info('📦 Cached default categories for first time');
+      }
+      
+      // Trigger background sync (non-blocking)
+      syncCategoriesInBackground().catchError((error) {
+        AppLogger.warning('⚠️ Background sync failed: $error');
+      });
       
       AppLogger.log('CategoryManagerService: Initialized categories');
     } catch (e) {

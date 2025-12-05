@@ -182,9 +182,10 @@ class _FastNewsAppState extends State<FastNewsApp> with WidgetsBindingObserver {
       try {
         AppLogger.info('🎯 PRIORITY 2 (HIGH): Starting ALL ads initialization...');
         
-        // Initialize native ads
-        await AdIntegrationService.initialize();
-        AppLogger.success('✅ PRIORITY 2: Native ads ready!');
+        // 🚀 CRITICAL FIX: Don't await - let ads load in background!
+        // Articles show first (~500ms), then ads load (~15s)
+        AdIntegrationService.initialize();  // No await!
+        AppLogger.success('✅ PRIORITY 2: Native ads started (loading in background)!');
         
         // Initialize sticky banner ads (no await - parallel)
         _initializeStickyBannersAsync();

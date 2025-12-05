@@ -11,8 +11,10 @@ class LocalStorageService {
   static const String _firstTimeSetupKey = 'first_time_setup_completed';
   static const String _languagePreferenceKey = 'language_preference';
   static const String _categoryPreferencesKey = 'category_preferences';
+  static const String _availableCategoriesKey = 'available_categories';
+  static const String _categoriesLastSyncKey = 'categories_last_sync';
 
-  /// Save articles to local storage (only saves unread articles to prevent duplicates)
+  /// Save articles to local storage (with LRU cache limit of 500 articles)
   static Future<void> saveArticles(List<NewsArticleEntity> articles) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -25,8 +27,33 @@ class LocalStorageService {
       
       AppLogger.info('💾 SAVE FILTER: ${articles.length} total articles → ${unreadArticles.length} unread articles (filtered out ${articles.length - unreadArticles.length} read articles)');
       
-      // Convert ONLY unread articles to JSON
-      final articlesJson = unreadArticles.map((article) => {
+      // 🎯 LRU CACHE: Load existing cache and merge with new articles
+      final existingArticles = await _loadAllArticles();
+      
+      // Use LinkedHashMap to maintain insertion order (LRU behavior)
+      final cache = <String, NewsArticleEntity>{};
+      
+      // Add existing articles first (maintain order)
+      for (final article in existingArticles) {
+        cache[article.id] = article;
+      }
+      
+      // Add new unread articles (will replace duplicates and move to end)
+      for (final article in unreadArticles) {
+        cache.remove(article.id); // Remove if exists
+        cache[article.id] = article; // Add to end (most recent)
+      }
+      
+      // 🎯 LRU EVICTION: Keep only last 500 articles
+      final allCached = cache.values.toList();
+      final lruArticles = allCached.length > 500 
+          ? allCached.sublist(allCached.length - 500) // Keep last 500
+          : allCached;
+      
+      AppLogger.info('🎯 LRU CACHE: ${cache.length} total → ${lruArticles.length} after eviction (limit: 500)');
+      
+      // Convert to JSON
+      final articlesJson = lruArticles.map((article) => {
         'id': article.id,
         'title': article.title,
         'description': article.description,
@@ -40,11 +67,11 @@ class LocalStorageService {
       await prefs.setString(_lastFetchKey, DateTime.now().toIso8601String());
       
       // Save the latest article ID to track what we've seen
-      if (unreadArticles.isNotEmpty) {
-        await prefs.setString(_lastArticleIdKey, unreadArticles.first.id);
+      if (lruArticles.isNotEmpty) {
+        await prefs.setString(_lastArticleIdKey, lruArticles.first.id);
       }
       
-      AppLogger.success('💾 Saved ${unreadArticles.length} UNREAD articles to local storage (no duplicates)');
+      AppLogger.success('💾 Saved ${lruArticles.length} articles to LRU cache (max: 500)');
     } catch (e) {
       AppLogger.error('❌ Error saving articles to local storage: $e');
     }
@@ -304,6 +331,42 @@ class LocalStorageService {
     }
   }
 
+  /// Save available categories (fetched from backend)
+  static Future<void> setAvailableCategories(List<String> categories) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList(_availableCategoriesKey, categories);
+      await prefs.setString(_categoriesLastSyncKey, DateTime.now().toIso8601String());
+      AppLogger.success('📦 Available categories cached: ${categories.join(', ')}');
+    } catch (e) {
+      AppLogger.error('❌ Error saving available categories: $e');
+    }
+  }
+
+  /// Get available categories from cache
+  static Future<List<String>?> getAvailableCategories() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getStringList(_availableCategoriesKey);
+    } catch (e) {
+      AppLogger.error('❌ Error getting available categories: $e');
+      return null;
+    }
+  }
+
+  /// Get categories last sync timestamp
+  static Future<DateTime?> getCategoriesLastSync() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final syncString = prefs.getString(_categoriesLastSyncKey);
+      if (syncString == null) return null;
+      return DateTime.tryParse(syncString);
+    } catch (e) {
+      AppLogger.error('❌ Error getting categories last sync: $e');
+      return null;
+    }
+  }
+
   /// Reset first-time setup (for testing)
   static Future<void> resetFirstTimeSetup() async {
     try {
@@ -311,9 +374,9 @@ class LocalStorageService {
       await prefs.remove(_firstTimeSetupKey);
       await prefs.remove(_languagePreferenceKey);
       await prefs.remove(_categoryPreferencesKey);
-      AppLogger.info(' First-time setup reset');
+      AppLogger.info('🔄 First-time setup reset');
     } catch (e) {
-      AppLogger.error(' Error resetting first-time setup: $e');
+      AppLogger.error('❌ Error resetting first-time setup: $e');
     }
   }
 }

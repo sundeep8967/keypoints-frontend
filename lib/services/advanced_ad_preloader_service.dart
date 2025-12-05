@@ -130,29 +130,27 @@ class AdvancedAdPreloaderService {
     
     try {
       final adsNeeded = _targetPoolSize - _adPool.length;
-      AppLogger.log('🚨 AGGRESSIVE PRELOAD: Loading $adsNeeded ads quickly...');
+      AppLogger.log('🚨 AGGRESSIVE PRELOAD: Loading $adsNeeded ads sequentially...');
       
-      // Load in parallel batches for speed
-      final futures = <Future<List<NativeAdModel>>>[];
+      // 🎯 CRITICAL FIX: Load sequentially to avoid UI frame drops
+      // Previous parallel loading caused "Skipped 527 frames" (9 seconds frozen!)
+      int totalLoaded = 0;
       final batchSize = 2;
       final numBatches = (adsNeeded / batchSize).ceil();
       
       for (int i = 0; i < numBatches; i++) {
-        futures.add(AdMobService.createMultipleAds(batchSize));
-        
-        // Small delay between batch starts
-        if (i < numBatches - 1) {
-          await Future.delayed(const Duration(milliseconds: 500));
-        }
-      }
-      
-      // Wait for all batches
-      final results = await Future.wait(futures);
-      
-      int totalLoaded = 0;
-      for (final batch in results) {
+        // Load one batch at a time (sequential)
+        final batch = await AdMobService.createMultipleAds(batchSize);
         _adPool.addAll(batch);
         totalLoaded += batch.length;
+        
+        AppLogger.log('🚨 BATCH ${i + 1}/$numBatches: Loaded ${batch.length} ads (Pool: ${_adPool.length})');
+        
+        // Add delay between batches to prevent overwhelming main thread
+        // This prevents DynamiteModule initialization from stacking
+        if (i < numBatches - 1) {
+          await Future.delayed(const Duration(milliseconds: 200));
+        }
       }
       
       AppLogger.log('🚨 AGGRESSIVE PRELOAD: Loaded $totalLoaded ads (Pool: ${_adPool.length})');

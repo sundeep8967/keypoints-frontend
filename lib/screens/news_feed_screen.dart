@@ -97,58 +97,61 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
     });
   }
 
-  /// ULTRA FAST initial content load - show content in <2 seconds
-  Future<void> _quickLoadInitialContent() async {
-    AppLogger.info('⚡ ULTRA FAST LOAD: Starting immediate content display');
+  /// INSTANT initial content load - show content immediately!
+  void _quickLoadInitialContent() {
+    AppLogger.info('⚡ INSTANT LOAD: Starting immediate content display');
     
-    try {
-      // PHASE 1: Show loading initially but for short time
-      setState(() {
-        _isLoading = true;
-        _error = '';
-      });
-      
-      // PHASE 2: Try instant cache load first
-      final cachedArticles = await LocalStorageService.loadUnreadArticles();
-      if (cachedArticles.isNotEmpty && mounted) {
-        final instant = cachedArticles.take(5).toList();
-        setState(() {
-          _feedItems = instant;
-          _isLoading = false;
-          _isInitialLoad = false;
-        });
-        _categoryArticles['All'] = instant;
-        AppLogger.success('⚡ INSTANT CACHE: ${instant.length} articles shown immediately');
-        
-        // Mark first as read
-        if (instant.isNotEmpty) {
-          ReadArticlesService.markAsRead(instant.first.id);
+    // Show loading state immediately (0ms)
+    setState(() {
+      _isLoading = true;
+      _error = '';
+    });
+    
+    // Load cache async - DON'T BLOCK UI!
+    Future.microtask(() async {
+      try {
+        // Try instant cache load
+        final cachedArticles = await LocalStorageService.loadUnreadArticles();
+        if (cachedArticles.isNotEmpty && mounted) {
+          final instant = cachedArticles.take(5).toList();
+          setState(() {
+            _feedItems = instant;
+            _isLoading = false;
+            _isInitialLoad = false;
+          });
+          _categoryArticles['All'] = instant;
+          AppLogger.success('⚡ INSTANT CACHE: ${instant.length} articles shown!');
+          
+          // Mark first as read
+          if (instant.isNotEmpty) {
+            ReadArticlesService.markAsRead(instant.first.id);
+          }
+          
+          // Start async preloading
+          _startAsyncPreloading(instant);
+          
+          // Load fresh content in background
+          Future.microtask(() => _loadAllCategorySimple());
+        } else {
+          // No cache - load fresh content
+          AppLogger.info('⚡ NO CACHE: Loading fresh content');
+          _loadAllCategorySimple();
         }
         
-        // Start async preloading
-        _startAsyncPreloading(instant);
+        // Start background services
+        _initializeBackgroundServices();
         
-        // Load fresh content in background (don't wait)
-        Future.microtask(() => _loadAllCategorySimple());
-      } else {
-        // No cache - load fresh content immediately
-        AppLogger.info('⚡ NO CACHE: Loading fresh content');
-        await _loadAllCategorySimple();
+      } catch (e) {
+        AppLogger.error('⚡ QUICK LOAD ERROR: $e');
+        if (mounted) {
+          setState(() {
+            _error = 'Unable to load articles. Please check your connection.';
+            _isLoading = false;
+            _isInitialLoad = false;
+          });
+        }
       }
-      
-      // Start background services
-      _initializeBackgroundServices();
-      
-    } catch (e) {
-      AppLogger.error('⚡ QUICK LOAD ERROR: $e');
-      if (mounted) {
-        setState(() {
-          _error = 'Unable to load articles. Please check your connection.';
-          _isLoading = false;
-          _isInitialLoad = false;
-        });
-      }
-    }
+    });
   }
 
   /// Initialize heavy services in background after content loads
@@ -985,8 +988,8 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
 
   void _startDynamicCategoryDiscovery() {
     AppLogger.debug(' DISCOVERY: Starting dynamic category discovery...');
-    
-    DynamicCategoryDiscoveryService.discoverCategoriesInParallel(
+    // Use sequential discovery with delays to prevent backend congestion
+    DynamicCategoryDiscoveryService.discoverCategoriesSequentially(
       onCategoryDiscovered: (String dbCategory, List<NewsArticleEntity> articles) {
         final uiCategory = DynamicCategoryDiscoveryService.getUIFriendlyName(dbCategory);
         

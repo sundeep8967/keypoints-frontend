@@ -20,16 +20,22 @@ class ReadArticlesService {
   /// Mark an article as read
   static Future<void> markAsRead(String articleId) async {
     try {
-      // ⚡ INSTANT: Update memory cache first
-      if (_memoryCache != null) {
-        _memoryCache!.add(articleId);
-      }
+      AppLogger.info('🔖 MARK AS READ: Starting for article $articleId');
       
+      // ⚡ CRITICAL FIX: Get read IDs from DISK first, not memory cache
+      // This prevents race condition where memory cache already has the ID
       final prefs = await SharedPreferences.getInstance();
-      final readIds = await getReadArticleIds();
+      final readIdsString = prefs.getString(_readArticlesKey);
       
-      AppLogger.debug('📖 ReadArticlesService: Attempting to mark article $articleId as read');
-      AppLogger.debug('📖 ReadArticlesService: Current read count before: ${readIds.length}');
+      List<String> readIds;
+      if (readIdsString == null) {
+        readIds = [];
+        AppLogger.debug('📖 No existing read IDs on disk');
+      } else {
+        final List<dynamic> readIdsList = jsonDecode(readIdsString);
+        readIds = readIdsList.cast<String>();
+        AppLogger.debug('📖 Loaded ${readIds.length} read IDs from disk');
+      }
       
       if (!readIds.contains(articleId)) {
         readIds.add(articleId);
@@ -39,21 +45,22 @@ class ReadArticlesService {
           readIds.removeRange(0, readIds.length - _maxReadArticles);
         }
         
-        await prefs.setString(_readArticlesKey, jsonEncode(readIds));
+        // ⚡ CRITICAL: Save to SharedPreferences FIRST
+        final jsonString = jsonEncode(readIds);
+        await prefs.setString(_readArticlesKey, jsonString);
+        AppLogger.success('💾 SAVED to SharedPreferences: $articleId (total: ${readIds.length})');
         
-        // ⚡ UPDATE: Refresh memory cache after write
+        // ⚡ NOW update memory cache AFTER successful save
         _memoryCache = readIds.toSet();
-        
-        AppLogger.log('Marked article $articleId as read. Total read: ${readIds.length}');
+        AppLogger.success('🔖 Memory cache updated with ${_memoryCache!.length} IDs');
         
         // Emit the new count to listeners
-        AppLogger.debug('📖 ReadArticlesService: Emitting new count to stream: ${readIds.length}');
         _readCountController.add(readIds.length);
       } else {
-        AppLogger.debug('📖 ReadArticlesService: Article $articleId already marked as read');
+        AppLogger.debug('📖 Article $articleId already marked as read on disk');
       }
     } catch (e) {
-      AppLogger.log('Error marking article as read: $e');
+      AppLogger.error('❌ Error marking article as read: $e');
     }
   }
 
@@ -73,16 +80,17 @@ class ReadArticlesService {
     try {
       // ⚡ INSTANT: Return from memory cache if available
       if (_memoryCache != null) {
-        AppLogger.debug('⚡ CACHE HIT: Returning ${_memoryCache!.length} read IDs from memory (0ms)');
+        AppLogger.debug('⚡ CACHE HIT: Returning ${_memoryCache!.length} read IDs from memory');
         return _memoryCache!.toList();
       }
       
-      // Load from storage (only happens once)
-      AppLogger.debug('💾 CACHE MISS: Loading read IDs from SharedPreferences (~300ms)');
+      // Load from storage (only happens once per app session)
+      AppLogger.info('💾 CACHE MISS: Loading read IDs from SharedPreferences');
       final prefs = await SharedPreferences.getInstance();
       final readIdsString = prefs.getString(_readArticlesKey);
       
       if (readIdsString == null) {
+        AppLogger.warning('💾 No saved read IDs found in SharedPreferences');
         _memoryCache = {};
         return [];
       }
@@ -92,11 +100,11 @@ class ReadArticlesService {
       
       // ⚡ CACHE: Store in memory for future instant access
       _memoryCache = ids.toSet();
-      AppLogger.success('⚡ CACHED: Loaded ${ids.length} read IDs into memory');
+      AppLogger.success('💾 LOADED ${ids.length} read IDs from disk into memory cache');
       
       return ids;
     } catch (e) {
-      AppLogger.log('Error getting read article IDs: $e');
+      AppLogger.error('❌ Error getting read article IDs: $e');
       _memoryCache = {};
       return [];
     }
