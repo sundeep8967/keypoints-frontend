@@ -53,6 +53,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
   int _currentIndex = 0;
   String _selectedCategory = 'All'; // Track selected category
   bool _isInitialLoad = true; // Track if this is the first load
+  bool _cachedContentShown = false; // Track if cached content is displaying - DON'T REPLACE!
   
   // Cache for category articles (dynamic to support ads)
   final Map<String, List<dynamic>> _categoryArticles = {};
@@ -97,7 +98,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
     });
   }
 
-  /// INSTANT initial content load - show content immediately!
+  /// INSTANT initial content load - show cached content IMMEDIATELY!
   void _quickLoadInitialContent() {
     AppLogger.info('⚡ INSTANT LOAD: Starting immediate content display');
     
@@ -107,51 +108,55 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
       _error = '';
     });
     
-    // Load cache async - DON'T BLOCK UI!
-    Future.microtask(() async {
-      try {
-        // Try instant cache load
-        final cachedArticles = await LocalStorageService.loadUnreadArticles();
-        if (cachedArticles.isNotEmpty && mounted) {
-          final instant = cachedArticles.take(5).toList();
-          setState(() {
-            _feedItems = instant;
-            _isLoading = false;
-            _isInitialLoad = false;
-          });
-          _categoryArticles['All'] = instant;
-          AppLogger.success('⚡ INSTANT CACHE: ${instant.length} articles shown!');
-          
-          // Mark first as read
-          if (instant.isNotEmpty) {
-            ReadArticlesService.markAsRead(instant.first.id);
-          }
-          
-          // Start async preloading
-          _startAsyncPreloading(instant);
-          
-          // Load fresh content in background
-          Future.microtask(() => _loadAllCategorySimple());
-        } else {
-          // No cache - load fresh content
-          AppLogger.info('⚡ NO CACHE: Loading fresh content');
-          _loadAllCategorySimple();
+    // 🚀 INSTANT CACHE: Load synchronously for maximum speed!
+    _loadCacheAndShowInstant();
+  }
+  
+  /// Load from cache and show instantly, then fetch fresh content
+  Future<void> _loadCacheAndShowInstant() async {
+    try {
+      // INSTANT: Load cached articles
+      final cachedArticles = await LocalStorageService.loadUnreadArticles();
+      
+      if (cachedArticles.isNotEmpty && mounted) {
+        // 🎯 INSTANT DISPLAY: Show cached articles IMMEDIATELY!
+        final instant = cachedArticles.take(20).toList(); // Show more cached articles
+        setState(() {
+          _feedItems = instant;
+          _isLoading = false;
+          _isInitialLoad = false;
+        });
+        _categoryArticles['All'] = instant;
+        _cachedContentShown = true; // Mark that we're showing cached content - DON'T REPLACE!
+        AppLogger.success('⚡ INSTANT CACHE: ${instant.length} articles shown INSTANTLY!');
+        
+        // Mark first as read
+        if (instant.isNotEmpty) {
+          ReadArticlesService.markAsRead(instant.first.id);
         }
         
-        // Start background services
+        // Start async preloading (images, colors)
+        _startAsyncPreloading(instant);
+        
+        // 🛑 DON'T load fresh content in background - it causes UI replacement!
+        // Fresh content will load when user swipes through all cached articles
+        // or manually refreshes. This keeps the UI stable.
+        AppLogger.info('⚡ CACHE LOADED: Skipping background network fetch to prevent UI replacement');
+        
+        // Start background services (ads, etc.)
         _initializeBackgroundServices();
-        
-      } catch (e) {
-        AppLogger.error('⚡ QUICK LOAD ERROR: $e');
-        if (mounted) {
-          setState(() {
-            _error = 'Unable to load articles. Please check your connection.';
-            _isLoading = false;
-            _isInitialLoad = false;
-          });
-        }
+      } else {
+        // No cache - load fresh content (first time user)
+        AppLogger.info('⚡ NO CACHE: First time user - loading fresh content');
+        _loadAllCategorySimple();
+        _initializeBackgroundServices();
       }
-    });
+    } catch (e) {
+      AppLogger.error('⚡ CACHE LOAD ERROR: $e');
+      // Fallback to network load
+      _loadAllCategorySimple();
+      _initializeBackgroundServices();
+    }
   }
 
   /// Initialize heavy services in background after content loads
@@ -925,16 +930,24 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
         if (!mounted) break;
         
         if (!hasShownFirstBatch) {
-          // First batch - show immediately
-          setState(() {
-            _feedItems = feed;
-            _logArticleOrder('Progressive first batch -> UI', _feedItems);
-            _isLoading = false;
-            _isInitialLoad = false;
-            _error = '';
-          });
+          // First batch from network
+          // DON'T replace if cached content is showing!
+          if (!_cachedContentShown && _feedItems.isEmpty) {
+            setState(() {
+              _feedItems = feed;
+              _logArticleOrder('Progressive first batch -> UI', _feedItems);
+              _isLoading = false;
+              _isInitialLoad = false;
+              _error = '';
+            });
+            AppLogger.success('🚀 FIRST BATCH: Updated UI with ${feed.length} items (no cache was showing)');
+          } else {
+            // Cached articles ARE showing - DON'T replace UI!
+            // Just update background cache silently
+            AppLogger.info('🚀 FIRST BATCH: Cached content locked, updating background only (${feed.length} items)');
+          }
           
-          // Cache FULL feed including ads
+          // Always update background cache
           _categoryArticles['All'] = feed;
           _categoryLoading['All'] = false;
           hasShownFirstBatch = true;
@@ -947,15 +960,22 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
           
           // Mark first article as read
           if (articlesOnly.isNotEmpty) {
+            // 💾 CACHE: Save articles FIRST and WAIT for it to complete!
+            // This prevents the race condition where markAsRead runs before save
+            await LocalStorageService.saveArticles(articlesOnly);
+            AppLogger.success('💾 CACHED ${articlesOnly.length} articles for instant next launch!');
+            
+            // NOW mark first as read (AFTER saving is complete)
             ReadArticlesService.markAsRead(articlesOnly.first.id);
           }
           
           AppLogger.success('🚀 PROGRESSIVE STABLE: UI updated with first batch (${feed.length} items)');
         } else {
-          // Subsequent updates (Mixed Feed)
+          // Subsequent updates (Mixed Feed) - these are BIGGER batches!
           _categoryArticles['All'] = feed;
           
-          if (_feedItems.isEmpty || _error.isNotEmpty) {
+          // Subsequent updates should NOT replace UI if cached content showing
+          if (!_cachedContentShown && (_feedItems.isEmpty || _error.isNotEmpty)) {
              setState(() {
               _feedItems = feed;
               _isLoading = false;
@@ -970,6 +990,13 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> with TickerProviderStat
           final articlesOnly = feed.whereType<NewsArticleEntity>().toList();
           _startAsyncPreloading(articlesOnly);
           _startBackgroundPreloading();
+          
+          // 💾 CACHE BIG BATCH: Save MORE articles for better instant display
+          if (articlesOnly.length >= 10) {
+            LocalStorageService.saveArticles(articlesOnly).then((_) {
+              AppLogger.success('💾 BIG CACHE: Saved ${articlesOnly.length} articles for instant next launch!');
+            });
+          }
         }
       }
     } catch (e) {

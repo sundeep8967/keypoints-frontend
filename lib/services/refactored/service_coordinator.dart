@@ -213,19 +213,32 @@ class ServiceCoordinator {
     }
   }
 
-  /// Load main feed progressively with ads
+  /// Load main feed progressively with ads - FIRST BATCH IS INSTANT!
   Stream<List<dynamic>> loadFeedProgressivelyWithAds() async* {
     _ensureInitialized();
     
     final articleStream = _newsLoader.loadArticlesProgressively();
+    bool firstBatchEmitted = false;
     
     await for (final articles in articleStream) {
-      // Integrate ads
-      final feed = await _adManager.integrateAdsIntoFeed(
-        articles: articles,
-        category: 'All', // Main feed
-      );
-      yield feed;
+      // FIRST BATCH: Emit INSTANTLY without waiting for ads!
+      if (!firstBatchEmitted && articles.isNotEmpty) {
+        firstBatchEmitted = true;
+        yield articles; // Instant! No ads delay!
+        AppLogger.info('⚡ INSTANT FIRST BATCH: ${articles.length} articles shown immediately!');
+        continue;
+      }
+      
+      // Subsequent batches: Add ads (only if we have enough articles)
+      if (articles.length >= 10) {
+        final feed = await _adManager.integrateAdsIntoFeed(
+          articles: articles,
+          category: 'All',
+        );
+        yield feed;
+      } else {
+        yield articles; // Small batch - skip ads
+      }
     }
   }
 
